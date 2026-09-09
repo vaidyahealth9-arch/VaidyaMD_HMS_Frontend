@@ -22,6 +22,47 @@ const steps = [
   { id: 7, label: 'Summary & Submit', icon: '✅' },
 ];
 
+interface EndometrialMonitoringRow {
+  date: string;
+  day_of_cycle: number;
+  thickness_mm: number;
+  pattern: string;
+  vascularity: string;
+}
+
+interface CycleFormState {
+  treatment_type: string;
+  attempt_number: number;
+  treating_doctor_id: string;
+  female_factors: string[];
+  male_factors: string[];
+  treatment_at_other_centre: boolean;
+  previous_centre_name: string;
+  protocol_template_id: string;
+  sentinel_dates: {
+    lmp_day1: string;
+    baseline_scan: string;
+    stim_start: string;
+    trigger: string;
+    opu: string;
+    et: string;
+  };
+  gametes_source: {
+    oocyte: string;
+    donor_oocyte_id: string;
+    sperm: string;
+    donor_sperm_id: string;
+  };
+  pgs_pgd_data: {
+    indicated: boolean;
+    type: string;
+    lab_name: string;
+    biopsy_day: string;
+  };
+  endometrial_monitoring: EndometrialMonitoringRow[];
+  remarks: string;
+}
+
 export default function TreatmentCycleWizard({
   patientId,
   partnerId,
@@ -35,21 +76,22 @@ export default function TreatmentCycleWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarPreview, setCalendarPreview] = useState<any>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<CycleFormState>({
     treatment_type: 'ICSI',
     attempt_number: 1,
     treating_doctor_id: '',
-    female_factors: ['PCOS', 'High AFC'],
-    male_factors: ['Asthenozoospermia'],
+    female_factors: [],
+    male_factors: [],
     treatment_at_other_centre: false,
+    previous_centre_name: '',
     protocol_template_id: '',
     sentinel_dates: {
-      lmp_day1: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
-      baseline_scan: new Date(Date.now() - 4 * 86400000).toISOString().split('T')[0],
-      stim_start: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
-      trigger: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-      opu: new Date(Date.now() + 9 * 86400000).toISOString().split('T')[0],
-      et: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+      lmp_day1: '',
+      baseline_scan: '',
+      stim_start: '',
+      trigger: '',
+      opu: '',
+      et: '',
     },
     gametes_source: {
       oocyte: 'self',
@@ -60,13 +102,11 @@ export default function TreatmentCycleWizard({
     pgs_pgd_data: {
       indicated: false,
       type: 'PGT-A',
-      lab_name: 'Genomics Lab India',
+      lab_name: '',
       biopsy_day: 'D5',
     },
-    endometrial_monitoring: [
-      { date: new Date().toISOString().split('T')[0], day_of_cycle: 7, thickness_mm: 7.8, pattern: 'Trilaminar', vascularity: 'Zone 3' }
-    ],
-    remarks: 'Standard stimulation initiated. Patient counseled regarding OHSS risk.',
+    endometrial_monitoring: [],
+    remarks: '',
   });
 
   useEffect(() => {
@@ -88,13 +128,57 @@ export default function TreatmentCycleWizard({
     }).catch(() => {});
   }, []);
 
+  const generateFallbackCalendar = () => {
+    const baseDateStr = form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0];
+    const baseDate = new Date(baseDateStr);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const days = [];
+    for (let i = 0; i < 21; i++) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().split('T')[0];
+      const dayNum = i + 1;
+      let milestone = '';
+      if (iso === form.sentinel_dates.lmp_day1) milestone = 'Day 1 (LMP)';
+      else if (iso === form.sentinel_dates.baseline_scan) milestone = 'Baseline Scan';
+      else if (iso === form.sentinel_dates.stim_start) milestone = 'Stimulation Start';
+      else if (iso === form.sentinel_dates.trigger) milestone = 'Trigger Injection';
+      else if (iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval)';
+      else if (iso === form.sentinel_dates.et) milestone = 'Embryo Transfer';
+
+      days.push({
+        date: iso,
+        day_number: dayNum,
+        display_date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        day_of_week: dayNames[d.getDay()],
+        stim_day_label: dayNum >= 2 && dayNum <= 12 ? `Stim Day ${dayNum - 1}` : null,
+        milestone: milestone || null,
+        medications: [],
+      });
+    }
+    return {
+      start_date: baseDateStr,
+      days,
+    };
+  };
+
   // Recalculate preview calendar whenever protocol or sentinel dates change
   useEffect(() => {
     if (form.protocol_template_id) {
       protocolsApi.previewCalendar({
         protocol_template_id: form.protocol_template_id,
         sentinel_dates: form.sentinel_dates,
-      }).then((cal: any) => setCalendarPreview(cal)).catch(() => {});
+      }).then((cal: any) => {
+        if (cal && cal.days && cal.days.length > 0) {
+          setCalendarPreview(cal);
+        } else {
+          setCalendarPreview(generateFallbackCalendar());
+        }
+      }).catch(() => {
+        setCalendarPreview(generateFallbackCalendar());
+      });
+    } else {
+      setCalendarPreview(generateFallbackCalendar());
     }
   }, [form.protocol_template_id, form.sentinel_dates]);
 
@@ -105,6 +189,105 @@ export default function TreatmentCycleWizard({
     }));
   };
 
+  const handleLmpChange = (lmpDate: string) => {
+    if (!lmpDate) {
+      updateSentinel('lmp_day1', '');
+      return;
+    }
+    const lmp = new Date(lmpDate);
+    const addDays = (d: Date, days: number) => {
+      const res = new Date(d);
+      res.setDate(res.getDate() + days);
+      return res.toISOString().split('T')[0];
+    };
+
+    setForm((prev) => ({
+      ...prev,
+      sentinel_dates: {
+        ...prev.sentinel_dates,
+        lmp_day1: lmpDate,
+        baseline_scan: addDays(lmp, 1), // Day 2
+        stim_start: addDays(lmp, 2),    // Day 3
+        trigger: addDays(lmp, 11),      // Day 12
+        opu: addDays(lmp, 13),          // Day 14
+        et: addDays(lmp, 18),           // Day 19
+      },
+    }));
+  };
+
+  const handleAddEndometrialRow = () => {
+    const nextDay = (form.endometrial_monitoring.length + 1) * 2 + 5;
+    setForm((prev) => ({
+      ...prev,
+      endometrial_monitoring: [
+        ...prev.endometrial_monitoring,
+        {
+          date: new Date().toISOString().split('T')[0],
+          day_of_cycle: nextDay,
+          thickness_mm: 8.0,
+          pattern: 'Trilaminar',
+          vascularity: 'Zone 3',
+        },
+      ],
+    }));
+  };
+
+  const handleUpdateEndometrialRow = (idx: number, field: keyof EndometrialMonitoringRow, value: any) => {
+    setForm((prev) => {
+      const updated = [...prev.endometrial_monitoring];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return { ...prev, endometrial_monitoring: updated };
+    });
+  };
+
+  const handleRemoveEndometrialRow = (idx: number) => {
+    setForm((prev) => ({
+      ...prev,
+      endometrial_monitoring: prev.endometrial_monitoring.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleAddDayMedication = (dayNumber: number) => {
+    if (!calendarPreview || !calendarPreview.days) return;
+    const updatedDays = calendarPreview.days.map((d: any) => {
+      if (d.day_number === dayNumber) {
+        const meds = d.medications ? [...d.medications] : [];
+        meds.push({
+          drug_name: 'Inj. Cetrotide',
+          dose: '0.25 mg',
+          frequency: 'OD',
+        });
+        return { ...d, medications: meds };
+      }
+      return d;
+    });
+    setCalendarPreview({ ...calendarPreview, days: updatedDays });
+  };
+
+  const handleUpdateDayMedication = (dayNumber: number, medIdx: number, field: string, value: string) => {
+    if (!calendarPreview || !calendarPreview.days) return;
+    const updatedDays = calendarPreview.days.map((d: any) => {
+      if (d.day_number === dayNumber && d.medications) {
+        const meds = [...d.medications];
+        meds[medIdx] = { ...meds[medIdx], [field]: value };
+        return { ...d, medications: meds };
+      }
+      return d;
+    });
+    setCalendarPreview({ ...calendarPreview, days: updatedDays });
+  };
+
+  const handleRemoveDayMedication = (dayNumber: number, medIdx: number) => {
+    if (!calendarPreview || !calendarPreview.days) return;
+    const updatedDays = calendarPreview.days.map((d: any) => {
+      if (d.day_number === dayNumber && d.medications) {
+        return { ...d, medications: d.medications.filter((_: any, i: number) => i !== medIdx) };
+      }
+      return d;
+    });
+    setCalendarPreview({ ...calendarPreview, days: updatedDays });
+  };
+
   const handlePrintCalendar = () => {
     window.print();
   };
@@ -112,6 +295,15 @@ export default function TreatmentCycleWizard({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const cycleRemarks = form.previous_centre_name
+        ? `${form.remarks} [Initiated at previous centre: ${form.previous_centre_name}]`
+        : form.remarks;
+
+      const finalSentinelDates = {
+        ...form.sentinel_dates,
+        custom_calendar: calendarPreview?.days || [],
+      };
+
       const cycle = await treatmentCyclesApi.create({
         patient_id: patientId,
         partner_id: partnerId || undefined,
@@ -122,11 +314,11 @@ export default function TreatmentCycleWizard({
         male_factors: form.male_factors,
         treatment_at_other_centre: form.treatment_at_other_centre,
         protocol_template_id: form.protocol_template_id || undefined,
-        sentinel_dates: form.sentinel_dates,
+        sentinel_dates: finalSentinelDates,
         gametes_source: form.gametes_source,
         pgs_pgd_data: form.pgs_pgd_data,
         endometrial_monitoring: form.endometrial_monitoring,
-        remarks: form.remarks,
+        remarks: cycleRemarks,
         created_by: userId,
       });
       onSuccess(cycle);
@@ -221,17 +413,31 @@ export default function TreatmentCycleWizard({
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="treatment_at_other_centre"
-                  checked={form.treatment_at_other_centre}
-                  onChange={(e) => setForm({ ...form, treatment_at_other_centre: e.target.checked })}
-                  className="w-4 h-4 text-indigo-600 rounded"
-                />
-                <label htmlFor="treatment_at_other_centre" className="text-xs font-bold text-slate-700">
-                  Treatment initiated at another centre / Referral cycle
-                </label>
+              <div className="pt-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="treatment_at_other_centre"
+                    checked={form.treatment_at_other_centre}
+                    onChange={(e) => setForm({ ...form, treatment_at_other_centre: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                  />
+                  <label htmlFor="treatment_at_other_centre" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    Treatment initiated at another centre / Referral cycle
+                  </label>
+                </div>
+                {form.treatment_at_other_centre && (
+                  <div className="mt-2.5 pl-6 animate-in fade-in">
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Previous Fertility Centre / Clinic Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Oasis Fertility, Cloudnine, Apollo Cradle..."
+                      value={form.previous_centre_name || ''}
+                      onChange={(e) => setForm({ ...form, previous_centre_name: e.target.value })}
+                      className="vmd-input text-xs"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -323,7 +529,13 @@ export default function TreatmentCycleWizard({
         {currentStep === 3 && (
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-900 border-b pb-2">🔬 Preimplantation Genetic Testing (PGT)</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+            
+            {!['ICSI', 'IVF', 'ICSI_FET', 'SURROGACY'].includes(form.treatment_type) ? (
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-500 text-xs">
+                PGT is not applicable for the selected treatment type ({form.treatment_type}).
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -375,13 +587,18 @@ export default function TreatmentCycleWizard({
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 
         {/* Step 4: Protocol & Sentinel Dates */}
         {currentStep === 4 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">📅 Stimulation Protocol & Sentinel Dates</h3>
+            <div className="border-b pb-2">
+              <h3 className="text-sm font-black text-slate-900">📅 Stimulation Protocol & Sentinel Dates</h3>
+              <p className="text-[11px] text-slate-500">Set Day 1 (LMP) to auto-calculate milestones, or customize dates individually.</p>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Select Stimulation Protocol</label>
               <select
@@ -395,15 +612,22 @@ export default function TreatmentCycleWizard({
               </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+            <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-xs text-indigo-800 flex items-center gap-2">
+              <span>💡</span>
+              <span>
+                <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, and Day 19 ET. You can adjust any date manually.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
               {[
-                { key: 'lmp_day1', label: 'Day 1 (LMP Date)', icon: '🩸' },
-                { key: 'baseline_scan', label: 'Baseline Scan Date', icon: '🔍' },
-                { key: 'stim_start', label: 'Stimulation Start Date', icon: '💉' },
-                { key: 'trigger', label: 'Estimated Trigger Date', icon: '⚡' },
-                { key: 'opu', label: 'Planned OPU Retrieval', icon: '🧫' },
-                { key: 'et', label: 'Planned Embryo Transfer', icon: '👶' },
-              ].map((s) => (
+                { key: 'lmp_day1', label: 'Day 1 (LMP Date)', icon: '🩸', show: true },
+                { key: 'baseline_scan', label: 'Baseline Scan Date', icon: '🔍', show: true },
+                { key: 'stim_start', label: 'Stimulation Start Date', icon: '💉', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'trigger', label: 'Estimated Trigger Date', icon: '⚡', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY', 'IUI_H', 'IUI_D'].includes(form.treatment_type) },
+                { key: 'opu', label: 'Planned OPU Retrieval', icon: '🧫', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'et', label: 'Planned Embryo Transfer', icon: '👶', show: ['ICSI', 'IVF', 'FET', 'SURROGACY'].includes(form.treatment_type) },
+              ].filter(s => s.show).map((s) => (
                 <div key={s.key} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
                     {s.icon} {s.label}
@@ -411,7 +635,13 @@ export default function TreatmentCycleWizard({
                   <input
                     type="date"
                     value={(form.sentinel_dates as any)[s.key] || ''}
-                    onChange={(e) => updateSentinel(s.key, e.target.value)}
+                    onChange={(e) => {
+                      if (s.key === 'lmp_day1') {
+                        handleLmpChange(e.target.value);
+                      } else {
+                        updateSentinel(s.key, e.target.value);
+                      }
+                    }}
                     className="vmd-input text-xs"
                   />
                 </div>
@@ -423,7 +653,20 @@ export default function TreatmentCycleWizard({
         {/* Step 5: Endometrial Monitoring */}
         {currentStep === 5 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">📊 Serial Endometrial & Follicular Monitoring</h3>
+            <div className="flex items-center justify-between border-b pb-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">📊 Serial Endometrial & Follicular Monitoring</h3>
+                <p className="text-[11px] text-slate-500">Track endometrial thickness, echo-pattern, and sub-endometrial vascularity zones</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddEndometrialRow}
+                className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors shadow-sm"
+              >
+                + Add Scan Date
+              </button>
+            </div>
+
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
@@ -433,18 +676,80 @@ export default function TreatmentCycleWizard({
                     <th className="p-3">Thickness (mm)</th>
                     <th className="p-3">Pattern</th>
                     <th className="p-3">Vascularity Zone</th>
+                    <th className="p-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {form.endometrial_monitoring.map((m, idx) => (
-                    <tr key={idx}>
-                      <td className="p-3 font-medium">{m.date}</td>
-                      <td className="p-3 font-bold text-indigo-600">Day {m.day_of_cycle}</td>
-                      <td className="p-3 font-bold">{m.thickness_mm} mm</td>
-                      <td className="p-3">{m.pattern}</td>
-                      <td className="p-3">{m.vascularity}</td>
+                    <tr key={idx} className="hover:bg-slate-50/50">
+                      <td className="p-2.5">
+                        <input
+                          type="date"
+                          value={m.date}
+                          onChange={(e) => handleUpdateEndometrialRow(idx, 'date', e.target.value)}
+                          className="vmd-input text-xs py-1 px-2"
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          value={m.day_of_cycle}
+                          onChange={(e) => handleUpdateEndometrialRow(idx, 'day_of_cycle', parseInt(e.target.value) || 0)}
+                          className="vmd-input text-xs py-1 px-2 w-20"
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={m.thickness_mm}
+                          onChange={(e) => handleUpdateEndometrialRow(idx, 'thickness_mm', parseFloat(e.target.value) || 0)}
+                          className="vmd-input text-xs py-1 px-2 w-24 font-bold"
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <select
+                          value={m.pattern}
+                          onChange={(e) => handleUpdateEndometrialRow(idx, 'pattern', e.target.value)}
+                          className="vmd-input text-xs py-1 px-2"
+                        >
+                          <option value="Trilaminar">Trilaminar (Triple-line)</option>
+                          <option value="Homogeneous">Homogeneous</option>
+                          <option value="Hyperechoic">Hyperechoic</option>
+                          <option value="Secretory">Secretory / Luteal</option>
+                        </select>
+                      </td>
+                      <td className="p-2.5">
+                        <select
+                          value={m.vascularity}
+                          onChange={(e) => handleUpdateEndometrialRow(idx, 'vascularity', e.target.value)}
+                          className="vmd-input text-xs py-1 px-2"
+                        >
+                          <option value="Zone 1">Zone 1 (Peri-endometrial)</option>
+                          <option value="Zone 2">Zone 2 (Outer sub-endometrial)</option>
+                          <option value="Zone 3">Zone 3 (Inner sub-endometrial)</option>
+                          <option value="Zone 4">Zone 4 (Intra-endometrial)</option>
+                        </select>
+                      </td>
+                      <td className="p-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEndometrialRow(idx)}
+                          className="text-rose-500 hover:text-rose-700 font-bold px-2 py-1 text-xs"
+                          title="Delete Scan Record"
+                        >
+                          ✕
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {form.endometrial_monitoring.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400 italic">
+                        No scan records added yet. Click "+ Add Scan Date" to record monitoring data.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -496,17 +801,55 @@ export default function TreatmentCycleWizard({
                       </p>
                     )}
 
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-2 space-y-1.5">
                       {d.medications?.length > 0 ? (
                         d.medications.map((m: any, mIdx: number) => (
-                          <div key={mIdx} className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[11px]">
-                            <p className="font-bold text-slate-800 leading-tight">{m.drug_name}</p>
-                            <p className="text-slate-500 text-[10px]">{m.dose} · {m.frequency}</p>
+                          <div key={mIdx} className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[11px] group relative">
+                            <div className="flex items-start justify-between">
+                              <input
+                                type="text"
+                                value={m.drug_name}
+                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'drug_name', e.target.value)}
+                                className="font-bold text-slate-800 text-[11px] bg-transparent border-none p-0 focus:outline-none w-full"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDayMedication(d.day_number, mIdx)}
+                                className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px]"
+                                title="Remove medication"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div className="flex gap-1 text-[10px] text-slate-500 mt-1">
+                              <input
+                                type="text"
+                                value={m.dose}
+                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'dose', e.target.value)}
+                                className="bg-white border border-slate-200 rounded px-1 py-0.5 text-[10px] w-20"
+                                placeholder="Dose"
+                              />
+                              <input
+                                type="text"
+                                value={m.frequency}
+                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'frequency', e.target.value)}
+                                className="bg-white border border-slate-200 rounded px-1 py-0.5 text-[10px] w-14"
+                                placeholder="Freq"
+                              />
+                            </div>
                           </div>
                         ))
                       ) : (
                         <p className="text-[10px] text-slate-400 italic">No scheduled meds</p>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddDayMedication(d.day_number)}
+                        className="w-full py-1 text-[10px] font-bold text-indigo-600 bg-indigo-50/60 hover:bg-indigo-100 rounded-lg border border-dashed border-indigo-200 transition-colors"
+                      >
+                        + Add Medication
+                      </button>
                     </div>
                   </div>
                 ))}

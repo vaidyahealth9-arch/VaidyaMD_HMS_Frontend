@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { pharmacyApi, patientsApi } from '@/lib/api';
@@ -34,8 +35,23 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 export default function PharmacyPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'indents' | 'pos_orders'>('inventory');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'indents' | 'pos_orders'>(
+    tabParam && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders'].includes(tabParam)
+      ? (tabParam as any)
+      : 'inventory'
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [posSearch, setPosSearch] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResult, setOcrResult] = useState<any>(null);
@@ -78,7 +94,7 @@ export default function PharmacyPage() {
     queryKey: ['patients-list'],
     queryFn: () => patientsApi.list({ per_page: 500 }),
   });
-  const patients = patientsData?.items || [];
+  const patients = patientsData?.patients || patientsData?.items || [];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -201,13 +217,19 @@ export default function PharmacyPage() {
 
   // Dispense POS FEFO Mutation
   const dispenseMutation = useMutation({
-    mutationFn: () =>
-      pharmacyApi.dispenseFEFO({
-        patient_id: posPatientId,
+    mutationFn: () => {
+      const match = patients.find((p: any) => p.id === posPatientId || `${p.name} (${p.mrn || p.vid})` === posPatientId);
+      const effectivePatientId = match ? match.id : posPatientId;
+      if (!effectivePatientId) {
+        throw new Error('Please select a registered patient before dispensing.');
+      }
+      return pharmacyApi.dispenseFEFO({
+        patient_id: effectivePatientId,
         items: posCart.map((i) => ({ item_code: i.item_code, quantity: i.quantity })),
         doctor_id: user?.id,
         notes: 'Dispensed via Point of Sale counter',
-      }),
+      });
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
       setPosCart([]);
@@ -421,30 +443,60 @@ export default function PharmacyPage() {
                 </CardContent>
               </Card>
 
-              {/* Fast Stock Selector Grid */}
+              {/* Fast Stock Selector Grid with Inline Search */}
               <Card>
-                <CardHeader className="pb-3 border-b border-slate-100">
-                  <CardTitle className="text-sm">Available Medications (1-Click Add)</CardTitle>
+                <CardHeader className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm">Available Medications (1-Click Add)</CardTitle>
+                    <p className="text-[11px] text-slate-500">Search inventory by drug name, generic or batch number</p>
+                  </div>
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="Search medications..."
+                      value={posSearch}
+                      onChange={(e) => setPosSearch(e.target.value)}
+                      className="pl-8 h-8 text-xs bg-slate-50"
+                    />
+                  </div>
                 </CardHeader>
-                <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {batches.slice(0, 8).map((b: any) => (
-                    <div
-                      key={b.id}
-                      onClick={() => handleAddToCart(b)}
-                      className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/40 cursor-pointer transition-all flex items-center justify-between"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-bold text-xs text-slate-900 truncate">{b.item_name}</p>
-                        <p className="text-[10px] text-slate-500">
-                          Batch: {b.batch_number} · Exp: {formatDate(b.expiry_date)}
-                        </p>
+                <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto">
+                  {batches
+                    .filter((b: any) =>
+                      !posSearch ||
+                      b.item_name?.toLowerCase().includes(posSearch.toLowerCase()) ||
+                      b.batch_number?.toLowerCase().includes(posSearch.toLowerCase()) ||
+                      b.item_code?.toLowerCase().includes(posSearch.toLowerCase())
+                    )
+                    .slice(0, 20)
+                    .map((b: any) => (
+                      <div
+                        key={b.id}
+                        onClick={() => handleAddToCart(b)}
+                        className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/40 cursor-pointer transition-all flex items-center justify-between"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="font-bold text-xs text-slate-900 truncate">{b.item_name}</p>
+                          <p className="text-[10px] text-slate-500">
+                            Batch: {b.batch_number} · Exp: {formatDate(b.expiry_date)}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xs font-bold text-indigo-700">{formatCurrency(b.selling_price || b.mrp)}</p>
+                          <span className="text-[10px] font-semibold text-emerald-600">{b.quantity_available} in stock</span>
+                        </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-indigo-700">{formatCurrency(b.selling_price || b.mrp)}</p>
-                        <span className="text-[10px] font-semibold text-emerald-600">{b.quantity_available} in stock</span>
-                      </div>
+                    ))}
+                  {batches.filter((b: any) =>
+                    !posSearch ||
+                    b.item_name?.toLowerCase().includes(posSearch.toLowerCase()) ||
+                    b.batch_number?.toLowerCase().includes(posSearch.toLowerCase()) ||
+                    b.item_code?.toLowerCase().includes(posSearch.toLowerCase())
+                  ).length === 0 && (
+                    <div className="col-span-2 text-center py-6 text-slate-400 text-xs">
+                      No matching medications found in inventory.
                     </div>
-                  ))}
+                  )}
                 </CardContent>
               </Card>
             </div>

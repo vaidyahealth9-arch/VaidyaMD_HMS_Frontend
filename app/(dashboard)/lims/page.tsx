@@ -232,6 +232,26 @@ export default function LimsPage() {
         </div>
       </div>
 
+      {/* LIMS Workflow Explanation Banner */}
+      <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div className="space-y-0.5">
+            <h4 className="font-bold text-slate-900">How Laboratory & HL7 Ingestion Works in VaidyaMD:</h4>
+            <p className="text-slate-600 leading-relaxed">
+              1. <strong>Direct Analyzer Ingestion:</strong> Automated analyzers (CASA Semen Analyzer, Hematology/CBC) stream raw results over MLLP Port 2575 into this LIMS queue as <em>Pending Authorization</em>.
+            </p>
+            <p className="text-slate-600 leading-relaxed">
+              2. <strong>Pathologist Review & Sign-Off:</strong> Click <em>Review & Authorize</em> to verify reference ranges and add clinical impressions.
+            </p>
+            <p className="text-slate-600 leading-relaxed">
+              3. <strong>Instant EMR Publication:</strong> Once authorized, reports are automatically published to the patient&apos;s EMR and visible in <em>Patient 360 &rarr; Investigations</em>.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {actionSuccess && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">

@@ -1,20 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { appointmentsApi, patientsApi, authApi } from '@/lib/api';
 import { statusColors, statusLabels, formatDateTime } from '@/lib/utils';
 import { toast } from '@/contexts/ToastContext';
 import Link from 'next/link';
 
-
 const statusOrder = ['in_progress', 'waiting', 'scheduled', 'completed', 'cancelled'];
 
 export default function AppointmentsPage() {
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get('status');
+
   const [appointments, setAppointments] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(() => (statusParam && statusParam !== 'today' ? statusParam : 'all'));
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -22,6 +25,18 @@ export default function AppointmentsPage() {
   });
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s === 'today') {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      setSelectedDate(d.toISOString().split('T')[0]);
+      setFilter('all');
+    } else if (s) {
+      setFilter(s);
+    }
+  }, [searchParams]);
 
   // Book Appointment Modal State
   const [showBookModal, setShowBookModal] = useState(false);
@@ -155,9 +170,16 @@ export default function AppointmentsPage() {
     return true;
   });
 
+  const parseUtc = (dStr: string) => {
+    if (!dStr) return new Date();
+    const s = (dStr.includes('T') && !dStr.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(dStr)) ? `${dStr}Z` : dStr;
+    return new Date(s);
+  };
+
   const getWaitTime = (apt: any) => {
     if (apt.status !== 'waiting') return null;
-    const refDate = apt.updated_at ? new Date(apt.updated_at) : new Date(apt.created_at || apt.scheduled_at);
+    const dateStr = apt.updated_at || apt.created_at || apt.scheduled_at;
+    const refDate = parseUtc(dateStr);
     const waitMs = currentTime.getTime() - refDate.getTime();
     return Math.max(0, Math.floor(waitMs / 60000));
   };

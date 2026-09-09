@@ -66,7 +66,7 @@ export default function BreadcrumbBar() {
   const visibleModules = moduleItems.filter((m) => can(m.id));
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-10 flex-shrink-0 shadow-sm">
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-10 flex-shrink-0 shadow-sm print:hidden">
       {/* Mobile Menu Trigger (Shadcn Sheet) */}
       <div className="flex items-center gap-2 lg:hidden">
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

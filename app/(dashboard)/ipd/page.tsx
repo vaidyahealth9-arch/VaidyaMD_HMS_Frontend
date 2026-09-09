@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { ipdApi, patientsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -44,7 +45,17 @@ export default function IPDBedboardPage() {
   const [diagnosis, setDiagnosis] = useState('');
   const [packageName, setPackageName] = useState('');
   const [notes, setNotes] = useState('');
-  const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>('bedboard');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>(() => {
+    const t = searchParams.get('tab');
+    return (t === 'nursing' || t === 'history' || t === 'bedboard') ? (t === 'history' ? 'admissions' : t as any) : 'bedboard';
+  });
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'nursing') setActiveTab('nursing');
+    else if (t === 'history') setActiveTab('admissions');
+    else if (t === 'bedboard' || !t) setActiveTab('bedboard');
+  }, [searchParams]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   // Fetch Wards
@@ -77,21 +88,27 @@ export default function IPDBedboardPage() {
   // Fetch Patients
   const { data: patientsData } = useQuery({
     queryKey: ['patients-list'],
-    queryFn: () => patientsApi.list({ per_page: 100 }),
+    queryFn: () => patientsApi.list({ per_page: 500 }),
   });
-  const patients = patientsData?.items || [];
+  const patients = patientsData?.patients || patientsData?.items || [];
 
   // Admit Mutation
   const admitMutation = useMutation({
-    mutationFn: () =>
-      ipdApi.admitPatient({
-        patient_id: selectedPatientId,
+    mutationFn: () => {
+      const match = patients.find((p: any) => p.id === selectedPatientId || `${p.name} (${p.mrn || p.vid})` === selectedPatientId);
+      const patientUuid = match ? match.id : selectedPatientId;
+      if (!patientUuid) {
+        throw new Error('Please select a registered patient from the list.');
+      }
+      return ipdApi.admitPatient({
+        patient_id: patientUuid,
         bed_id: selectedBedForAdmission.id,
         admitting_doctor_id: user?.id,
         diagnosis,
         package_name: packageName,
         notes,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
       queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
@@ -99,6 +116,9 @@ export default function IPDBedboardPage() {
       setAdmitSheetOpen(false);
       setActionMessage('Patient successfully admitted to bed!');
       setTimeout(() => setActionMessage(null), 4000);
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to admit patient');
     },
   });
 

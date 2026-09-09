@@ -5,6 +5,7 @@ import { patientsApi, authApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { toast } from '@/contexts/ToastContext';
 
 export default function RegisterPatientPage() {
   const { user, currentBranch } = useAuth();
@@ -24,11 +25,11 @@ export default function RegisterPatientPage() {
 
   const [form, setForm] = useState({
     registration_type: 'patient',
-    title: 'Mrs.',
+    title: '',
     name: '',
     surname: '',
     surname_at_birth: '',
-    gender: 'female',
+    gender: '',
     age: '',
     dob: '',
     marital_status: 'married',
@@ -60,12 +61,12 @@ export default function RegisterPatientPage() {
   });
 
   const [partnerForm, setPartnerForm] = useState({
-    title: 'Mr.',
+    title: '',
     name: '',
     surname: '',
     age: '',
     dob: '',
-    gender: 'male',
+    gender: '',
     marital_status: 'married',
     phone: '',
     email: '',
@@ -96,7 +97,7 @@ export default function RegisterPatientPage() {
     const payload: Record<string, any> = {
       name: data.name?.trim(),
       registration_type: form.registration_type,
-      gender: data.gender || (isPartner ? 'male' : 'female'),
+      gender: data.gender,
       phone: data.phone?.trim() || '+91-9999900000',
     };
 
@@ -156,6 +157,7 @@ export default function RegisterPatientPage() {
         await patientsApi.linkPartner(primaryPatient.id, partner.id).catch(() => {});
       }
 
+      toast.success('Patient Registered', 'Registration successful. Redirecting to EMR profile...');
       router.push(`/patients/${primaryPatient.id}`);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please review the input fields.');
@@ -177,9 +179,9 @@ export default function RegisterPatientPage() {
       return { icon: '👩', title: 'Female Partner / Wife', subtitle: 'Primary Commissioning Patient' };
     }
     return {
-      icon: form.gender === 'male' ? '👨' : '👩',
-      title: `${form.gender === 'male' ? 'Male' : 'Female'} Patient Details`,
-      subtitle: 'Individual Patient Registration',
+      icon: form.gender === 'male' ? '👨' : form.gender === 'female' ? '👩' : '👤',
+      title: 'Patient Details',
+      subtitle: 'Universal Patient Registration (OPD / GYN / General)',
     };
   };
 
@@ -371,7 +373,9 @@ export default function RegisterPatientPage() {
                 value={form.gender}
                 onChange={(e) => update('gender', e.target.value)}
                 className="vmd-input text-xs"
+                required
               >
+                <option value="" disabled>— Select —</option>
                 <option value="female">Female</option>
                 <option value="male">Male</option>
                 <option value="other">Other</option>
@@ -457,13 +461,15 @@ export default function RegisterPatientPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Treating Consultant</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Treating Consultant <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              </label>
               <select
                 value={form.treating_doctor_id}
                 onChange={(e) => update('treating_doctor_id', e.target.value)}
                 className="vmd-input text-xs"
               >
-                <option value="">— Select Doctor —</option>
+                <option value="">— Assign Doctor Later at OPD —</option>
                 {doctorsList.map((d) => (
                   <option key={d.id} value={d.id}>{d.name} ({d.specialization || 'Doctor'})</option>
                 ))}
@@ -481,6 +487,20 @@ export default function RegisterPatientPage() {
                 <option value="marketing_person">Marketing Camp</option>
               </select>
             </div>
+          </div>
+
+          {/* Clinical Alerts & Drug Allergies Field */}
+          <div className="pt-3 border-t border-slate-100">
+            <label className="block text-xs font-bold text-amber-800 mb-1 flex items-center gap-1.5">
+              <span>⚠️</span> Clinical Alerts & Drug Allergies <span className="text-[10px] text-slate-400 font-normal">(Optional — leave blank if none)</span>
+            </label>
+            <input
+              type="text"
+              value={form.alert_notes_text}
+              onChange={(e) => update('alert_notes_text', e.target.value)}
+              className="vmd-input text-xs bg-amber-50/40 border-amber-200 text-amber-950 placeholder-amber-700/50 focus:ring-amber-400"
+              placeholder="e.g. Sulfa drug allergy, Penicillin allergy, Diabetic, Hypertensive, Thyroid"
+            />
           </div>
         </div>
 

@@ -218,12 +218,15 @@ export const treatmentCyclesApi = {
   update: (id: string, data: Record<string, unknown>) =>
     request<any>(`/plugins/fertility/treatment-cycles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   getCalendar: (cycleId: string) => request<any>(`/plugins/fertility/treatment-cycles/${cycleId}/calendar`),
+  addMedication: (cycleId: string, data: { day_number: number; drug_name: string; dose: string; frequency?: string; instructions?: string }) =>
+    request<any>(`/plugins/fertility/treatment-cycles/${cycleId}/medications`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export const fertilityApi = {
   ...treatmentCyclesApi,
   getSchemas: () => request<any>('/plugins/fertility/schemas'),
-  getSchema: (pluginId?: string) => request<any>(`/plugins/${pluginId || 'fertility'}/schemas`),
+  getSchema: (recordType?: string) =>
+    request<any>(recordType && recordType !== 'fertility' ? `/plugins/fertility/schemas/${recordType}` : '/plugins/fertility/schemas'),
   getDues: (patientId: string) => request<any>(`/plugins/fertility/patient-dues/${patientId}`),
   getRecords: (patientId: string, pluginId?: string) =>
     request<any[]>(`/plugins/fertility/clinical-records/${patientId}${toQueryString({ plugin_id: pluginId })}`),
@@ -372,4 +375,17 @@ export const analyticsApi = {
   resolveLeakage: (data: { leakage_item_id: string; patient_id: string; item_description: string; amount: number; department: string }) =>
     request<any>('/core/analytics/resolve-leakage', { method: 'POST', body: JSON.stringify(data) }),
 };
+
+// ==========================================
+// 12. Patient Documents & Reports
+// ==========================================
+export const documentsApi = {
+  list: (patientId: string, category?: string) =>
+    request<any[]>(`/core/documents?patient_id=${patientId}${category ? `&category=${category}` : ''}`),
+  create: (data: { patient_id: string; file_name: string; file_path: string; mime_type?: string; category?: string; tags?: string[]; metadata?: Record<string, any> }) =>
+    request<any>('/core/documents', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (documentId: string) =>
+    request<void>(`/core/documents/${documentId}`, { method: 'DELETE' }),
+};
+
 

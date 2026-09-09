@@ -40,7 +40,7 @@ export default function IconRail() {
   const activeItem = visibleItems.find((item) => pathname.startsWith(item.href));
 
   return (
-    <aside className="w-16 bg-slate-900 flex flex-col items-center py-4 border-r border-slate-800 z-20 shadow-xl flex-shrink-0 h-screen sticky top-0">
+    <aside className="w-16 bg-slate-900 flex flex-col items-center py-4 border-r border-slate-800 z-20 shadow-xl flex-shrink-0 h-screen sticky top-0 print:hidden">
       {/* Logo */}
       <Link href="/dashboard" className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-xl flex items-center justify-center font-bold text-sm mb-6 shadow-lg shadow-indigo-500/30 flex-shrink-0 hover:scale-105 transition-transform">
         VM

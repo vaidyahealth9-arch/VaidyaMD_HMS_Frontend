@@ -58,6 +58,18 @@ export default function PatientsPage() {
   const handleSendToOPD = async (p: any) => {
     if (!user) return;
     try {
+      // Check if patient is already in queue today to prevent duplicates
+      const todayStr = new Date().toISOString().split('T')[0];
+      const existing: any = await appointmentsApi.list({ date_filter: todayStr }).catch(() => ({ appointments: [] }));
+      const isAlreadyInQueue = (existing?.appointments || []).some(
+        (a: any) => a.patient_id === p.id && (a.status === 'waiting' || a.status === 'in_progress')
+      );
+
+      if (isAlreadyInQueue) {
+        alert(`Notice: Patient ${p.name} is ALREADY in today's OPD Queue (Waiting/In Consultation). Duplicate entry was prevented.`);
+        return;
+      }
+
       await appointmentsApi.create({
         patient_id: p.id,
         doctor_id: p.treating_doctor_id || user.id,
@@ -80,7 +92,7 @@ export default function PatientsPage() {
       p.name,
       p.gender,
       p.age || '',
-      p.phone,
+      p.phone ? `'${p.phone}` : '', // Single quote prefix forces Excel to treat +91-XXX as text, preventing arithmetic evaluation
       p.blood_group || '',
       p.partner_name || '',
       p.referred_by_name || p.referred_by_type || '',

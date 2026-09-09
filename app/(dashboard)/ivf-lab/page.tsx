@@ -20,7 +20,7 @@ import OocyteGridTable from '@/components/fertility/OocyteGridTable';
 export default function IvfLabPage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'andrology' | 'embryology' | 'cryopreservation' | 'qc'>('andrology');
+  const [activeTab, setActiveTab] = useState<'andrology' | 'embryology' | 'cryopreservation' | 'qc'>('embryology');
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
 
   useEffect(() => {
@@ -62,6 +62,7 @@ export default function IvfLabPage() {
   };
 
   const [andrologyForm, setAndrologyForm] = useState(defaultAndrologyValues);
+  const [andrologyQueueFilter, setAndrologyQueueFilter] = useState<'active_cycles' | 'all'>('active_cycles');
 
   // === EMBRYOLOGY STATE ===
   const [selectedCyclePatient, setSelectedCyclePatient] = useState<any>(null);
@@ -390,7 +391,33 @@ export default function IvfLabPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Patient Selector */}
           <div className="lg:col-span-1 bg-white border border-slate-200 rounded-3xl p-5 space-y-4 shadow-sm flex flex-col h-[calc(100vh-12rem)]">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Male Patients</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Male Patients</h3>
+              <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setAndrologyQueueFilter('active_cycles')}
+                  className={`px-2 py-0.5 rounded transition-all ${
+                    andrologyQueueFilter === 'active_cycles'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Active Cycles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAndrologyQueueFilter('all')}
+                  className={`px-2 py-0.5 rounded transition-all ${
+                    andrologyQueueFilter === 'all'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Males
+                </button>
+              </div>
+            </div>
             <input
               type="text"
               placeholder="Search by name or VID..."
@@ -399,23 +426,41 @@ export default function IvfLabPage() {
               className="vmd-input text-xs w-full mb-2"
             />
             <div className="space-y-2 overflow-y-auto flex-1 pr-1 custom-scrollbar">
-              {malePatients.filter(p => !patientSearchQuery || p.name.toLowerCase().includes(patientSearchQuery.toLowerCase()) || p.vid.toLowerCase().includes(patientSearchQuery.toLowerCase())).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedMalePatient(p)}
-                  className={`w-full flex flex-col gap-1 p-3.5 rounded-2xl border text-left transition-all ${
-                    selectedMalePatient?.id === p.id
-                      ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 shadow-sm'
-                      : 'border-slate-100 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <p className="font-bold text-sm leading-tight">{p.name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{p.vid}</span>
-                    <span className="text-[10px] text-slate-500 font-semibold">{p.age} yrs</span>
-                  </div>
-                </button>
-              ))}
+              {malePatients
+                .filter((p) => {
+                  if (andrologyQueueFilter === 'active_cycles') {
+                    return cycles.some((c: any) => c.partner_id === p.id || c.patient_id === p.id);
+                  }
+                  return true;
+                })
+                .filter((p) => !patientSearchQuery || p.name.toLowerCase().includes(patientSearchQuery.toLowerCase()) || p.vid.toLowerCase().includes(patientSearchQuery.toLowerCase()))
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedMalePatient(p)}
+                    className={`w-full flex flex-col gap-1 p-3.5 rounded-2xl border text-left transition-all ${
+                      selectedMalePatient?.id === p.id
+                        ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 shadow-sm'
+                        : 'border-slate-100 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <p className="font-bold text-sm leading-tight">{p.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{p.vid}</span>
+                      <span className="text-[10px] text-slate-500 font-semibold">{p.age} yrs</span>
+                    </div>
+                  </button>
+                ))}
+              {malePatients.filter((p) => {
+                if (andrologyQueueFilter === 'active_cycles') {
+                  return cycles.some((c: any) => c.partner_id === p.id || c.patient_id === p.id);
+                }
+                return true;
+              }).length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No male patients found for this filter.
+                </div>
+              )}
             </div>
           </div>
 

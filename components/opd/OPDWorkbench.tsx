@@ -19,6 +19,8 @@ import {
   FlaskConical,
   Pill,
   Clock,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,15 +29,65 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import AmbientScribeWidget from './AmbientScribeWidget';
 import SmartOrderDialog from './SmartOrderDialog';
+import PrintablePrescription from '@/components/common/PrintablePrescription';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
 
-export default function OPDWorkbench({ patientId, triageData, onBack }: { patientId?: string; triageData?: any; onBack?: () => void }) {
+const CLINICAL_TEMPLATES = [
+  {
+    id: 'infertility_workup',
+    name: 'Fertility Evaluation & Workup',
+    complaint: 'Trying to conceive for > 1 year. Regular/irregular menstrual cycles.',
+    hopi: 'Couple presenting for comprehensive fertility evaluation. Menstrual history, coital frequency, and previous treatments assessed.',
+    diagnosis: 'Primary / Secondary Subfertility under evaluation',
+    investigations: '1. Transvaginal Ultrasound (Pelvic TVS)\n2. Serum AMH, Day 2/3 FSH, LH, Estradiol, TSH, Prolactin\n3. Semen Analysis (WHO 6th Ed) for male partner\n4. Viral Markers (HBsAg, HCV, HIV)',
+    plan: '1. Tab Folic Acid 5mg OD\n2. Schedule baseline TVS scan on Day 2 of next cycle\n3. Male partner semen analysis after 3 days abstinence\n4. Review in OPD with reports',
+  },
+  {
+    id: 'follicular_monitoring',
+    name: 'Ovulation Induction & Follicular Scan',
+    complaint: 'Follow-up for follicle tracking / stimulation cycle.',
+    hopi: 'Patient on ovarian stimulation. Monitoring endometrial lining and dominant follicular response.',
+    diagnosis: 'Stimulated Ovulatory Cycle / Folliculometry',
+    investigations: 'Serial Follicular Ultrasound (TVS)',
+    plan: '1. Continue ongoing stimulation protocol as directed\n2. Next follicular tracking scan scheduled on day after tomorrow\n3. Timed intercourse instructions explained',
+  },
+  {
+    id: 'pcos_metabolic',
+    name: 'PCOS Metabolic & Lifestyle Review',
+    complaint: 'Oligomenorrhea, weight gain, hirsutism.',
+    hopi: 'Irregular cycles with delayed periods. History of acne and difficulty managing weight.',
+    diagnosis: 'Polycystic Ovarian Syndrome (PCOS Phenotype)',
+    investigations: 'Fasting Insulin, Fasting Glucose (HOMA-IR), Lipid Profile, Serum Total Testosterone, Pelvic USG',
+    plan: '1. Low glycemic index diet, regular aerobic exercise 45 mins/day\n2. Tab Myo-inositol + D-Chiro-Inositol 2g BD\n3. Tab Metformin 500mg OD post-dinner if insulin resistance confirmed\n4. Review after 6 weeks',
+  },
+  {
+    id: 'anc_first_trimester',
+    name: 'Antenatal Checkup (ANC) - 1st Trimester',
+    complaint: 'Confirmed pregnancy (Urine Pregnancy Test +ve). Routine first trimester antenatal care.',
+    hopi: 'Spontaneous / ART conception. Mild nausea, no spotting or abdominal cramps.',
+    diagnosis: 'Intrauterine Gestation - 1st Trimester (Antenatal Care)',
+    investigations: 'Dating / Viability USG, Complete Blood Count, Blood Group & Rh, Thyroid Profile, HbA1c, Rubella IgG, Double Marker (11-13 weeks)',
+    plan: '1. Tab Folic Acid 5mg OD\n2. Tab Doxylamine + Pyridoxine SOS for morning sickness\n3. Avoid heavy lifting and long travel\n4. Viability scan report review',
+  },
+  {
+    id: 'general_opd',
+    name: 'General OPD / Medical Review',
+    complaint: 'General health checkup / non-specific symptoms.',
+    hopi: 'Patient presenting for evaluation and supportive clinical care.',
+    diagnosis: 'General Clinical Review',
+    investigations: 'Complete Blood Count (CBC), Urine Routine',
+    plan: '1. Symptomatic medical management\n2. Adequate hydration and balanced nutrition\n3. Follow up SOS or in 1 week',
+  },
+];
+
+export default function OPDWorkbench({ patientId, triageData, appointment, onBack }: { patientId?: string; triageData?: any; appointment?: any; onBack?: () => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const selectedPatientId = patientId || '';
   const [smartOrderOpen, setSmartOrderOpen] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
+  const [printablePrescription, setPrintablePrescription] = useState<any>(null);
 
   // Fetch Selected Patient Details
   const { data: patient } = useQuery({
@@ -51,24 +103,24 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
     enabled: !!selectedPatientId,
   });
 
-  // Form Setup
+  // Form Setup with Clean Non-Dummy Defaults
   const { register, handleSubmit, setValue, watch, reset } = useForm({
     defaultValues: {
-      weight: triageData?.vitals?.weight || 65,
-      height: 165,
-      bmi: '23.8',
-      blood_pressure_systolic: triageData?.vitals?.bp?.split('/')[0] || 120,
-      blood_pressure_diastolic: triageData?.vitals?.bp?.split('/')[1] || 80,
-      heart_rate: triageData?.vitals?.hr || 72,
-      respiratory_rate: 16,
-      temperature: triageData?.vitals?.temp || 98.6,
-      spo2: triageData?.vitals?.spo2 || 98,
+      weight: triageData?.vitals?.weight || '',
+      height: triageData?.vitals?.height || '',
+      bmi: triageData?.vitals?.bmi || '',
+      blood_pressure_systolic: triageData?.vitals?.bp?.split('/')[0] || '',
+      blood_pressure_diastolic: triageData?.vitals?.bp?.split('/')[1] || '',
+      heart_rate: triageData?.vitals?.hr || '',
+      respiratory_rate: triageData?.vitals?.rr || '',
+      temperature: triageData?.vitals?.temp || '',
+      spo2: triageData?.vitals?.spo2 || '',
       chief_complaints: triageData?.chief_complaint || '',
       history_of_illness: '',
       past_medical_history: '',
-      cvs_findings: 'S1 S2 normal, no murmurs',
-      cns_findings: 'Conscious, oriented',
-      rs_findings: 'Bilateral vesicular breath sounds, clear',
+      cvs_findings: '',
+      cns_findings: '',
+      rs_findings: '',
       provisional_diagnosis: '',
       differential_diagnosis: '',
       investigations_ordered: '',
@@ -76,6 +128,29 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
       follow_up: '1_week',
     },
   });
+
+  // Auto-apply template based on visit type if appointment is passed
+  useEffect(() => {
+    if (appointment?.visit_type) {
+      // Map visit types to template IDs
+      const typeMap: Record<string, string> = {
+        'consultation': 'general_opd',
+        'procedure': 'infertility_workup',
+        'scan': 'follicular_monitoring',
+        'follow_up': 'pcos_metabolic' // or general_opd depending on defaults
+      };
+      const templateIdToApply = typeMap[appointment.visit_type] || 'general_opd';
+      const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateIdToApply);
+      
+      if (tmpl) {
+        if (!watch('chief_complaints')) setValue('chief_complaints', tmpl.complaint);
+        if (!watch('history_of_illness')) setValue('history_of_illness', tmpl.hopi);
+        if (!watch('provisional_diagnosis')) setValue('provisional_diagnosis', tmpl.diagnosis);
+        if (!watch('investigations_ordered')) setValue('investigations_ordered', tmpl.investigations);
+        if (!watch('plan')) setValue('plan', tmpl.plan);
+      }
+    }
+  }, [appointment]);
 
   const weight = watch('weight');
   const height = watch('height');
@@ -115,20 +190,79 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
     },
   });
 
-  const onSubmit = (data: any) => {
-    saveMutation.mutate(data);
+  const onSubmit = (data: any, andPrint = false) => {
+    saveMutation.mutate(data, {
+      onSuccess: () => {
+        if (andPrint) {
+          const meds = data.plan
+            ? data.plan
+                .split('\n')
+                .filter((l: string) => l.trim().length > 0)
+                .map((line: string) => ({
+                  drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
+                  instructions: 'As directed by physician',
+                }))
+            : [];
+          setPrintablePrescription({
+            patient: {
+              name: patient?.name,
+              mrn: patient?.mrn,
+              age: patient?.age,
+              gender: patient?.gender,
+              phone: patient?.phone,
+              blood_group: patient?.blood_group,
+            },
+            doctor: {
+              name: user?.name || 'Dr. Consultant Specialist',
+              department: 'Reproductive Medicine & Infertility',
+            },
+            visitDate: new Date().toISOString().split('T')[0],
+            chiefComplaint: data.chief_complaints,
+            hopi: data.history_of_illness,
+            pastHistory: data.past_medical_history,
+            vitals: {
+              bp: data.blood_pressure_systolic && data.blood_pressure_diastolic ? `${data.blood_pressure_systolic}/${data.blood_pressure_diastolic}` : undefined,
+              pulse: data.heart_rate ? `${data.heart_rate} bpm` : undefined,
+              temp: data.temperature ? `${data.temperature} °F` : undefined,
+              weight: data.weight ? `${data.weight} kg` : undefined,
+              spo2: data.spo2 ? `${data.spo2}%` : undefined,
+            },
+            diagnosis: data.provisional_diagnosis,
+            medications: meds,
+            advice: data.plan,
+            nextFollowUp: data.follow_up === '1_week' ? 'Review in 1 week' : data.follow_up === '2_weeks' ? 'Review in 2 weeks' : data.follow_up === '1_month' ? 'Review in 1 month' : 'As advised',
+          });
+        }
+      },
+    });
+  };
+
+  const handleApplyTemplate = (templateId: string) => {
+    const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateId);
+    if (!tmpl) return;
+    setValue('chief_complaints', tmpl.complaint);
+    setValue('history_of_illness', tmpl.hopi);
+    setValue('provisional_diagnosis', tmpl.diagnosis);
+    setValue('investigations_ordered', tmpl.investigations);
+    setValue('plan', tmpl.plan);
   };
 
   // Populate from Ambient Scribe
   const handleScribeParsed = (extracted: any) => {
     if (extracted.vitals) {
-      Object.entries(extracted.vitals).forEach(([k, v]) => setValue(k as any, v));
+      Object.entries(extracted.vitals).forEach(([k, v]) => {
+        if (v !== '' && v !== null && v !== undefined) setValue(k as any, v);
+      });
     }
     if (extracted.clinical) {
-      Object.entries(extracted.clinical).forEach(([k, v]) => setValue(k as any, v));
+      Object.entries(extracted.clinical).forEach(([k, v]) => {
+        if (v) setValue(k as any, v);
+      });
     }
     if (extracted.assessment) {
-      Object.entries(extracted.assessment).forEach(([k, v]) => setValue(k as any, v));
+      Object.entries(extracted.assessment).forEach(([k, v]) => {
+        if (v) setValue(k as any, v);
+      });
     }
   };
 
@@ -139,6 +273,47 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
 
     const newPlan = `Prescribed Order Set [${orderSet.name}]:\n- ${orderSet.medications.join('\n- ')}\nInstructions: ${orderSet.instructions || 'None'}`;
     setValue('plan', newPlan);
+  };
+
+  const handlePrintPrevious = (rec: any) => {
+    const meds = rec.data?.plan
+      ? rec.data.plan
+          .split('\n')
+          .filter((l: string) => l.trim().length > 0)
+          .map((line: string) => ({
+            drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
+            instructions: 'As directed by physician',
+          }))
+      : [];
+    setPrintablePrescription({
+      patient: {
+        name: patient?.name,
+        mrn: patient?.mrn,
+        age: patient?.age,
+        gender: patient?.gender,
+        phone: patient?.phone,
+        blood_group: patient?.blood_group,
+      },
+      doctor: {
+        name: rec.created_by_name || user?.name || 'Dr. Treating Specialist',
+        department: 'Reproductive Medicine & Infertility',
+      },
+      visitDate: rec.created_at ? rec.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      chiefComplaint: rec.data?.chief_complaints,
+      hopi: rec.data?.history_of_illness,
+      pastHistory: rec.data?.past_medical_history,
+      vitals: {
+        bp: rec.data?.blood_pressure_systolic && rec.data?.blood_pressure_diastolic ? `${rec.data.blood_pressure_systolic}/${rec.data.blood_pressure_diastolic}` : undefined,
+        pulse: rec.data?.heart_rate ? `${rec.data.heart_rate} bpm` : undefined,
+        temp: rec.data?.temperature ? `${rec.data.temperature} °F` : undefined,
+        weight: rec.data?.weight ? `${rec.data.weight} kg` : undefined,
+        spo2: rec.data?.spo2 ? `${rec.data.spo2}%` : undefined,
+      },
+      diagnosis: rec.data?.provisional_diagnosis,
+      medications: meds,
+      advice: rec.data?.plan,
+      nextFollowUp: rec.data?.follow_up === '1_week' ? 'Review in 1 week' : rec.data?.follow_up === '2_weeks' ? 'Review in 2 weeks' : rec.data?.follow_up === '1_month' ? 'Review in 1 month' : 'As advised',
+    });
   };
 
   return (
@@ -155,7 +330,7 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {onBack && (
             <Button
               variant="outline"
@@ -166,6 +341,24 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
               <span>&larr; Back to Queue</span>
             </Button>
           )}
+
+          {/* Quick Template Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
+            <FileText className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-[11px] font-bold text-slate-600 hidden sm:inline">Template:</span>
+            <select
+              onChange={(e) => {
+                if (e.target.value) handleApplyTemplate(e.target.value);
+              }}
+              defaultValue=""
+              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="" disabled>— Select Clinical Template —</option>
+              {CLINICAL_TEMPLATES.map((tmpl) => (
+                <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
+              ))}
+            </select>
+          </div>
 
           <Button
             variant="outline"
@@ -199,22 +392,29 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
               <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
                 <div className="bg-white p-2 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">BLOOD GROUP</span>
-                  <span className="font-bold text-slate-800">{patient.blood_group || 'B+ Positive'}</span>
+                  <span className="font-bold text-slate-800">{patient.blood_group || 'Not Specified'}</span>
                 </div>
                 <div className="bg-white p-2 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">PHONE</span>
-                  <span className="font-semibold text-slate-800">{patient.phone || '+91 98450 12345'}</span>
+                  <span className="font-semibold text-slate-800">{patient.phone || '—'}</span>
                 </div>
               </div>
 
-              {/* Allergy / Clinical Alerts */}
-              <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
-                  <span>{patient.alert_notes?.[0] || 'Sulfa drug allergy. Monitored for PCOS metabolic profile.'}</span>
+              {/* Allergy / Clinical Alerts - Non-dummy fix */}
+              {patient.alert_notes && patient.alert_notes.length > 0 ? (
+                <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
+                    <span>{patient.alert_notes.join(', ')}</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mt-3 p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700 flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-[11px] font-medium">No known drug allergies or active clinical alerts</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -230,21 +430,40 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
                 {consultationHistory.map((rec: any) => (
                   <div 
                     key={rec.id} 
-                    onClick={() => setViewingRecord(rec)}
-                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors group relative"
+                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors group relative"
                   >
                     <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
-                      <span className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      <span 
+                        onClick={() => setViewingRecord(rec)}
+                        className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
                         <Clock className="w-3 h-3 text-slate-400" />
                         {formatDateTime(rec.created_at)}
                       </span>
-                      <Badge variant="outline" className="text-[10px]">{rec.record_type}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handlePrintPrevious(rec)}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md flex items-center gap-1 shadow-2xs"
+                          title="Print Prescription (Rx)"
+                        >
+                          <Printer className="w-2.5 h-2.5" />
+                          <span>Print Rx</span>
+                        </button>
+                        <Badge variant="outline" className="text-[10px]">{rec.record_type}</Badge>
+                      </div>
                     </div>
-                    <p className="text-xs font-bold text-slate-800 line-clamp-1">
+                    <p 
+                      onClick={() => setViewingRecord(rec)}
+                      className="text-xs font-bold text-slate-800 line-clamp-1 cursor-pointer"
+                    >
                       Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'General OPD'}
                     </p>
                     {rec.data?.plan && (
-                      <p className="text-[11px] text-slate-600 line-clamp-2 mt-1 bg-white p-1.5 rounded border border-slate-100">
+                      <p 
+                        onClick={() => setViewingRecord(rec)}
+                        className="text-[11px] text-slate-600 line-clamp-2 mt-1 bg-white p-1.5 rounded border border-slate-100 cursor-pointer"
+                      >
                         {rec.data.plan}
                       </p>
                     )}
@@ -268,7 +487,7 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-5xl pb-24">
+          <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 max-w-5xl pb-24">
             <div className="space-y-6">
               {/* SECTION 1: Subjective */}
               <Card className="border-slate-200 shadow-sm">
@@ -355,19 +574,40 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
                   </div>
                 </CardContent>
                 <div className="border-t border-slate-100 p-4">
-                  <h4 className="text-xs font-bold text-slate-700 mb-3">Systemic Examination Findings</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold text-slate-700">Systemic Examination Findings</h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Vitals
+                        if (!watch('blood_pressure_systolic')) setValue('blood_pressure_systolic', '120');
+                        if (!watch('blood_pressure_diastolic')) setValue('blood_pressure_diastolic', '80');
+                        if (!watch('heart_rate')) setValue('heart_rate', '72');
+                        if (!watch('respiratory_rate')) setValue('respiratory_rate', '16');
+                        if (!watch('temperature')) setValue('temperature', '98.6');
+                        if (!watch('spo2')) setValue('spo2', '98');
+                        // Systemic Exam
+                        setValue('cvs_findings', 'S1 S2 heard, no murmurs');
+                        setValue('cns_findings', 'Conscious, oriented, afebrile');
+                        setValue('rs_findings', 'Bilateral vesicular breath sounds, clear');
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 transition-colors"
+                    >
+                      + Autofill Normal Vitals & Exam
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">CVS Findings</label>
-                      <Input {...register('cvs_findings')} className="h-9 text-xs" />
+                      <Input {...register('cvs_findings')} placeholder="e.g. S1 S2 normal" className="h-9 text-xs" />
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">CNS Findings</label>
-                      <Input {...register('cns_findings')} className="h-9 text-xs" />
+                      <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-9 text-xs" />
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">RS Findings</label>
-                      <Input {...register('rs_findings')} className="h-9 text-xs" />
+                      <Input {...register('rs_findings')} placeholder="e.g. Bilateral clear" className="h-9 text-xs" />
                     </div>
                   </div>
                 </div>
@@ -460,6 +700,16 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
             {/* Bottom Form Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <Button
+                type="button"
+                variant="outline"
+                disabled={saveMutation.isPending}
+                onClick={handleSubmit((data) => onSubmit(data, true))}
+                className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-11 rounded-xl shadow-sm gap-2"
+              >
+                <Printer className="w-4 h-4 text-emerald-600" />
+                <span>Save & Print Rx</span>
+              </Button>
+              <Button
                 type="submit"
                 disabled={saveMutation.isPending}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 h-11 rounded-xl shadow-lg shadow-indigo-500/20 gap-2"
@@ -541,13 +791,32 @@ export default function OPDWorkbench({ patientId, triageData, onBack }: { patien
                 </div>
               </div>
             </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => {
+                  handlePrintPrevious(viewingRecord);
+                }}
+                className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 rounded-xl font-bold px-4 flex items-center gap-1.5"
+              >
+                <Printer className="w-4 h-4 text-indigo-600" />
+                <span>Print Prescription (Rx)</span>
+              </Button>
               <Button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white rounded-xl font-bold px-6">
                 Close
               </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Printable Prescription Modal */}
+      {printablePrescription && (
+        <PrintablePrescription
+          {...printablePrescription}
+          onClose={() => setPrintablePrescription(null)}
+        />
       )}
     </div>
   );

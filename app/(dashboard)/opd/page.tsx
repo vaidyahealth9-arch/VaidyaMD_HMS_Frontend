@@ -18,7 +18,13 @@ export default function OPDPage() {
   }, []);
 
   const getWaitTimeDetails = (scheduledAt: string) => {
-    const diff = Math.floor((now.getTime() - new Date(scheduledAt).getTime()) / 60000);
+    if (!scheduledAt) return { text: '0m wait', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+    // Parse UTC datetime correctly: if ISO string has no timezone indicator, treat as UTC
+    const dateStr = (scheduledAt.includes('T') && !scheduledAt.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(scheduledAt))
+      ? `${scheduledAt}Z`
+      : scheduledAt;
+    const schedDate = new Date(dateStr);
+    const diff = Math.floor((now.getTime() - schedDate.getTime()) / 60000);
     if (diff < 0) return { text: `In ${-diff}m`, color: 'text-slate-500 bg-slate-50 border-slate-200' };
     if (diff < 15) return { text: `${diff}m wait`, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
     if (diff < 30) return { text: `${diff}m wait`, color: 'text-amber-700 bg-amber-50 border-amber-200' };
@@ -36,6 +42,7 @@ export default function OPDPage() {
       date_filter: new Date().toISOString().split('T')[0],
       status: 'waiting'
     }),
+    refetchInterval: 5000,
   });
 
   const appointments: any[] = Array.isArray(appointmentsData)
@@ -68,6 +75,7 @@ export default function OPDPage() {
     return <OPDWorkbench 
       patientId={selectedAppointment.patient_id} 
       triageData={selectedAppointment.metadata_?.triage} 
+      appointment={selectedAppointment}
       onBack={() => setSelectedAppointment(null)} 
     />;
   }

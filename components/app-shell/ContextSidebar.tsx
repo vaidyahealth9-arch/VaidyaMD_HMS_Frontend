@@ -15,7 +15,7 @@ export default function ContextSidebar() {
 
   if (isPatientProfile && patientId) {
     const patientTabs = [
-      { id: 'overview', href: `/patients/${patientId}?tab=overview`, icon: '👫', label: 'Couple 360' },
+      { id: 'overview', href: `/patients/${patientId}?tab=overview`, icon: '👤', label: 'Overview' },
       { id: 'visits', href: `/patients/${patientId}?tab=visits`, icon: '📋', label: 'Visits & Rx' },
       { id: 'investigations', href: `/patients/${patientId}?tab=investigations`, icon: '🔬', label: 'Investigations & USG' },
       { id: 'treatment', href: `/patients/${patientId}?tab=treatment`, icon: '🧫', label: 'Treatment Cycles' },
@@ -25,7 +25,7 @@ export default function ContextSidebar() {
     ];
 
     return (
-      <aside className="w-60 bg-white border-r border-slate-200 flex flex-col overflow-y-auto z-0 hidden md:flex flex-shrink-0">
+      <aside className="w-60 bg-white border-r border-slate-200 flex flex-col overflow-y-auto z-0 hidden md:flex flex-shrink-0 print:hidden">
         <div className="p-3 border-b border-slate-100 flex flex-col gap-1.5">
           <Link
             href="/patients"
@@ -124,9 +124,9 @@ export default function ContextSidebar() {
       {
         label: 'Financial Desk',
         items: [
-          { id: 'invoices', href: '/billing', icon: '📑', label: 'Invoices & Receipts' },
-          { id: 'pending', href: '/billing?status=pending', icon: '⏳', label: 'Pending Dues' },
-          { id: 'packages', href: '/billing', icon: '📦', label: 'Treatment Packages' },
+          { id: 'invoices', href: '/billing?tab=invoices', icon: '📑', label: 'Invoices & Receipts' },
+          { id: 'pending', href: '/billing?tab=invoices&status=pending', icon: '⏳', label: 'Pending Dues' },
+          { id: 'packages', href: '/billing?tab=packages', icon: '📦', label: 'Treatment Packages' },
         ],
       },
     ],
@@ -134,8 +134,8 @@ export default function ContextSidebar() {
       {
         label: 'Dispensary',
         items: [
-          { id: 'inventory', href: '/pharmacy', icon: '📦', label: 'Stock Registry' },
-          { id: 'dispensary', href: '/pharmacy', icon: '🏪', label: 'Recent Dispenses' },
+          { id: 'inventory', href: '/pharmacy?tab=inventory', icon: '📦', label: 'Stock Registry' },
+          { id: 'dispensary', href: '/pharmacy?tab=pos', icon: '🏪', label: 'Point of Sale (POS)' },
         ],
       },
     ],
@@ -144,7 +144,16 @@ export default function ContextSidebar() {
         label: 'Outpatient Clinic',
         items: [
           { id: 'opd-queue', href: '/opd', icon: '📋', label: 'OPD Patient Queue', statusDot: 'green' },
-          { id: 'patients', href: '/patients', icon: '👥', label: 'Patient Directory' },
+        ],
+      },
+    ],
+    '/ipd': [
+      {
+        label: 'Inpatient Ward',
+        items: [
+          { id: 'ipd-beds', href: '/ipd', icon: '🛏️', label: 'Bedboard & Admissions', statusDot: 'green' },
+          { id: 'ipd-nursing', href: '/ipd?tab=nursing', icon: '💊', label: 'Nursing Checklists' },
+          { id: 'ipd-history', href: '/ipd?tab=history', icon: '📋', label: 'Discharge History' },
         ],
       },
     ],
@@ -154,7 +163,7 @@ export default function ContextSidebar() {
   const sections = sidebarConfig[activeModule] || [];
 
   return (
-    <aside className="w-56 bg-white border-r border-slate-200 flex flex-col overflow-y-auto z-0 hidden md:flex flex-shrink-0">
+    <aside className="w-56 bg-white border-r border-slate-200 flex flex-col overflow-y-auto z-0 hidden md:flex flex-shrink-0 print:hidden">
       <div className="flex-1 py-3 px-2 space-y-4">
         {sections.map((section, si) => (
           <div key={si}>
@@ -165,7 +174,20 @@ export default function ContextSidebar() {
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive = pathname === item.href || (item.href.includes('?') && `${pathname}?${searchParams.toString()}` === item.href);
+                const currentTab = searchParams.get('tab');
+                const currentStatus = searchParams.get('status');
+                let isActive = false;
+                if (item.href.includes('?')) {
+                  const [itemPath, itemQuery] = item.href.split('?');
+                  const itemParams = new URLSearchParams(itemQuery);
+                  const pathMatches = pathname === itemPath;
+                  const tabMatches = !itemParams.has('tab') || itemParams.get('tab') === (currentTab || (itemPath === '/billing' ? 'invoices' : itemPath === '/pharmacy' ? 'inventory' : null));
+                  const statusMatches = !itemParams.has('status') || itemParams.get('status') === currentStatus;
+                  isActive = pathMatches && tabMatches && statusMatches;
+                } else {
+                  isActive = pathname === item.href && (!currentStatus || currentStatus === 'all' || item.id === 'today');
+                }
+
                 return (
                   <Link
                     key={item.id}

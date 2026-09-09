@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { billingApi, patientsApi, walletApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
-
+import { Printer, X, Building2 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -20,17 +21,64 @@ const appointmentSources = [
   'IVF-Theatre', 'Lab', 'Nurse', 'OP', 'Package', 'Scan', 'Yoga'
 ];
 
+export const TARIFF_CATALOG = [
+  // Consultations & OPD
+  { category: 'Consultation', code: 'OPD-001', description: 'Senior Infertility Specialist Consultation', price: 1500 },
+  { category: 'Consultation', code: 'OPD-002', description: 'Routine Gynec Consultation / Follow-up', price: 800 },
+  { category: 'Consultation', code: 'OPD-003', description: 'Andrology / Male Fertility Consultation', price: 1200 },
+  { category: 'Consultation', code: 'OPD-004', description: 'Clinical Diet & Nutrition Counseling', price: 600 },
+  // Diagnostics & Scans
+  { category: 'Scans', code: 'USG-001', description: 'Pelvic Ultrasound TVS (Baseline)', price: 1500 },
+  { category: 'Scans', code: 'USG-002', description: 'Follicular Monitoring Scan (Single Sitting)', price: 800 },
+  { category: 'Scans', code: 'USG-003', description: 'Complete Follicular Tracking Package (6 Scans)', price: 4000 },
+  { category: 'Scans', code: 'USG-004', description: 'Early Pregnancy Viability / Dating Scan', price: 1800 },
+  { category: 'Scans', code: 'USG-005', description: 'Color Doppler Pelvis / Uterine Artery', price: 2500 },
+  // Laboratory & Andrology
+  { category: 'Lab', code: 'AND-001', description: 'CASA Semen Analysis (WHO 6th Edition)', price: 1200 },
+  { category: 'Lab', code: 'AND-002', description: 'Sperm DNA Fragmentation Index (DFI)', price: 3500 },
+  { category: 'Lab', code: 'AND-003', description: 'Semen Freezing & Vitrification (1 Year)', price: 8000 },
+  { category: 'Lab', code: 'LAB-001', description: 'Serum AMH (Anti-Mullerian Hormone)', price: 2200 },
+  { category: 'Lab', code: 'LAB-002', description: 'Day 2 Ovarian Reserve Profile (FSH, LH, E2, TSH, PRL)', price: 3500 },
+  { category: 'Lab', code: 'LAB-003', description: 'Couple Viral Markers (HIV, HBsAg, HCV, VDRL)', price: 2800 },
+  { category: 'Lab', code: 'LAB-004', description: 'Complete Blood Count (CBC) with ESR', price: 450 },
+  // Daycare & Procedures
+  { category: 'Procedure', code: 'PRC-001', description: 'Intrauterine Insemination (IUI) Procedure & Prep', price: 8500 },
+  { category: 'Procedure', code: 'PRC-002', description: 'Diagnostic Hysteroscopy (Daycare)', price: 18000 },
+  { category: 'Procedure', code: 'PRC-003', description: 'Operative Laparoscopy / Ovarian Drilling', price: 45000 },
+  { category: 'Procedure', code: 'PRC-004', description: 'Cervical Pap Smear & Liquid Based Cytology', price: 1200 },
+  // Pharmacy & Administration
+  { category: 'Pharmacy', code: 'PHR-001', description: 'Injection Administration & Nursing Charge', price: 200 },
+  { category: 'Daycare', code: 'DAY-001', description: 'Daycare Recovery Bed Charge (Up to 4 Hours)', price: 1500 },
+];
+
 export default function BillingPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const statusParam = searchParams.get('status');
+
   const [invoices, setInvoices] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'invoices' | 'packages' | 'wallet'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'packages' | 'wallet'>(
+    tabParam && ['invoices', 'packages', 'wallet'].includes(tabParam)
+      ? (tabParam as any)
+      : 'invoices'
+  );
 
   // Filters
   const [sourceFilter, setSourceFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(statusParam || '');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['invoices', 'packages', 'wallet'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+    const status = searchParams.get('status');
+    setStatusFilter(status || '');
+  }, [searchParams]);
 
   // New invoice form state
   const [showNewInvoice, setShowNewInvoice] = useState(false);
@@ -38,7 +86,8 @@ export default function BillingPage() {
   const [selectedSource, setSelectedSource] = useState('OP');
   const [reasonForAttendance, setReasonForAttendance] = useState('');
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0, total: 0 }]);
-  const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
+  const [discountValue, setDiscountValue] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [upiPayMode, setUpiPayMode] = useState('GPay');
   const [immediatePaid, setImmediatePaid] = useState(0);
@@ -60,11 +109,11 @@ export default function BillingPage() {
         status: statusFilter || undefined,
       }),
       billingApi.listPackages(),
-      patientsApi.list({ per_page: 100 }),
+      patientsApi.list({ per_page: 500 }),
     ]).then(([invData, pkgData, patData]: any) => {
       setInvoices(invData || []);
       setPackages(pkgData || []);
-      setPatients(patData.patients || []);
+      setPatients(patData.patients || patData.items || []);
     }).catch(() => {}).finally(() => setIsLoading(false));
   };
 
@@ -92,6 +141,22 @@ export default function BillingPage() {
     });
   };
 
+  const handleSelectTariff = (idx: number, tariffCode: string) => {
+    const tariff = TARIFF_CATALOG.find((t) => t.code === tariffCode);
+    if (!tariff) return;
+    setItems((prev) => {
+      const updated = [...prev];
+      const qty = updated[idx]?.quantity || 1;
+      updated[idx] = {
+        ...updated[idx],
+        description: tariff.description,
+        unit_price: tariff.price,
+        total: tariff.price * qty,
+      };
+      return updated;
+    });
+  };
+
   const addItemRow = () => {
     setItems([...items, { description: '', quantity: 1, unit_price: 0, total: 0 }]);
   };
@@ -113,7 +178,10 @@ export default function BillingPage() {
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-  const totalAmount = Math.max(0, subtotal - discount);
+  const calculatedDiscount = discountType === 'percentage'
+    ? Math.round((subtotal * (discountValue || 0)) / 100)
+    : (discountValue || 0);
+  const totalAmount = Math.max(0, subtotal - calculatedDiscount);
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +193,7 @@ export default function BillingPage() {
         appointment_source: selectedSource,
         reason_for_attendance: reasonForAttendance,
         items: items.map((i) => ({ ...i, total: i.unit_price * i.quantity })),
-        discount,
+        discount: calculatedDiscount,
         tax: 0,
         paid_amount: immediatePaid,
         wallet_amount_used: walletDeduction,
@@ -387,51 +455,68 @@ export default function BillingPage() {
 
       {/* Invoice Printable Receipt Modal */}
       {receiptModalInv && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:static print:bg-transparent print:z-auto">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl border border-slate-200 print:shadow-none print:border-none print:p-6 print:max-w-none print:w-full print:rounded-none">
             <div className="flex items-center justify-between border-b pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-black flex items-center justify-center">
-                  VM
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm print:border print:border-slate-800">
+                  <Building2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-slate-900">VaidyaMD Fertility & ART Centre</h2>
-                  <p className="text-xs text-slate-500">Jubilee Hills Main Hospital · GSTIN: 36AAAAA0000A1Z5</p>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">VaidyaMD Advanced Hospital & Fertility Centre</h2>
+                  <p className="text-xs text-slate-500 font-medium">Road No. 36, Jubilee Hills, Hyderabad · Phone: +91 40 2345 6789</p>
+                  <p className="text-[11px] text-slate-400 font-mono">GSTIN: 36AAAAA0000A1Z5 · Reg No: TS/MED/2024/9876</p>
                 </div>
               </div>
-              <button onClick={() => setReceiptModalInv(null)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+              <div className="text-right">
+                <span className={`inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase ${
+                  parseFloat(receiptModalInv.pending_due) <= 0
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : parseFloat(receiptModalInv.paid_amount) > 0
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                }`}>
+                  {parseFloat(receiptModalInv.pending_due) <= 0 ? 'PAID IN FULL' : parseFloat(receiptModalInv.paid_amount) > 0 ? 'PARTIAL PAYMENT' : 'UNPAID'}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">Hospital Tax Invoice</p>
+                <button onClick={() => setReceiptModalInv(null)} className="no-print ml-2 text-slate-400 hover:text-slate-700 font-bold">✕</button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl">
+            <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
               <div>
-                <p className="text-slate-400 font-bold uppercase text-[10px]">Patient Name</p>
+                <p className="text-slate-400 font-bold uppercase text-[10px]">Patient Information</p>
                 <p className="text-slate-900 font-black text-sm">{receiptModalInv.patient_name || 'Patient'}</p>
-                <p className="font-mono text-slate-500">{receiptModalInv.patient_vid || '—'}</p>
+                <p className="font-mono text-slate-600 font-medium">VID / MRN: {receiptModalInv.patient_vid || '—'}</p>
+                {receiptModalInv.reason_for_attendance && (
+                  <p className="text-slate-500 mt-0.5"><span className="font-semibold">Reason:</span> {receiptModalInv.reason_for_attendance}</p>
+                )}
               </div>
               <div className="text-right">
-                <p className="text-slate-400 font-bold uppercase text-[10px]">Invoice Details</p>
-                <p className="font-mono font-bold text-indigo-700">{receiptModalInv.invoice_number}</p>
-                <p className="text-slate-500">{formatDate(receiptModalInv.created_at)}</p>
+                <p className="text-slate-400 font-bold uppercase text-[10px]">Invoice Summary</p>
+                <p className="font-mono font-bold text-indigo-700 text-sm">{receiptModalInv.invoice_number}</p>
+                <p className="text-slate-600 font-medium">Date: {formatDate(receiptModalInv.created_at)}</p>
+                <p className="text-slate-500">Dept / Source: <span className="font-bold text-slate-700">{receiptModalInv.appointment_source || 'OPD'}</span></p>
               </div>
             </div>
 
             {/* Line Items */}
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider print:bg-slate-200">
                 <tr>
-                  <th className="p-2.5">Item Description</th>
-                  <th className="p-2.5 text-center">Qty</th>
-                  <th className="p-2.5 text-right">Unit Price</th>
-                  <th className="p-2.5 text-right">Total</th>
+                  <th className="p-2.5 border-b border-slate-200">Item / Procedure Description</th>
+                  <th className="p-2.5 text-center border-b border-slate-200">Qty</th>
+                  <th className="p-2.5 text-right border-b border-slate-200">Unit Rate (₹)</th>
+                  <th className="p-2.5 text-right border-b border-slate-200">Total (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {receiptModalInv.items?.map((it: any, i: number) => (
-                  <tr key={i}>
-                    <td className="p-2.5">{it.description}</td>
-                    <td className="p-2.5 text-center">{it.quantity}</td>
-                    <td className="p-2.5 text-right">₹{parseFloat(it.unit_price).toLocaleString()}</td>
-                    <td className="p-2.5 text-right font-bold">₹{parseFloat(it.total).toLocaleString()}</td>
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="p-2.5 text-slate-800 font-semibold">{it.description}</td>
+                    <td className="p-2.5 text-center text-slate-600">{it.quantity}</td>
+                    <td className="p-2.5 text-right font-mono text-slate-600">₹{parseFloat(it.unit_price).toLocaleString()}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">₹{parseFloat(it.total).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -440,45 +525,64 @@ export default function BillingPage() {
             {/* Summary Totals */}
             <div className="border-t pt-4 space-y-1.5 text-xs text-right">
               <div className="flex justify-between text-slate-500">
-                <span>Subtotal:</span>
-                <span>₹{parseFloat(receiptModalInv.subtotal || receiptModalInv.total_amount).toLocaleString()}</span>
+                <span>Subtotal / Gross Amount:</span>
+                <span className="font-mono font-semibold">₹{parseFloat(receiptModalInv.subtotal || receiptModalInv.total_amount).toLocaleString()}</span>
               </div>
               {parseFloat(receiptModalInv.discount) > 0 && (
                 <div className="flex justify-between text-rose-600 font-bold">
-                  <span>Discount:</span>
-                  <span>- ₹{parseFloat(receiptModalInv.discount).toLocaleString()}</span>
+                  <span>Concession / Discount:</span>
+                  <span className="font-mono">- ₹{parseFloat(receiptModalInv.discount).toLocaleString()}</span>
                 </div>
               )}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>GST (Healthcare Services - Exempted):</span>
+                <span className="font-mono">₹0.00 (0%)</span>
+              </div>
               {parseFloat(receiptModalInv.wallet_amount_used) > 0 && (
                 <div className="flex justify-between text-emerald-700 font-bold">
-                  <span>Paid from Advance Wallet:</span>
-                  <span>₹{parseFloat(receiptModalInv.wallet_amount_used).toLocaleString()}</span>
+                  <span>Deducted from Advance Wallet:</span>
+                  <span className="font-mono">- ₹{parseFloat(receiptModalInv.wallet_amount_used).toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-black text-slate-900 border-t pt-2">
-                <span>Total Amount:</span>
-                <span>₹{parseFloat(receiptModalInv.total_amount).toLocaleString()}</span>
+                <span>Net Total Billable:</span>
+                <span className="font-mono text-indigo-900">₹{parseFloat(receiptModalInv.total_amount).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-emerald-700 font-bold">
-                <span>Total Paid:</span>
-                <span>₹{parseFloat(receiptModalInv.paid_amount).toLocaleString()}</span>
+                <span>Total Amount Paid:</span>
+                <span className="font-mono">₹{parseFloat(receiptModalInv.paid_amount).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-rose-700 font-black">
-                <span>Pending Balance:</span>
-                <span>₹{parseFloat(receiptModalInv.pending_due).toLocaleString()}</span>
+              <div className="flex justify-between text-rose-700 font-black text-sm">
+                <span>Balance Due:</span>
+                <span className="font-mono">₹{parseFloat(receiptModalInv.pending_due).toLocaleString()}</span>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t">
+            {/* Signature & Terms */}
+            <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-4 items-end text-[11px] text-slate-400">
+              <div>
+                <p className="font-semibold text-slate-600">Terms & Conditions:</p>
+                <p>1. Payments received are non-refundable.</p>
+                <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
+                <p className="mt-2 text-[10px]">This is a computer-generated invoice and requires no physical stamp.</p>
+              </div>
+              <div className="text-right space-y-1">
+                <div className="border-b border-slate-300 w-40 ml-auto h-10"></div>
+                <p className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Authorized Signatory</p>
+                <p className="text-[10px] text-slate-500">VaidyaMD Accounts Billing Desk</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t no-print">
               <button
                 onClick={() => window.print()}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
               >
-                🖨️ Print Official Receipt
+                🖨️ Print Tax Invoice (A4)
               </button>
               <button
                 onClick={() => setReceiptModalInv(null)}
-                className="px-5 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl"
               >
                 Close
               </button>
@@ -492,8 +596,11 @@ export default function BillingPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-black text-lg text-slate-900">Generate Multi-Department Invoice</h3>
-              <button onClick={() => setShowNewInvoice(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+              <div>
+                <h3 className="font-black text-lg text-slate-900">Generate Multi-Department Invoice</h3>
+                <p className="text-xs text-slate-500">Add billable services, procedures, or select standard tariffs</p>
+              </div>
+              <button onClick={() => setShowNewInvoice(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
             </div>
 
             <form onSubmit={handleCreateInvoice} className="space-y-4">
@@ -533,58 +640,79 @@ export default function BillingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Reason for Attendance</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Reason for Attendance / Clinical Indication</label>
                 <input
                   type="text"
                   value={reasonForAttendance}
                   onChange={(e) => setReasonForAttendance(e.target.value)}
-                  placeholder="e.g. OPU Retrieval, Semen Analysis, Follicular Scan"
+                  placeholder="e.g. OPU Retrieval, Semen Analysis, Follicular Scan, OPD Consultation"
                   className="vmd-input text-xs"
                 />
               </div>
 
               {/* Line Items */}
-              <div className="space-y-2 pt-2 border-t">
-                <label className="block text-xs font-bold text-slate-700">Billable Services & Procedures</label>
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700">Billable Services & Procedures</label>
+                  <span className="text-[11px] text-slate-400">Select standard tariff or enter custom service</span>
+                </div>
                 {items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-6">
-                      <input
-                        type="text"
-                        placeholder="Service Description"
-                        value={item.description}
-                        onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                        required
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        placeholder="Qty"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <input
-                        type="number"
-                        placeholder="Unit Price ₹"
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div className="col-span-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeItemRow(idx)}
-                        className="text-rose-500 font-bold hover:text-rose-700 text-sm"
-                      >
-                        ✕
-                      </button>
+                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-12 sm:col-span-4">
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) handleSelectTariff(idx, e.target.value);
+                          }}
+                          defaultValue=""
+                          className="vmd-input text-xs bg-white text-slate-600 font-medium"
+                        >
+                          <option value="">⚡ Select Tariff Master...</option>
+                          {TARIFF_CATALOG.map((t) => (
+                            <option key={t.code} value={t.code}>
+                              [{t.category}] {t.description} (₹{t.price})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-12 sm:col-span-4">
+                        <input
+                          type="text"
+                          placeholder="Service Description (Select from Tariff)"
+                          value={item.description}
+                          readOnly
+                          className="vmd-input text-xs bg-slate-100 text-slate-600 cursor-not-allowed border-slate-300"
+                        />
+                      </div>
+                      <div className="col-span-4 sm:col-span-1">
+                        <input
+                          type="number"
+                          placeholder="Qty"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                          min={1}
+                          className="vmd-input text-xs bg-white text-center"
+                        />
+                      </div>
+                      <div className="col-span-6 sm:col-span-2">
+                        <input
+                          type="number"
+                          placeholder="Rate ₹"
+                          value={item.unit_price}
+                          readOnly
+                          className="vmd-input text-xs bg-slate-100 text-slate-600 font-mono cursor-not-allowed border-slate-300"
+                        />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(idx)}
+                          className="text-rose-500 font-bold hover:text-rose-700 text-sm px-2 py-1 rounded hover:bg-rose-50"
+                          title="Remove Item"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -593,30 +721,54 @@ export default function BillingPage() {
                   onClick={addItemRow}
                   className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
                 >
-                  + Add Line Item
+                  + Add Another Service
                 </button>
               </div>
 
               {/* Totals & Payments */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 pt-3">
                 <div className="flex justify-between text-xs text-slate-600">
-                  <span>Subtotal:</span>
-                  <span className="font-bold">₹{subtotal.toLocaleString()}</span>
+                  <span>Gross Subtotal:</span>
+                  <span className="font-bold font-mono">₹{subtotal.toLocaleString()}</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 items-end">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Discount (₹)</label>
-                    <input
-                      type="number"
-                      value={discount}
-                      onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                      className="vmd-input text-xs"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-slate-500">Concession / Discount</label>
+                      <div className="flex rounded-lg overflow-hidden border border-slate-300 text-[10px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setDiscountType('amount')}
+                          className={`px-2 py-0.5 ${discountType === 'amount' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600'}`}
+                        >
+                          ₹ Flat
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDiscountType('percentage')}
+                          className={`px-2 py-0.5 ${discountType === 'percentage' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600'}`}
+                        >
+                          % Pct
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={discountValue || ''}
+                        onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                        placeholder={discountType === 'percentage' ? 'e.g. 10%' : 'e.g. 500'}
+                        className="vmd-input text-xs pr-16 font-medium"
+                      />
+                      <span className="absolute right-3 top-2 text-[11px] font-bold text-slate-400 pointer-events-none">
+                        {discountType === 'percentage' ? `${calculatedDiscount ? `(-₹${calculatedDiscount})` : '%'}` : '₹'}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Total Billable Amount</label>
-                    <p className="text-lg font-black text-slate-900 pt-1">₹{totalAmount.toLocaleString()}</p>
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                    <label className="block text-[10px] font-bold uppercase text-slate-400">Total Billable Amount</label>
+                    <p className="text-xl font-black text-slate-900 font-mono">₹{totalAmount.toLocaleString()}</p>
                   </div>
                 </div>
 
