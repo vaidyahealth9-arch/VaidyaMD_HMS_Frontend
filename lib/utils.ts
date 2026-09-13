@@ -56,12 +56,12 @@ export function calculateBMI(weightKg: number, heightCm: number): string {
 
 /** Status color map for appointment statuses */
 export const statusColors: Record<string, string> = {
-  scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
-  waiting: 'bg-amber-100 text-amber-700 border-amber-200',
-  in_progress: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  completed: 'bg-slate-100 text-slate-600 border-slate-200',
-  cancelled: 'bg-red-100 text-red-700 border-red-200',
-  no_show: 'bg-red-100 text-red-700 border-red-200',
+  scheduled:   'bg-blue-50   text-blue-700   border-blue-200',
+  waiting:     'bg-amber-50  text-amber-700  border-amber-200',
+  in_progress: 'bg-teal-50   text-teal-700   border-teal-200',
+  completed:   'bg-slate-50  text-slate-500  border-slate-200',
+  cancelled:   'bg-red-50    text-red-600    border-red-200',
+  no_show:     'bg-red-50    text-red-600    border-red-200',
 };
 
 export const statusLabels: Record<string, string> = {
@@ -86,13 +86,13 @@ export const roleLabels: Record<string, string> = {
 
 /** Role color classes */
 export const roleColors: Record<string, string> = {
-  admin: 'bg-purple-100 text-purple-700',
-  doctor: 'bg-indigo-100 text-indigo-700',
-  nurse: 'bg-pink-100 text-pink-700',
-  receptionist: 'bg-cyan-100 text-cyan-700',
-  embryologist: 'bg-emerald-100 text-emerald-700',
-  andrologist: 'bg-teal-100 text-teal-700',
-  pharma: 'bg-orange-100 text-orange-700',
+  admin:         'bg-purple-100  text-purple-700',
+  doctor:        'bg-teal-100    text-teal-800',
+  nurse:         'bg-pink-100    text-pink-700',
+  receptionist:  'bg-sky-100     text-sky-700',
+  embryologist:  'bg-emerald-100 text-emerald-700',
+  andrologist:   'bg-cyan-100    text-cyan-700',
+  pharma:        'bg-orange-100  text-orange-700',
 };
 
 /** Check if a user role can access a field */
@@ -105,4 +105,31 @@ export function canAccessField(fieldRoles: string[] | undefined, userRole: strin
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength)}...`;
+}
+
+/**
+ * Format user role display:
+ * - If admin and is_doctor: "Admin + Doctor"
+ * - If admin and not is_doctor: "Admin only"
+ * - Otherwise: standard role label
+ */
+export function getUserRoleDisplay(user: { role?: string; is_doctor?: boolean } | null | undefined): string {
+  if (!user || !user.role) return 'Staff';
+  const roleLower = user.role.toLowerCase();
+  if (roleLower === 'admin') {
+    return user.is_doctor ? 'Admin + Doctor' : 'Admin only';
+  }
+  return roleLabels[roleLower] || user.role;
+}
+
+/**
+ * Determine if a user can act as a treating doctor.
+ * Admin cannot be doctor default, but can if is_doctor is true.
+ */
+export function isUserDoctor(user: { role?: string; is_doctor?: boolean } | null | undefined): boolean {
+  if (!user) return false;
+  const roleLower = (user.role || '').toLowerCase();
+  if (roleLower === 'doctor') return true;
+  if (roleLower === 'admin') return Boolean(user.is_doctor);
+  return Boolean(user.is_doctor);
 }

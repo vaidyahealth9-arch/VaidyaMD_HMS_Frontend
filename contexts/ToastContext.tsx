@@ -28,22 +28,16 @@ export const toast = {
   success: (title: string, description?: string) => {
     if (globalShowToast) {
       globalShowToast({ type: 'success', title, description });
-    } else {
-      console.log('Toast (success):', title, description);
     }
   },
   error: (title: string, description?: string) => {
     if (globalShowToast) {
       globalShowToast({ type: 'error', title, description });
-    } else {
-      console.error('Toast (error):', title, description);
     }
   },
   info: (title: string, description?: string) => {
     if (globalShowToast) {
       globalShowToast({ type: 'info', title, description });
-    } else {
-      console.info('Toast (info):', title, description);
     }
   },
 };

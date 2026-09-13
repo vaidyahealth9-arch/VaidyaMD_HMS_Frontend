@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { patientsApi, opdApi } from '@/lib/api';
+import { patientsApi, opdApi, appointmentsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Stethoscope,
@@ -21,12 +21,17 @@ import {
   Clock,
   Printer,
   FileText,
+  X,
+  ChevronDown,
+  ChevronUp,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
+import { Badge } from '@/shared/ui/badge';
 import AmbientScribeWidget from './AmbientScribeWidget';
 import SmartOrderDialog from './SmartOrderDialog';
 import PrintablePrescription from '@/components/common/PrintablePrescription';
@@ -89,6 +94,15 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   const [viewingRecord, setViewingRecord] = useState<any>(null);
   const [printablePrescription, setPrintablePrescription] = useState<any>(null);
 
+  // Workbench Mode: Doctor Consultation vs Nurse Triage View
+  const [workbenchMode, setWorkbenchMode] = useState<'doctor' | 'nurse'>(user?.role === 'nurse' ? 'nurse' : 'doctor');
+
+  // Collapsible States
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isDoctorVitalsExpanded, setIsDoctorVitalsExpanded] = useState(false); // Collapsed by default for Doctor
+  const [isHistorySectionExpanded, setIsHistorySectionExpanded] = useState(true);
+  const [isPlanSectionExpanded, setIsPlanSectionExpanded] = useState(true);
+
   // Fetch Selected Patient Details
   const { data: patient } = useQuery({
     queryKey: ['patient', selectedPatientId],
@@ -103,24 +117,97 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     enabled: !!selectedPatientId,
   });
 
+  // Fetch Patient Appointments (to locate today's triage / active appointment if not explicitly passed)
+  const { data: appointmentResponse } = useQuery({
+    queryKey: ['patient-appointments', selectedPatientId],
+    queryFn: () => appointmentsApi.list({ patient_id: selectedPatientId }),
+    enabled: !!selectedPatientId,
+  });
+
+  const patientAppointments = appointmentResponse?.appointments || [];
+
+  // Active or linked appointment
+  const currentAppointment = useMemo(() => {
+    if (appointment) return appointment;
+    if (!patientAppointments || patientAppointments.length === 0) return null;
+    return (
+      patientAppointments.find((a: any) => a.metadata?.triage || a.metadata_?.triage) ||
+      patientAppointments.find((a: any) => a.status === 'scheduled' || a.status === 'in_consultation' || a.status === 'arrived') ||
+      patientAppointments[0]
+    );
+  }, [appointment, patientAppointments]);
+
+  // Compute effective triage data across all sources (Appointment, Props, or Past Nurse Triage Records)
+  const effectiveTriage = useMemo(() => {
+    // 1. Explicit triageData prop
+    if (triageData?.vitals || triageData?.chief_complaint) {
+      return {
+        vitals: triageData.vitals,
+        chief_complaint: triageData.chief_complaint,
+        nurse_notes: triageData.nurse_notes,
+        source: 'Appointment Triage',
+      };
+    }
+    // 2. Appointment triage metadata
+    const apptTriage = currentAppointment?.metadata?.triage || currentAppointment?.metadata_?.triage;
+    if (apptTriage?.vitals || apptTriage?.chief_complaint) {
+      return {
+        vitals: apptTriage.vitals,
+        chief_complaint: apptTriage.chief_complaint,
+        nurse_notes: apptTriage.nurse_notes,
+        source: 'Appointment Triage',
+      };
+    }
+    // 3. Latest nurse triage record from consultationHistory
+    const triageRecord = consultationHistory?.find(
+      (r: any) => r.record_type === 'nurse_triage' || r.data?.record_type === 'nurse_triage' || (r.data?.vitals && !r.data?.plan)
+    );
+    if (triageRecord) {
+      return {
+        vitals: triageRecord.data?.vitals || {
+          bp:
+            triageRecord.data?.blood_pressure_systolic && triageRecord.data?.blood_pressure_diastolic
+              ? `${triageRecord.data.blood_pressure_systolic}/${triageRecord.data.blood_pressure_diastolic}`
+              : undefined,
+          hr: triageRecord.data?.heart_rate,
+          rr: triageRecord.data?.respiratory_rate,
+          temp: triageRecord.data?.temperature,
+          spo2: triageRecord.data?.spo2,
+          weight: triageRecord.data?.weight,
+          height: triageRecord.data?.height,
+          bmi: triageRecord.data?.bmi,
+        },
+        chief_complaint: triageRecord.data?.chief_complaints || triageRecord.data?.chief_complaint,
+        nurse_notes: triageRecord.data?.nurse_notes,
+        cvs_findings: triageRecord.data?.cvs_findings,
+        cns_findings: triageRecord.data?.cns_findings,
+        rs_findings: triageRecord.data?.rs_findings,
+        record_id: triageRecord.id,
+        source: 'Nurse Triage Record',
+      };
+    }
+    return null;
+  }, [triageData, currentAppointment, consultationHistory]);
+
   // Form Setup with Clean Non-Dummy Defaults
   const { register, handleSubmit, setValue, watch, reset } = useForm({
     defaultValues: {
-      weight: triageData?.vitals?.weight || '',
-      height: triageData?.vitals?.height || '',
-      bmi: triageData?.vitals?.bmi || '',
-      blood_pressure_systolic: triageData?.vitals?.bp?.split('/')[0] || '',
-      blood_pressure_diastolic: triageData?.vitals?.bp?.split('/')[1] || '',
-      heart_rate: triageData?.vitals?.hr || '',
-      respiratory_rate: triageData?.vitals?.rr || '',
-      temperature: triageData?.vitals?.temp || '',
-      spo2: triageData?.vitals?.spo2 || '',
-      chief_complaints: triageData?.chief_complaint || '',
+      weight: '',
+      height: '',
+      bmi: '',
+      blood_pressure_systolic: '',
+      blood_pressure_diastolic: '',
+      heart_rate: '',
+      respiratory_rate: '',
+      temperature: '',
+      spo2: '',
+      chief_complaints: '',
       history_of_illness: '',
       past_medical_history: '',
       cvs_findings: '',
       cns_findings: '',
       rs_findings: '',
+      nurse_notes: '',
       provisional_diagnosis: '',
       differential_diagnosis: '',
       investigations_ordered: '',
@@ -129,19 +216,48 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     },
   });
 
+  // Auto-populate Triage Data into form fields whenever effectiveTriage updates
+  useEffect(() => {
+    if (effectiveTriage) {
+      const v = effectiveTriage.vitals;
+      if (v) {
+        if (v.weight) setValue('weight', String(v.weight));
+        if (v.height) setValue('height', String(v.height));
+        if (v.bmi) setValue('bmi', String(v.bmi));
+        if (v.bp) {
+          const parts = String(v.bp).split('/');
+          if (parts[0]) setValue('blood_pressure_systolic', parts[0]);
+          if (parts[1]) setValue('blood_pressure_diastolic', parts[1]);
+        }
+        if (v.hr) setValue('heart_rate', String(v.hr));
+        if (v.rr) setValue('respiratory_rate', String(v.rr));
+        if (v.temp) setValue('temperature', String(v.temp));
+        if (v.spo2) setValue('spo2', String(v.spo2));
+      }
+      if (effectiveTriage.chief_complaint) {
+        setValue('chief_complaints', effectiveTriage.chief_complaint);
+      }
+      if (effectiveTriage.nurse_notes) {
+        setValue('nurse_notes', effectiveTriage.nurse_notes);
+      }
+      if (effectiveTriage.cvs_findings) setValue('cvs_findings', effectiveTriage.cvs_findings);
+      if (effectiveTriage.cns_findings) setValue('cns_findings', effectiveTriage.cns_findings);
+      if (effectiveTriage.rs_findings) setValue('rs_findings', effectiveTriage.rs_findings);
+    }
+  }, [effectiveTriage, setValue]);
+
   // Auto-apply template based on visit type if appointment is passed
   useEffect(() => {
-    if (appointment?.visit_type) {
-      // Map visit types to template IDs
+    if (currentAppointment?.visit_type) {
       const typeMap: Record<string, string> = {
-        'consultation': 'general_opd',
-        'procedure': 'infertility_workup',
-        'scan': 'follicular_monitoring',
-        'follow_up': 'pcos_metabolic' // or general_opd depending on defaults
+        consultation: 'general_opd',
+        procedure: 'infertility_workup',
+        scan: 'follicular_monitoring',
+        follow_up: 'pcos_metabolic',
       };
-      const templateIdToApply = typeMap[appointment.visit_type] || 'general_opd';
+      const templateIdToApply = typeMap[currentAppointment.visit_type] || 'general_opd';
       const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateIdToApply);
-      
+
       if (tmpl) {
         if (!watch('chief_complaints')) setValue('chief_complaints', tmpl.complaint);
         if (!watch('history_of_illness')) setValue('history_of_illness', tmpl.hopi);
@@ -150,7 +266,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         if (!watch('plan')) setValue('plan', tmpl.plan);
       }
     }
-  }, [appointment]);
+  }, [currentAppointment]);
 
   const weight = watch('weight');
   const height = watch('height');
@@ -175,22 +291,116 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Save Consultation Mutation
+  // Save Consultation Mutation (Doctor)
   const saveMutation = useMutation({
-    mutationFn: (formData: any) =>
-      opdApi.saveConsultation({
+    mutationFn: (formData: any) => {
+      const vitalsPayload = {
+        bp:
+          formData.blood_pressure_systolic && formData.blood_pressure_diastolic
+            ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
+            : undefined,
+        hr: formData.heart_rate,
+        rr: formData.respiratory_rate,
+        temp: formData.temperature,
+        spo2: formData.spo2,
+        weight: formData.weight,
+        height: formData.height,
+        bmi: formData.bmi,
+      };
+
+      const consultationPayload = {
+        ...formData,
+        record_type: 'opd_consultation',
+        vitals: vitalsPayload,
+        nurse_triage_merged: !!effectiveTriage,
+        triage_source: effectiveTriage?.source,
+        linked_triage_record_id: effectiveTriage?.record_id,
+        status: 'completed',
+      };
+
+      return opdApi.saveConsultation({
         patient_id: selectedPatientId,
         created_by: user?.id,
-        data: formData,
-      }),
+        record_id: effectiveTriage?.record_id, // Updates triage into unified doctor consultation!
+        data: consultationPayload,
+      });
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
+
+      // Automatically mark linked appointment as completed
+      const linkedApptId = currentAppointment?.id || appointment?.id;
+      if (linkedApptId) {
+        try {
+          await appointmentsApi.update(linkedApptId, { status: 'completed' });
+          queryClient.invalidateQueries({ queryKey: ['appointment', linkedApptId] });
+          queryClient.invalidateQueries({ queryKey: ['appointments'] });
+        } catch (err) {
+          console.error('Failed to complete linked appointment:', err);
+        }
+      }
+
+      setSaveSuccessMessage('OPD Consultation record (with triage vitals & prescription) successfully saved and added to EMR!');
+      setTimeout(() => setSaveSuccessMessage(null), 5000);
+    },
+  });
+
+  // Save Triage Mutation (Nurse)
+  const saveNurseTriageMutation = useMutation({
+    mutationFn: async (formData: any) => {
+      const vitalsPayload = {
+        bp:
+          formData.blood_pressure_systolic && formData.blood_pressure_diastolic
+            ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
+            : undefined,
+        hr: formData.heart_rate,
+        rr: formData.respiratory_rate,
+        temp: formData.temperature,
+        spo2: formData.spo2,
+        weight: formData.weight,
+        height: formData.height,
+        bmi: formData.bmi,
+      };
+
+      const linkedApptId = currentAppointment?.id || appointment?.id;
+      if (linkedApptId) {
+        await appointmentsApi.triage(linkedApptId, {
+          vitals: vitalsPayload,
+          chief_complaint: formData.chief_complaints,
+          nurse_notes: formData.nurse_notes,
+        });
+      }
+
+      return opdApi.saveConsultation({
+        patient_id: selectedPatientId,
+        created_by: user?.id,
+        record_id: effectiveTriage?.record_id,
+        data: {
+          ...formData,
+          record_type: 'nurse_triage',
+          vitals: vitalsPayload,
+          status: 'triage_completed',
+        },
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
-      setSaveSuccessMessage('OPD Consultation record successfully saved and added to EMR!');
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
+      setSaveSuccessMessage('Nurse triage vitals recorded successfully for Doctor OPD Consultation!');
       setTimeout(() => setSaveSuccessMessage(null), 5000);
     },
   });
 
   const onSubmit = (data: any, andPrint = false) => {
+    if (workbenchMode === 'nurse') {
+      saveNurseTriageMutation.mutate(data);
+      return;
+    }
+
     saveMutation.mutate(data, {
       onSuccess: () => {
         if (andPrint) {
@@ -221,7 +431,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             hopi: data.history_of_illness,
             pastHistory: data.past_medical_history,
             vitals: {
-              bp: data.blood_pressure_systolic && data.blood_pressure_diastolic ? `${data.blood_pressure_systolic}/${data.blood_pressure_diastolic}` : undefined,
+              bp:
+                data.blood_pressure_systolic && data.blood_pressure_diastolic
+                  ? `${data.blood_pressure_systolic}/${data.blood_pressure_diastolic}`
+                  : undefined,
               pulse: data.heart_rate ? `${data.heart_rate} bpm` : undefined,
               temp: data.temperature ? `${data.temperature} °F` : undefined,
               weight: data.weight ? `${data.weight} kg` : undefined,
@@ -230,7 +443,14 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             diagnosis: data.provisional_diagnosis,
             medications: meds,
             advice: data.plan,
-            nextFollowUp: data.follow_up === '1_week' ? 'Review in 1 week' : data.follow_up === '2_weeks' ? 'Review in 2 weeks' : data.follow_up === '1_month' ? 'Review in 1 month' : 'As advised',
+            nextFollowUp:
+              data.follow_up === '1_week'
+                ? 'Review in 1 week'
+                : data.follow_up === '2_weeks'
+                ? 'Review in 2 weeks'
+                : data.follow_up === '1_month'
+                ? 'Review in 1 month'
+                : 'As advised',
           });
         }
       },
@@ -268,11 +488,17 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
   // Insert Order Set from Smart Order Palette
   const handleSelectOrderSet = (orderSet: any) => {
-    const newInv = `[${orderSet.name}]:\n- ${orderSet.investigations.join('\n- ')}`;
-    setValue('investigations_ordered', newInv);
+    const invItems = Array.isArray(orderSet.investigations) ? orderSet.investigations : [];
+    const medItems = Array.isArray(orderSet.medications) ? orderSet.medications : [];
 
-    const newPlan = `Prescribed Order Set [${orderSet.name}]:\n- ${orderSet.medications.join('\n- ')}\nInstructions: ${orderSet.instructions || 'None'}`;
-    setValue('plan', newPlan);
+    const newInv = `[${orderSet.name}]:\n- ${invItems.join('\n- ')}`;
+    const currentInv = watch('investigations_ordered');
+    setValue('investigations_ordered', currentInv && currentInv.trim() ? `${currentInv.trim()}\n\n${newInv}` : newInv);
+
+    const instPart = orderSet.instructions ? `\nInstructions: ${orderSet.instructions}` : '';
+    const newPlan = `Prescribed Order Set [${orderSet.name}]:\n- ${medItems.join('\n- ')}${instPart}`;
+    const currentPlan = watch('plan');
+    setValue('plan', currentPlan && currentPlan.trim() ? `${currentPlan.trim()}\n\n${newPlan}` : newPlan);
   };
 
   const handlePrintPrevious = (rec: any) => {
@@ -303,7 +529,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       hopi: rec.data?.history_of_illness,
       pastHistory: rec.data?.past_medical_history,
       vitals: {
-        bp: rec.data?.blood_pressure_systolic && rec.data?.blood_pressure_diastolic ? `${rec.data.blood_pressure_systolic}/${rec.data.blood_pressure_diastolic}` : undefined,
+        bp:
+          rec.data?.blood_pressure_systolic && rec.data?.blood_pressure_diastolic
+            ? `${rec.data.blood_pressure_systolic}/${rec.data.blood_pressure_diastolic}`
+            : undefined,
         pulse: rec.data?.heart_rate ? `${rec.data.heart_rate} bpm` : undefined,
         temp: rec.data?.temperature ? `${rec.data.temperature} °F` : undefined,
         weight: rec.data?.weight ? `${rec.data.weight} kg` : undefined,
@@ -312,417 +541,684 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       diagnosis: rec.data?.provisional_diagnosis,
       medications: meds,
       advice: rec.data?.plan,
-      nextFollowUp: rec.data?.follow_up === '1_week' ? 'Review in 1 week' : rec.data?.follow_up === '2_weeks' ? 'Review in 2 weeks' : rec.data?.follow_up === '1_month' ? 'Review in 1 month' : 'As advised',
+      nextFollowUp:
+        rec.data?.follow_up === '1_week'
+          ? 'Review in 1 week'
+          : rec.data?.follow_up === '2_weeks'
+          ? 'Review in 2 weeks'
+          : rec.data?.follow_up === '1_month'
+          ? 'Review in 1 month'
+          : 'As advised',
     });
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-slate-50">
       {/* Top Patient Selector Bar */}
-      <div className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
+      <div className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between flex-shrink-0 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-            <Stethoscope className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-md bg-[rgb(var(--clr-primary)/0.08)] border border-[rgb(var(--clr-primary)/0.2)] flex items-center justify-center text-[rgb(var(--clr-primary))]">
+            <Stethoscope className="w-4 h-4" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">OPD Clinical Workbench</h1>
-            <p className="text-[11px] text-slate-500 font-medium">Outpatient consultation, dynamic EMR charting & ambient scribing</p>
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">OPD Clinical Workbench</h1>
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium">Outpatient consultation, dynamic EMR charting &amp; ambient scribing</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* View Mode Switcher: Doctor Consultation vs Nurse Triage */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setWorkbenchMode('doctor')}
+              className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 ${
+                workbenchMode === 'doctor'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Doctor View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkbenchMode('nurse')}
+              className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 ${
+                workbenchMode === 'nurse'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <HeartPulse className="w-3.5 h-3.5 text-rose-600" />
+              <span>Nurse Triage</span>
+            </button>
+          </div>
+
           {onBack && (
             <Button
               variant="outline"
               size="sm"
               onClick={onBack}
-              className="gap-1.5 text-xs font-bold bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl h-8 mr-2"
+              className="gap-1 text-xs font-bold bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-md h-8"
             >
-              <span>&larr; Back to Queue</span>
+              <span>&larr; Back to EMR</span>
             </Button>
           )}
 
-          {/* Quick Template Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
-            <FileText className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[11px] font-bold text-slate-600 hidden sm:inline">Template:</span>
-            <select
-              onChange={(e) => {
-                if (e.target.value) handleApplyTemplate(e.target.value);
-              }}
-              defaultValue=""
-              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
-            >
-              <option value="" disabled>— Select Clinical Template —</option>
-              {CLINICAL_TEMPLATES.map((tmpl) => (
-                <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
-              ))}
-            </select>
-          </div>
+          {workbenchMode === 'doctor' && (
+            <>
+              {/* Quick Template Selector */}
+              <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) handleApplyTemplate(e.target.value);
+                  }}
+                  defaultValue=""
+                  className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                >
+                  <option value="" disabled>
+                    — Clinical Template —
+                  </option>
+                  {CLINICAL_TEMPLATES.map((tmpl) => (
+                    <option key={tmpl.id} value={tmpl.id}>
+                      {tmpl.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSmartOrderOpen(true)}
-            className="gap-1.5 text-xs font-bold bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 rounded-xl h-8"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Order Sets (Cmd+K)</span>
-          </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSmartOrderOpen(true)}
+                className="gap-1.5 text-xs font-bold bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.12)] rounded-md h-8"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Order Sets (Cmd+K)</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Split-Screen Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT PANE: Patient Details, Alerts, Vitals & Consultation History */}
-        <div className="w-80 lg:w-96 border-r border-slate-200 bg-white flex flex-col overflow-y-auto flex-shrink-0">
-          {/* Patient Card */}
-          {patient && (
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">{patient.name}</h2>
-                  <p className="text-xs text-indigo-600 font-semibold">{patient.mrn || 'MRN: VAIDYA-2026-092'}</p>
+        {/* LEFT PANE: Collapsible Consultation History Sidebar (Zero Demographics Duplication) */}
+        <div
+          className={`border-r border-slate-200 bg-white flex flex-col transition-all duration-300 flex-shrink-0 ${
+            isSidebarOpen ? 'w-72 sm:w-80' : 'w-12'
+          }`}
+        >
+          {/* Sidebar Header with Collapse Toggle */}
+          <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            {isSidebarOpen ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-slate-600" />
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Past Consultations</h3>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                    {consultationHistory?.length || 0}
+                  </Badge>
                 </div>
-                <Badge variant="purple" className="text-xs font-bold">
-                  {patient.gender || 'Female'}, {patient.age || 31}y
-                </Badge>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-200/60 transition-colors"
+                  title="Collapse History Sidebar"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="w-full flex justify-center text-slate-500 hover:text-slate-800 p-1"
+                title="Expand History Sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-              <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">BLOOD GROUP</span>
-                  <span className="font-bold text-slate-800">{patient.blood_group || 'Not Specified'}</span>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">PHONE</span>
-                  <span className="font-semibold text-slate-800">{patient.phone || '—'}</span>
-                </div>
-              </div>
-
-              {/* Allergy / Clinical Alerts - Non-dummy fix */}
-              {patient.alert_notes && patient.alert_notes.length > 0 ? (
-                <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          {/* Previous Consultations List */}
+          {isSidebarOpen && (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+              {/* Active Clinical Alerts in Sidebar (Compact if any) */}
+              {patient?.alert_notes && patient.alert_notes.length > 0 && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
-                    <span>{patient.alert_notes.join(', ')}</span>
+                    <span className="font-bold block text-[10px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
+                    <span className="text-[11px]">{patient.alert_notes.join(', ')}</span>
                   </div>
                 </div>
-              ) : (
-                <div className="mt-3 p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700 flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-[11px] font-medium">No known drug allergies or active clinical alerts</span>
-                </div>
               )}
-            </div>
-          )}
 
-          {/* Previous Consultations History */}
-          <div className="p-4 flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <History className="w-4 h-4 text-slate-500" />
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Consultation History</h3>
-            </div>
-
-            {consultationHistory && consultationHistory.length > 0 ? (
-              <div className="flex flex-col gap-2.5">
-                {consultationHistory.map((rec: any) => (
-                  <div 
-                    key={rec.id} 
-                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors group relative"
+              {consultationHistory && consultationHistory.length > 0 ? (
+                consultationHistory.map((rec: any) => (
+                  <div
+                    key={rec.id}
+                    className="p-2.5 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors group relative shadow-2xs"
                   >
                     <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
-                      <span 
+                      <span
                         onClick={() => setViewingRecord(rec)}
-                        className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 group-hover:text-[rgb(var(--clr-primary))] transition-colors cursor-pointer"
                       >
                         <Clock className="w-3 h-3 text-slate-400" />
                         {formatDateTime(rec.created_at)}
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => handlePrintPrevious(rec)}
-                          className="px-2 py-0.5 text-[10px] font-bold bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md flex items-center gap-1 shadow-2xs"
+                          className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] border border-[rgb(var(--clr-primary)/0.2)] rounded flex items-center gap-1 shadow-2xs"
                           title="Print Prescription (Rx)"
                         >
                           <Printer className="w-2.5 h-2.5" />
-                          <span>Print Rx</span>
+                          <span>Rx</span>
                         </button>
-                        <Badge variant="outline" className="text-[10px]">{rec.record_type}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] px-1.5 py-0 font-medium ${
+                            rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
+                              ? 'bg-rose-50 text-rose-700 border-rose-300'
+                              : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                        >
+                          {rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
+                            ? 'OPD (Vitals+Rx)'
+                            : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
+                            ? 'Triage'
+                            : 'OPD'}
+                        </Badge>
                       </div>
                     </div>
-                    <p 
+                    <p
                       onClick={() => setViewingRecord(rec)}
                       className="text-xs font-bold text-slate-800 line-clamp-1 cursor-pointer"
                     >
-                      Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'General OPD'}
+                      Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'Clinical Review'}
                     </p>
                     {rec.data?.plan && (
-                      <p 
+                      <p
                         onClick={() => setViewingRecord(rec)}
-                        className="text-[11px] text-slate-600 line-clamp-2 mt-1 bg-white p-1.5 rounded border border-slate-100 cursor-pointer"
+                        className="text-[10px] text-slate-600 line-clamp-2 mt-1 bg-white p-1 rounded border border-slate-100 cursor-pointer"
                       >
                         {rec.data.plan}
                       </p>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400 text-xs">
-                No previous consultations on record for this patient.
-              </div>
-            )}
-          </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No previous consultations recorded for this patient.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT PANE: Dynamic OPD Clinical Consultation Form */}
-        <div className="flex-1 overflow-y-auto p-6 relative">
+        {/* RIGHT PANE: Dynamic Form (Doctor Consultation vs Nurse Triage) */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative">
           {saveSuccessMessage && (
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-semibold flex items-center gap-2 animate-in fade-in">
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-sm font-semibold flex items-center gap-2 animate-in fade-in">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
               <span>{saveSuccessMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 max-w-5xl pb-24">
-            <div className="space-y-6">
-              {/* SECTION 1: Subjective */}
+          {/* ========================================================= */}
+          {/* NURSE TRIAGE VIEW: ONLY PATIENT VITALS & ANTHROPOMETRICS */}
+          {/* ========================================================= */}
+          {workbenchMode === 'nurse' ? (
+            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 max-w-4xl pb-24">
               <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
-                  <CardTitle className="text-sm">Clinical History & Subjective Assessment</CardTitle>
+                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <HeartPulse className="w-4 h-4 text-rose-600" />
+                    <CardTitle className="text-sm font-bold text-slate-900">Nurse Triage Assessment &amp; Vital Signs</CardTitle>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue('blood_pressure_systolic', '120');
+                      setValue('blood_pressure_diastolic', '80');
+                      setValue('heart_rate', '72');
+                      setValue('respiratory_rate', '16');
+                      setValue('temperature', '98.6');
+                      setValue('spo2', '98');
+                      setValue('cvs_findings', 'S1 S2 heard, no murmurs');
+                      setValue('cns_findings', 'Conscious, oriented, afebrile');
+                      setValue('rs_findings', 'Bilateral vesicular breath sounds, clear');
+                    }}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md transition-colors"
+                  >
+                    + Autofill Normal Vitals
+                  </button>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Chief Complaints <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      {...register('chief_complaints', { required: true })}
-                      rows={2}
-                      placeholder="e.g. Primary subfertility for 3 years, irregular menses..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+                  {/* Vitals Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">BP Systolic</label>
+                      <Input type="number" {...register('blood_pressure_systolic')} placeholder="120" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">BP Diastolic</label>
+                      <Input type="number" {...register('blood_pressure_diastolic')} placeholder="80" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Pulse (bpm)</label>
+                      <Input type="number" {...register('heart_rate')} placeholder="72" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Resp Rate</label>
+                      <Input type="number" {...register('respiratory_rate')} placeholder="16" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Temp (°F)</label>
+                      <Input type="number" step="0.1" {...register('temperature')} placeholder="98.6" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">SpO2 (%)</label>
+                      <Input type="number" {...register('spo2')} placeholder="98" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Weight (kg)</label>
+                      <Input type="number" step="0.1" {...register('weight')} placeholder="65" className="h-9 text-xs font-semibold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Height (cm)</label>
+                      <Input type="number" {...register('height')} placeholder="165" className="h-9 text-xs font-semibold" />
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Calculated BMI */}
+                  {watch('bmi') && (
+                    <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-md text-xs">
+                      <span className="font-semibold text-slate-600">Calculated Body Mass Index (BMI):</span>
+                      <strong className="text-slate-900">{watch('bmi')} kg/m²</strong>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {Number(watch('bmi')) < 18.5
+                          ? 'Underweight'
+                          : Number(watch('bmi')) < 25
+                          ? 'Normal'
+                          : Number(watch('bmi')) < 30
+                          ? 'Overweight'
+                          : 'Obese'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Triage Chief Complaint & Nurse Notes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">History of Present Illness</label>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Chief Complaint (Patient Statement) <span className="text-red-500">*</span>
+                      </label>
                       <textarea
-                        {...register('history_of_illness')}
+                        {...register('chief_complaints', { required: true })}
                         rows={3}
-                        placeholder="Detailed chronological history..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g. Lower abdominal pain since yesterday, feeling feverish..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                       />
                     </div>
-
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Past Medical / Surgical History</label>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Nurse Observation Notes</label>
                       <textarea
-                        {...register('past_medical_history')}
+                        {...register('nurse_notes')}
                         rows={3}
-                        placeholder="Previous hospitalizations, surgeries, drug allergies..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="e.g. Patient ambulatory, alert. Accompanied by spouse..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                       />
+                    </div>
+                  </div>
+
+                  {/* Quick Systemic Findings */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <h4 className="text-xs font-bold text-slate-700 mb-2">Preliminary Systemic Findings (Optional)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 block mb-1">CVS</label>
+                        <Input {...register('cvs_findings')} placeholder="e.g. Normal S1 S2" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 block mb-1">CNS</label>
+                        <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 block mb-1">RS</label>
+                        <Input {...register('rs_findings')} placeholder="e.g. Clear breath sounds" className="h-8 text-xs" />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* SECTION 2: Objective & Vitals */}
+              {/* Nurse Triage Save Action */}
+              <div className="flex items-center justify-start gap-3 pt-4 border-t border-slate-200">
+                <Button
+                  type="submit"
+                  disabled={saveNurseTriageMutation.isPending}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 h-10 rounded-md shadow-sm gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saveNurseTriageMutation.isPending ? 'Saving Triage...' : 'Save Nurse Triage Vitals'}</span>
+                </Button>
+              </div>
+            </form>
+          ) : (
+            /* ========================================================= */
+            /* DOCTOR CONSULTATION VIEW: COLLAPSED SUMMARY ON TOP        */
+            /* ========================================================= */
+            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-5 max-w-5xl pb-24">
+              {/* Top Collapsible Vitals & Triage Summary Banner (Doctor View) */}
+              <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs transition-all">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <HeartPulse className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                      <span className="uppercase tracking-wider text-[11px] text-slate-500">Triage Vitals:</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
+                        BP: <strong className="text-slate-900">{watch('blood_pressure_systolic') && watch('blood_pressure_diastolic') ? `${watch('blood_pressure_systolic')}/${watch('blood_pressure_diastolic')}` : '—'}</strong> mmHg
+                      </span>
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
+                        HR: <strong className="text-slate-900">{watch('heart_rate') || '—'}</strong> bpm
+                      </span>
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
+                        Temp: <strong className="text-slate-900">{watch('temperature') || '—'}</strong> °F
+                      </span>
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
+                        SpO2: <strong className="text-slate-900">{watch('spo2') || '—'}</strong>%
+                      </span>
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
+                        Wt: <strong className="text-slate-900">{watch('weight') || '—'}</strong> kg
+                      </span>
+                      {watch('bmi') && (
+                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded font-bold text-indigo-700">
+                          BMI: {watch('bmi')}
+                        </span>
+                      )}
+                    </div>
+                    {effectiveTriage && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        ✓ Triage Vitals Linked
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDoctorVitalsExpanded(!isDoctorVitalsExpanded)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 px-2.5 py-1 rounded hover:bg-indigo-50 transition-colors self-end sm:self-center"
+                  >
+                    {isDoctorVitalsExpanded ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5" />
+                        <span>Collapse Vitals</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                        <span>Edit / View Vitals &amp; Exam</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Nurse Observation Notes Banner (if provided) */}
+                {watch('nurse_notes') && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-start gap-2 text-xs bg-slate-50/80 p-2 rounded-md">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">Nurse Triage Notes: </span>
+                      <span className="text-slate-700 text-xs">{watch('nurse_notes')}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expanded Vitals & Systemic Exam Editor */}
+                {isDoctorVitalsExpanded && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-4 animate-in fade-in slide-in-from-top-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">BP Systolic</label>
+                        <Input type="number" {...register('blood_pressure_systolic')} placeholder="120" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">BP Diastolic</label>
+                        <Input type="number" {...register('blood_pressure_diastolic')} placeholder="80" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Heart Rate</label>
+                        <Input type="number" {...register('heart_rate')} placeholder="72" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Resp Rate</label>
+                        <Input type="number" {...register('respiratory_rate')} placeholder="16" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Temp (°F)</label>
+                        <Input type="number" step="0.1" {...register('temperature')} placeholder="98.6" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">SpO2 (%)</label>
+                        <Input type="number" {...register('spo2')} placeholder="98" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Weight (kg)</label>
+                        <Input type="number" step="0.1" {...register('weight')} placeholder="65" className="h-8 text-xs font-semibold" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Height (cm)</label>
+                        <Input type="number" {...register('height')} placeholder="165" className="h-8 text-xs font-semibold" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">CVS Findings</label>
+                        <Input {...register('cvs_findings')} placeholder="e.g. S1 S2 normal" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">CNS Findings</label>
+                        <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">RS Findings</label>
+                        <Input {...register('rs_findings')} placeholder="e.g. Bilateral clear" className="h-8 text-xs" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 1: Subjective / Clinical History (Collapsible Card) */}
               <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
-                  <div className="flex items-center gap-2">
-                    <HeartPulse className="w-4 h-4 text-indigo-600" />
-                    <CardTitle className="text-sm">Patient Vitals & Anthropometrics</CardTitle>
-                  </div>
+                <CardHeader
+                  className="py-3 px-4 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between cursor-pointer select-none"
+                  onClick={() => setIsHistorySectionExpanded(!isHistorySectionExpanded)}
+                >
+                  <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                    Clinical History &amp; Subjective Assessment
+                  </CardTitle>
+                  <button type="button" className="text-slate-400 hover:text-slate-600">
+                    {isHistorySectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
                 </CardHeader>
-                <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">BP Systolic</label>
-                    <Input type="number" {...register('blood_pressure_systolic')} placeholder="120" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">BP Diastolic</label>
-                    <Input type="number" {...register('blood_pressure_diastolic')} placeholder="80" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Heart Rate (bpm)</label>
-                    <Input type="number" {...register('heart_rate')} placeholder="72" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Resp Rate (/min)</label>
-                    <Input type="number" {...register('respiratory_rate')} placeholder="16" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Temp (°F)</label>
-                    <Input type="number" step="0.1" {...register('temperature')} placeholder="98.6" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">SpO2 (%)</label>
-                    <Input type="number" {...register('spo2')} placeholder="98" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Weight (kg)</label>
-                    <Input type="number" step="0.1" {...register('weight')} placeholder="65" className="h-9 text-xs font-semibold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Height (cm)</label>
-                    <Input type="number" {...register('height')} placeholder="165" className="h-9 text-xs font-semibold" />
-                  </div>
-                </CardContent>
-                <div className="border-t border-slate-100 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold text-slate-700">Systemic Examination Findings</h4>
-                    <button
+                {isHistorySectionExpanded && (
+                  <CardContent className="p-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Chief Complaints <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        {...register('chief_complaints', { required: true })}
+                        rows={2}
+                        placeholder="e.g. Primary subfertility for 3 years, irregular menses..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">History of Present Illness (HOPI)</label>
+                        <textarea
+                          {...register('history_of_illness')}
+                          rows={3}
+                          placeholder="Detailed chronological history..."
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Past Medical / Surgical History</label>
+                        <textarea
+                          {...register('past_medical_history')}
+                          rows={3}
+                          placeholder="Previous hospitalizations, surgeries, drug allergies..."
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* SECTION 2: Assessment & Plan (Collapsible Card) */}
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader
+                  className="py-3 px-4 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between cursor-pointer select-none"
+                  onClick={() => setIsPlanSectionExpanded(!isPlanSectionExpanded)}
+                >
+                  <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                    Assessment, Orders &amp; Management Plan
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
                       type="button"
-                      onClick={() => {
-                        // Vitals
-                        if (!watch('blood_pressure_systolic')) setValue('blood_pressure_systolic', '120');
-                        if (!watch('blood_pressure_diastolic')) setValue('blood_pressure_diastolic', '80');
-                        if (!watch('heart_rate')) setValue('heart_rate', '72');
-                        if (!watch('respiratory_rate')) setValue('respiratory_rate', '16');
-                        if (!watch('temperature')) setValue('temperature', '98.6');
-                        if (!watch('spo2')) setValue('spo2', '98');
-                        // Systemic Exam
-                        setValue('cvs_findings', 'S1 S2 heard, no murmurs');
-                        setValue('cns_findings', 'Conscious, oriented, afebrile');
-                        setValue('rs_findings', 'Bilateral vesicular breath sounds, clear');
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSmartOrderOpen(true);
                       }}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 transition-colors"
+                      className="gap-1.5 text-[11px] text-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.08)] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.12)] rounded h-7"
                     >
-                      + Autofill Normal Vitals & Exam
+                      <Sparkles className="w-3 h-3" />
+                      <span>Insert Order Set</span>
+                    </Button>
+                    <button type="button" className="text-slate-400 hover:text-slate-600">
+                      {isPlanSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">CVS Findings</label>
-                      <Input {...register('cvs_findings')} placeholder="e.g. S1 S2 normal" className="h-9 text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">CNS Findings</label>
-                      <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-9 text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">RS Findings</label>
-                      <Input {...register('rs_findings')} placeholder="e.g. Bilateral clear" className="h-9 text-xs" />
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* SECTION 3: Assessment */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50 rounded-t-xl flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm">Assessment, Orders & Management Plan</CardTitle>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSmartOrderOpen(true)}
-                    className="gap-1.5 text-xs text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 rounded-lg h-7 mt-0"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Insert Order Set</span>
-                  </Button>
                 </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isPlanSectionExpanded && (
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Provisional Diagnosis</label>
+                        <Input
+                          {...register('provisional_diagnosis')}
+                          placeholder="e.g. PCOS Phenotype A / Unexplained Infertility"
+                          className="h-9 text-xs font-bold text-slate-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Differential Diagnosis</label>
+                        <Input
+                          {...register('differential_diagnosis')}
+                          placeholder="e.g. Hypothalamic amenorrhea, Hyperprolactinemia"
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Provisional Diagnosis</label>
-                      <Input
-                        {...register('provisional_diagnosis')}
-                        placeholder="e.g. PCOS Phenotype A / Unexplained Infertility"
-                        className="h-9 text-xs font-bold text-indigo-900"
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <FlaskConical className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
+                          <span>Investigations &amp; Diagnostics Ordered</span>
+                        </label>
+                      </div>
+                      <textarea
+                        {...register('investigations_ordered')}
+                        rows={3}
+                        placeholder="e.g. AMH, Pelvic TVS, Semen Analysis, Day 2 FSH/LH..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] font-mono"
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Differential Diagnosis</label>
-                      <Input
-                        {...register('differential_diagnosis')}
-                        placeholder="e.g. Hypothalamic amenorrhea, Hyperprolactinemia"
-                        className="h-9 text-xs"
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Pill className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
+                          <span>Prescriptions &amp; Management Plan</span>
+                        </label>
+                      </div>
+                      <textarea
+                        {...register('plan')}
+                        rows={4}
+                        placeholder="Detailed Rx with dosages, frequencies, dietary and lifestyle instructions..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <FlaskConical className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Investigations & Diagnostics Ordered</span>
-                      </label>
+                    <div className="w-48">
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Follow-Up Schedule</label>
+                      <select
+                        {...register('follow_up')}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                      >
+                        <option value="1_week">1 Week</option>
+                        <option value="2_weeks">2 Weeks</option>
+                        <option value="1_month">1 Month</option>
+                        <option value="3_months">3 Months</option>
+                        <option value="sos">SOS (As needed)</option>
+                        <option value="no_followup">No Follow-up required</option>
+                      </select>
                     </div>
-                    <textarea
-                      {...register('investigations_ordered')}
-                      rows={3}
-                      placeholder="e.g. AMH, Pelvic TVS, Semen Analysis, Day 2 FSH/LH..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <Pill className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Prescriptions & Management Plan</span>
-                      </label>
-                    </div>
-                    <textarea
-                      {...register('plan')}
-                      rows={4}
-                      placeholder="Detailed Rx with dosages, frequencies, dietary and lifestyle instructions..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-
-                  <div className="w-48">
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Follow-Up Schedule</label>
-                    <select
-                      {...register('follow_up')}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="1_week">1 Week</option>
-                      <option value="2_weeks">2 Weeks</option>
-                      <option value="1_month">1 Month</option>
-                      <option value="3_months">3 Months</option>
-                      <option value="sos">SOS (As needed)</option>
-                      <option value="no_followup">No Follow-up required</option>
-                    </select>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
-            </div>
 
-            {/* Bottom Form Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={saveMutation.isPending}
-                onClick={handleSubmit((data) => onSubmit(data, true))}
-                className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-11 rounded-xl shadow-sm gap-2"
-              >
-                <Printer className="w-4 h-4 text-emerald-600" />
-                <span>Save & Print Rx</span>
-              </Button>
-              <Button
-                type="submit"
-                disabled={saveMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 h-11 rounded-xl shadow-lg shadow-indigo-500/20 gap-2"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saveMutation.isPending ? 'Saving to EMR...' : 'Save Consultation Record'}</span>
-              </Button>
-            </div>
-          </form>
+              {/* Bottom Form Actions - Left-aligned to keep bottom-right pinned Scribe button unobstructed */}
+              <div className="flex items-center justify-start gap-3 pt-4 border-t border-slate-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saveMutation.isPending}
+                  onClick={handleSubmit((data) => onSubmit(data, true))}
+                  className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-10 rounded-md shadow-xs gap-2"
+                >
+                  <Printer className="w-4 h-4 text-emerald-600" />
+                  <span>Save &amp; Print Rx</span>
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saveMutation.isPending}
+                  className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saveMutation.isPending ? 'Saving to EMR...' : 'Save Consultation Record'}</span>
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
-      {/* Floating Ambient AI Scribe Widget */}
+      {/* Floating Collapsible Ambient AI Scribe Widget (Bottom Right - Pinned) */}
       <AmbientScribeWidget patientId={selectedPatientId} onDataParsed={handleScribeParsed} />
 
       {/* Smart Order Set Palette (Cmd+K) */}
@@ -734,24 +1230,24 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
       {/* History Full View Modal */}
       {viewingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
                 <h3 className="font-bold text-slate-900 text-lg">Consultation Record</h3>
                 <p className="text-xs text-slate-500">{formatDateTime(viewingRecord.created_at)}</p>
               </div>
-              <button 
+              <button
                 onClick={() => setViewingRecord(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto space-y-6">
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Subjective & History</h4>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Subjective &amp; History</h4>
+                <div className="bg-slate-50 p-4 rounded-md border border-slate-100 space-y-3">
                   <div>
                     <span className="font-semibold text-slate-700 text-sm">Chief Complaints:</span>
                     <p className="text-sm text-slate-600 mt-1">{viewingRecord.data?.chief_complaints || 'None recorded'}</p>
@@ -772,38 +1268,42 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
               </div>
 
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assessment & Plan</h4>
-                <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assessment &amp; Plan</h4>
+                <div className="bg-slate-50 p-4 rounded-md border border-slate-200 space-y-3">
                   <div>
-                    <span className="font-semibold text-indigo-900 text-sm">Diagnosis:</span>
-                    <p className="text-sm text-indigo-800 font-bold mt-1">{viewingRecord.data?.provisional_diagnosis || 'None recorded'}</p>
+                    <span className="font-semibold text-slate-900 text-sm">Diagnosis:</span>
+                    <p className="text-sm text-slate-800 font-bold mt-1">{viewingRecord.data?.provisional_diagnosis || 'None recorded'}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-indigo-200/40 mt-3">
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 mt-3">
                     <div>
-                      <span className="font-semibold text-indigo-900 text-xs flex items-center gap-1"><FlaskConical className="w-3 h-3"/> Investigations:</span>
-                      <p className="text-xs text-indigo-800 mt-1 whitespace-pre-line">{viewingRecord.data?.investigations_ordered || '-'}</p>
+                      <span className="font-semibold text-slate-900 text-xs flex items-center gap-1">
+                        <FlaskConical className="w-3 h-3" /> Investigations:
+                      </span>
+                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data?.investigations_ordered || '-'}</p>
                     </div>
                     <div>
-                      <span className="font-semibold text-indigo-900 text-xs flex items-center gap-1"><Pill className="w-3 h-3"/> Prescriptions & Plan:</span>
-                      <p className="text-xs text-indigo-800 mt-1 whitespace-pre-line">{viewingRecord.data?.plan || '-'}</p>
+                      <span className="font-semibold text-slate-900 text-xs flex items-center gap-1">
+                        <Pill className="w-3 h-3" /> Prescriptions &amp; Plan:
+                      </span>
+                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data?.plan || '-'}</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   handlePrintPrevious(viewingRecord);
                 }}
-                className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 rounded-xl font-bold px-4 flex items-center gap-1.5"
+                className="text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] rounded-md font-semibold px-4 flex items-center gap-1.5"
               >
-                <Printer className="w-4 h-4 text-indigo-600" />
+                <Printer className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
                 <span>Print Prescription (Rx)</span>
               </Button>
-              <Button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white rounded-xl font-bold px-6">
+              <Button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white rounded-md font-bold px-6">
                 Close
               </Button>
             </div>

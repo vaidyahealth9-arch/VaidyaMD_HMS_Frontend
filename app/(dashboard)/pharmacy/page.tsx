@@ -24,12 +24,12 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
+import { Badge } from '@/shared/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
+import { Skeleton } from '@/shared/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function PharmacyPage() {
@@ -271,18 +271,18 @@ export default function PharmacyPage() {
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+          <div className="w-10 h-10 rounded-lg bg-[rgb(var(--clr-primary)/0.08)] border border-[rgb(var(--clr-primary)/0.2)] flex items-center justify-center text-[rgb(var(--clr-primary))]">
             <Pill className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 leading-tight">Pharmacy & Supply Chain</h1>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">Pharmacy & Supply Chain</h1>
             <p className="text-xs text-slate-500 font-medium">Smart AI OCR invoice ingestion, FEFO inventory, and point-of-sale dispensing</p>
           </div>
         </div>
 
         <Button
           onClick={() => setActiveTab('ocr_grn')}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 rounded-xl shadow-md text-xs"
+          className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
         >
           <Sparkles className="w-4 h-4" />
           <span>Smart OCR Invoice Ingestion</span>
@@ -290,7 +290,7 @@ export default function PharmacyPage() {
       </div>
 
       {actionSuccess && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span>{actionSuccess}</span>
         </div>
@@ -298,7 +298,7 @@ export default function PharmacyPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-xl h-11">
+        <TabsList className="bg-slate-100 p-1 rounded-md h-11">
           <TabsTrigger value="inventory" className="rounded-lg text-xs font-bold gap-1.5">
             <Layers className="w-3.5 h-3.5" />
             <span>Stock Inventory & FEFO ({batches.length})</span>
@@ -330,7 +330,7 @@ export default function PharmacyPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search drug, generic, batch..."
-                className="pl-9 h-9 text-xs rounded-xl"
+                className="pl-9 h-9 text-xs rounded-md"
               />
             </div>
             <Badge variant="purple" className="text-xs font-bold">
@@ -338,7 +338,7 @@ export default function PharmacyPage() {
             </Badge>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm overflow-hidden">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                 <tr>
@@ -366,7 +366,7 @@ export default function PharmacyPage() {
                       <td className="p-3.5">
                         <Badge variant="outline" className="text-[10px]">{b.category}</Badge>
                       </td>
-                      <td className="p-3.5 font-mono font-bold text-indigo-700">{b.batch_number}</td>
+                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{b.batch_number}</td>
                       <td className="p-3.5">
                         <div className="flex items-center gap-1.5">
                           <span className={`font-bold ${isExpiringSoon ? 'text-red-600' : 'text-slate-700'}`}>
@@ -380,7 +380,7 @@ export default function PharmacyPage() {
                         </div>
                       </td>
                       <td className="p-3.5">
-                        <span className={`font-black ${isLowStock ? 'text-amber-600' : 'text-slate-800'}`}>
+                        <span className={`font-bold ${isLowStock ? 'text-amber-600' : 'text-slate-800'}`}>
                           {b.quantity_available} units
                         </span>
                       </td>
@@ -394,7 +394,7 @@ export default function PharmacyPage() {
                             handleAddToCart(b);
                             setActiveTab('pos');
                           }}
-                          className="h-7 text-xs font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                          className="h-7 text-xs font-bold border-[rgb(var(--clr-primary)/0.2)] text-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.08)]"
                         >
                           + Dispense
                         </Button>
@@ -432,7 +432,7 @@ export default function PharmacyPage() {
                         const match = patients.find((p: any) => `${p.name} (${p.mrn || p.vid})` === e.target.value);
                         setPosPatientId(match ? match.id : e.target.value);
                       }}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                     />
                     <datalist id="posPatientsList">
                       {patients.map((p: any) => (
@@ -473,7 +473,7 @@ export default function PharmacyPage() {
                       <div
                         key={b.id}
                         onClick={() => handleAddToCart(b)}
-                        className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/40 cursor-pointer transition-all flex items-center justify-between"
+                        className="p-3 rounded-md border border-slate-200 hover:border-[rgb(var(--clr-primary)/0.4)] bg-white hover:bg-[rgb(var(--clr-primary)/0.04)] cursor-pointer transition-all flex items-center justify-between"
                       >
                         <div className="min-w-0 pr-2">
                           <p className="font-bold text-xs text-slate-900 truncate">{b.item_name}</p>
@@ -482,7 +482,7 @@ export default function PharmacyPage() {
                           </p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-bold text-indigo-700">{formatCurrency(b.selling_price || b.mrp)}</p>
+                          <p className="text-xs font-bold text-[rgb(var(--clr-primary))]">{formatCurrency(b.selling_price || b.mrp)}</p>
                           <span className="text-[10px] font-semibold text-emerald-600">{b.quantity_available} in stock</span>
                         </div>
                       </div>
@@ -503,7 +503,7 @@ export default function PharmacyPage() {
 
             {/* Right: Cart & Dispensing Summary */}
             <div className="space-y-4">
-              <Card className="border-indigo-200">
+              <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold">Dispensing Cart</CardTitle>
@@ -544,16 +544,16 @@ export default function PharmacyPage() {
                       <span className="text-slate-500">Subtotal:</span>
                       <span className="font-bold text-slate-900">{formatCurrency(cartTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-black">
-                      <span className="text-indigo-900">Total Billed:</span>
-                      <span className="text-indigo-700">{formatCurrency(cartTotal)}</span>
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="text-slate-900">Total Billed:</span>
+                      <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(cartTotal)}</span>
                     </div>
                   </div>
 
                   <Button
                     onClick={() => dispenseMutation.mutate()}
                     disabled={dispenseMutation.isPending || !posPatientId || posCart.length === 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl shadow-md text-xs mt-2"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-md shadow-md text-xs mt-2"
                   >
                     {dispenseMutation.isPending ? 'Dispensing & Deducting Stock...' : '1-Click Dispense & Bill'}
                   </Button>
@@ -585,13 +585,13 @@ export default function PharmacyPage() {
                 handleProcessFile(e.dataTransfer.files[0]);
               }
             }}
-            className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all bg-white cursor-pointer ${
-              isDragging ? 'border-indigo-600 bg-indigo-50/50 scale-[0.99]' : 'border-slate-300 hover:border-indigo-400'
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all bg-white cursor-pointer ${
+              isDragging ? 'border-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.05)] scale-[0.99]' : 'border-slate-300 hover:border-[rgb(var(--clr-primary)/0.4)]'
             }`}
             onClick={() => fileInputRef.current?.click()}
           >
             <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner">
+              <div className="w-14 h-14 rounded-md bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] flex items-center justify-center shadow-inner">
                 <UploadCloud className="w-7 h-7" />
               </div>
               <div>
@@ -602,7 +602,7 @@ export default function PharmacyPage() {
                 <Button
                   type="button"
                   size="sm"
-                  className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm"
+                  className="text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-md shadow-sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
@@ -615,7 +615,7 @@ export default function PharmacyPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl"
+                  className="text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-100 rounded-md"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleManualInvoiceCreate();
@@ -630,8 +630,8 @@ export default function PharmacyPage() {
 
           {/* Skeleton Loader during OCR parsing */}
           {ocrLoading && (
-            <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm animate-pulse">
-              <div className="flex items-center gap-2 text-xs font-bold text-indigo-600">
+            <div className="p-6 bg-white border border-slate-200 rounded-lg space-y-4 shadow-sm animate-pulse">
+              <div className="flex items-center gap-2 text-xs font-bold text-[rgb(var(--clr-primary))]">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>AI Optical Character Recognition (OCR) Parsing Invoice Line Items...</span>
               </div>
@@ -642,8 +642,8 @@ export default function PharmacyPage() {
 
           {/* Interactive OCR Pre-Commit Verification Grid */}
           {ocrResult && (
-            <Card className="border-indigo-300 shadow-md">
-              <CardHeader className="pb-3 border-b border-slate-100 bg-indigo-50/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="purple" className="text-[10px]">
@@ -659,7 +659,7 @@ export default function PharmacyPage() {
                       value={ocrResult.vendor_name}
                       onChange={(e) => setOcrResult({ ...ocrResult, vendor_name: e.target.value })}
                       placeholder="Vendor Name"
-                      className="font-bold text-sm text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-indigo-500"
+                      className="font-bold text-sm text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-[rgb(var(--clr-primary))]"
                     />
                     <input
                       type="text"
@@ -679,7 +679,7 @@ export default function PharmacyPage() {
                 </div>
                 <div className="text-right">
                   <span className="text-xs text-slate-400 block font-bold">TOTAL INVOICE AMOUNT</span>
-                  <span className="text-xl font-black text-indigo-700">{formatCurrency(ocrResult.total_amount)}</span>
+                  <span className="text-xl font-bold text-[rgb(var(--clr-primary))]">{formatCurrency(ocrResult.total_amount)}</span>
                 </div>
               </CardHeader>
 
@@ -706,7 +706,7 @@ export default function PharmacyPage() {
                               type="text"
                               value={item.item_name}
                               onChange={(e) => handleOcrItemChange(idx, 'item_name', e.target.value)}
-                              className="w-full font-semibold text-slate-900 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded text-xs"
+                              className="w-full font-semibold text-slate-900 bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded text-xs"
                             />
                           </td>
                           <td className="p-2">
@@ -714,7 +714,7 @@ export default function PharmacyPage() {
                               type="text"
                               value={item.batch_number}
                               onChange={(e) => handleOcrItemChange(idx, 'batch_number', e.target.value)}
-                              className="w-full font-mono font-bold text-indigo-700 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded text-xs"
+                              className="w-full font-mono font-bold text-[rgb(var(--clr-primary))] bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded text-xs"
                             />
                           </td>
                           <td className="p-2">
@@ -722,7 +722,7 @@ export default function PharmacyPage() {
                               type="date"
                               value={item.expiry_date}
                               onChange={(e) => handleOcrItemChange(idx, 'expiry_date', e.target.value)}
-                              className="text-xs text-slate-700 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded"
+                              className="text-xs text-slate-700 bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded"
                             />
                           </td>
                           <td className="p-2">
@@ -731,7 +731,7 @@ export default function PharmacyPage() {
                               min="1"
                               value={item.quantity}
                               onChange={(e) => handleOcrItemChange(idx, 'quantity', e.target.value)}
-                              className="w-20 font-bold text-slate-900 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded text-xs"
+                              className="w-20 font-bold text-slate-900 bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded text-xs"
                             />
                           </td>
                           <td className="p-2">
@@ -740,7 +740,7 @@ export default function PharmacyPage() {
                               step="0.1"
                               value={item.purchase_rate}
                               onChange={(e) => handleOcrItemChange(idx, 'purchase_rate', e.target.value)}
-                              className="w-24 text-slate-700 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded text-xs"
+                              className="w-24 text-slate-700 bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded text-xs"
                             />
                           </td>
                           <td className="p-2">
@@ -749,7 +749,7 @@ export default function PharmacyPage() {
                               step="0.1"
                               value={item.mrp}
                               onChange={(e) => handleOcrItemChange(idx, 'mrp', e.target.value)}
-                              className="w-24 text-slate-700 bg-transparent border-b border-transparent focus:border-indigo-400 focus:bg-white px-1.5 py-1 rounded text-xs"
+                              className="w-24 text-slate-700 bg-transparent border-b border-transparent focus:border-[rgb(var(--clr-primary))] focus:bg-white px-1.5 py-1 rounded text-xs"
                             />
                           </td>
                           <td className="p-2 text-right font-bold text-slate-900">
@@ -777,7 +777,7 @@ export default function PharmacyPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleAddOcrItem}
-                    className="text-xs font-bold gap-1 rounded-xl"
+                    className="text-xs font-bold gap-1 rounded-md"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Line Item
@@ -788,7 +788,7 @@ export default function PharmacyPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setOcrResult(null)}
-                      className="text-xs rounded-xl"
+                      className="text-xs rounded-md"
                     >
                       Discard
                     </Button>
@@ -796,7 +796,7 @@ export default function PharmacyPage() {
                       size="sm"
                       onClick={() => commitGRNMutation.mutate(ocrResult)}
                       disabled={commitGRNMutation.isPending || ocrResult.extracted_items.length === 0}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md text-xs shadow-md"
                     >
                       {commitGRNMutation.isPending ? 'Committing to Inventory...' : 'Approve & Stock to Inventory (GRN)'}
                     </Button>
@@ -827,7 +827,7 @@ export default function PharmacyPage() {
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {grns.map((g: any) => (
                     <tr key={g.id} className="hover:bg-slate-50">
-                      <td className="p-3.5 font-mono font-bold text-indigo-700">{g.grn_number}</td>
+                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{g.grn_number}</td>
                       <td className="p-3.5 font-bold text-slate-900">{g.vendor_name}</td>
                       <td className="p-3.5 text-slate-600">{g.invoice_number}</td>
                       <td className="p-3.5 font-bold text-slate-900">{formatCurrency(g.total_amount)}</td>
@@ -863,7 +863,7 @@ export default function PharmacyPage() {
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {indents.map((ind: any) => (
                     <tr key={ind.id} className="hover:bg-slate-50">
-                      <td className="p-3.5 font-mono font-bold text-indigo-700">{ind.indent_number}</td>
+                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{ind.indent_number}</td>
                       <td className="p-3.5 font-bold text-slate-900">{ind.requesting_department}</td>
                       <td className="p-3.5">
                         <Badge variant={ind.urgency === 'Emergency' ? 'destructive' : 'secondary'} className="text-[10px]">
@@ -902,7 +902,7 @@ export default function PharmacyPage() {
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {purchaseOrders.map((po: any) => (
                     <tr key={po.id} className="hover:bg-slate-50">
-                      <td className="p-3.5 font-mono font-bold text-indigo-700">{po.po_number}</td>
+                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{po.po_number}</td>
                       <td className="p-3.5 font-bold text-slate-900">{po.vendor_name}</td>
                       <td className="p-3.5 font-bold text-slate-900">{formatCurrency(po.total_amount)}</td>
                       <td className="p-3.5">

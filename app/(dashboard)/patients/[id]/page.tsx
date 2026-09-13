@@ -19,18 +19,62 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import DynamicForm from '@/components/dynamic-form/DynamicForm';
 import TreatmentCycleWizard from '@/components/fertility/TreatmentCycleWizard';
-import PrintablePrescription from '@/components/common/PrintablePrescription';
+
+import FertilityWalletCard from '@/components/fertility/FertilityWalletCard';
+import StatutoryConsentModal from '@/components/fertility/StatutoryConsentModal';
+import OPUAspirationReportModal from '@/components/fertility/OPUAspirationReportModal';
+import MasterEmbryologyRecordModal from '@/components/fertility/MasterEmbryologyRecordModal';
+import EmbryoTransferDischargeModal from '@/components/fertility/EmbryoTransferDischargeModal';
+import SpermPreparationModal from '@/components/fertility/SpermPreparationModal';
+import SpermFreezingModal from '@/components/fertility/SpermFreezingModal';
+import OPDWorkbench from '@/components/opd/OPDWorkbench';
+import AndrologyDataEntry from '@/components/fertility/AndrologyDataEntry';
+import MultiDocumentUploader from '@/components/common/MultiDocumentUploader';
+import {
+  Users,
+  Clock,
+  ClipboardList,
+  ScanLine,
+  Activity,
+  FlaskConical,
+  CreditCard,
+  FileCheck,
+  FolderOpen,
+  Printer,
+  Save,
+  Upload,
+  ExternalLink,
+  Plus,
+  X,
+  AlertTriangle,
+  Stethoscope,
+  Pill,
+  Check,
+  Building2,
+  Calendar,
+  Camera,
+  FileText,
+  Trash2,
+  UploadCloud,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  MapPin,
+  Phone,
+} from 'lucide-react';
 
 const tabs = [
-  { id: 'overview', label: 'Couple 360', icon: '👫' },
-  { id: 'timeline', label: 'Timeline', icon: '🕒' },
-  { id: 'visits', label: 'Visits & Rx', icon: '📋' },
-  { id: 'investigations', label: 'Investigations & USG', icon: '🔬' },
-  { id: 'treatment', label: 'Treatment Cycles', icon: '🧫' },
-  { id: 'andrology', label: 'Andrology Lab', icon: '🧪' },
-  { id: 'billing', label: 'Billing & Wallet', icon: '💰' },
-  { id: 'documents', label: 'Consents & Docs', icon: '📁' },
+  { id: 'overview', label: 'Couple 360', icon: Users },
+  { id: 'timeline', label: 'Timeline', icon: Clock },
+  { id: 'workbench', label: 'OPD & Rx', icon: Stethoscope },
+  { id: 'investigations', label: 'Investigations & USG', icon: ScanLine },
+  { id: 'treatment', label: 'Treatment Cycles', icon: Activity },
+  { id: 'andrology', label: 'Andrology Lab', icon: FlaskConical },
+  { id: 'billing', label: 'Billing & Wallet', icon: CreditCard },
+  { id: 'documents', label: 'Consents & Docs', icon: FileCheck },
 ];
+
+
 
 export default function PatientProfilePage() {
   const params = useParams();
@@ -40,59 +84,149 @@ export default function PatientProfilePage() {
   const patientId = params.id as string;
 
   const tabFromUrl = searchParams.get('tab');
+  const appointmentIdFromUrl = searchParams.get('appointment_id');
   const [patient, setPatient] = useState<any>(null);
   const [partner, setPartner] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState(tabFromUrl || 'overview');
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl === 'visits' ? 'workbench' : (tabFromUrl || 'overview')
+  );
+  const [activeAppointment, setActiveAppointment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // View Mode: Couple 360 vs Individual Patient
+  const [viewMode, setViewMode] = useState<'couple' | 'individual'>('couple');
+
+  // Link Partner Modal State
+  const [showLinkPartnerModal, setShowLinkPartnerModal] = useState(false);
+  const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
+  const [partnerSearchResults, setPartnerSearchResults] = useState<any[]>([]);
+  const [isSearchingPartner, setIsSearchingPartner] = useState(false);
+  const [isLinkingPartner, setIsLinkingPartner] = useState(false);
+
   useEffect(() => {
-    if (tabFromUrl && tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl);
+    if (tabFromUrl) {
+      const resolved = tabFromUrl === 'visits' ? 'workbench' : tabFromUrl;
+      if (resolved !== activeTab) {
+        setActiveTab(resolved);
+      }
     }
   }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (appointmentIdFromUrl) {
+      appointmentsApi.get(appointmentIdFromUrl)
+        .then((res: any) => {
+          setActiveAppointment(res);
+        })
+        .catch((err: any) => console.error('Failed to load appointment:', err));
+    }
+  }, [appointmentIdFromUrl]);
 
   // Dues & Wallet
   const [duesInfo, setDuesInfo] = useState<any>(null);
   const [walletInfo, setWalletInfo] = useState<any>(null);
-  const [showDepositModal, setShowDepositModal] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('25000');
-  const [depositMode, setDepositMode] = useState('upi');
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showOpuModal, setShowOpuModal] = useState(false);
+  const [showEmbryologyModal, setShowEmbryologyModal] = useState(false);
+  const [showEtDischargeModal, setShowEtDischargeModal] = useState(false);
+  const [showSpermPrepModal, setShowSpermPrepModal] = useState(false);
+  const [showSpermFreezingModal, setShowSpermFreezingModal] = useState(false);
+
+  // Collapsible States & Photo Upload
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isCyclesCardExpanded, setIsCyclesCardExpanded] = useState(true);
+  const [isDocUploadExpanded, setIsDocUploadExpanded] = useState(true);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      try {
+        await patientsApi.update(patientId, { photo_url: base64 });
+        loadData();
+      } catch (err: any) {
+        alert(err.message || 'Failed to update photo');
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Treatment Cycles
   const [cycles, setCycles] = useState<any[]>([]);
   const [activeCycle, setActiveCycle] = useState<any>(null);
-  const [showNewCycleModal, setShowNewCycleModal] = useState(false);
+  const [isCreatingCycle, setIsCreatingCycle] = useState(false);
   const [cycleCalendar, setCycleCalendar] = useState<any>(null);
   const [addingMedDay, setAddingMedDay] = useState<number | null>(null);
-  const [newMedForm, setNewMedForm] = useState({ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: '' });
+  const [newMedForm, setNewMedForm] = useState({
+    drug_name: '',
+    dose: '1 tab',
+    frequency: 'OD',
+    instructions: '',
+  });
   const [isSavingMed, setIsSavingMed] = useState(false);
+  // Partner Link & Unlink Handlers
+  const handleUnlinkPartner = async () => {
+    if (!partner) return;
+    if (!confirm(`Are you sure you want to unlink ${partner.name} from ${patient?.name}? This will separate their medical charts into independent individual patients.`)) {
+      return;
+    }
+    try {
+      await patientsApi.unlinkPartner(patientId);
+      alert(`Partner ${partner.name} unlinked successfully. Both patients are now independent individual records.`);
+      setViewMode('individual');
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to unlink partner');
+    }
+  };
+
+  const handleSearchPartner = async (query: string) => {
+    setPartnerSearchQuery(query);
+    if (!query.trim() || query.length < 2) {
+      setPartnerSearchResults([]);
+      return;
+    }
+    setIsSearchingPartner(true);
+    try {
+      const res: any = await patientsApi.list({ search: query.trim(), per_page: 8 });
+      const pts = (res?.patients || []).filter((p: any) => p.id !== patientId);
+      setPartnerSearchResults(pts);
+    } catch {
+      setPartnerSearchResults([]);
+    } finally {
+      setIsSearchingPartner(false);
+    }
+  };
+
+  const handleLinkPartner = async (candidateId: string, candidateName: string) => {
+    if (!confirm(`Link ${candidateName} as partner to ${patient?.name}?`)) return;
+    setIsLinkingPartner(true);
+    try {
+      await patientsApi.linkPartner(patientId, candidateId);
+      alert(`${candidateName} successfully linked as partner!`);
+      setShowLinkPartnerModal(false);
+      setPartnerSearchQuery('');
+      setPartnerSearchResults([]);
+      setViewMode('couple');
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to link partner');
+    } finally {
+      setIsLinkingPartner(false);
+    }
+  };
 
   // Timeline
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
 
   // Visits & Prescriptions State
   const [visitLogs, setVisitLogs] = useState<any[]>([]);
-  const [showVisitModal, setShowVisitModal] = useState(false);
-  const [printablePrescription, setPrintablePrescription] = useState<any>(null);
-  const [visitForm, setVisitForm] = useState({
-    visit_type: 'Consultation Visit',
-    seen_by: '',
-    chief_complaint: '',
-    history_of_illness: '',
-    past_medical_history: '',
-    vitals_bp: '',
-    vitals_pulse: '',
-    vitals_weight: '',
-    provisional_diagnosis: '',
-    summary: '',
-    wife_investigations: [] as string[],
-    husband_investigations: [] as string[],
-    wife_medications: [] as any[],
-    husband_medications: [] as any[],
-    patient_medications: [] as any[],
-    next_follow_up: 'Review in 1 week with lab reports',
-    visit_date: new Date().toISOString().split('T')[0],
-  });
 
   // Investigations Tab Sub-states
   const [investigationGender, setInvestigationGender] = useState<'female' | 'male'>('female');
@@ -101,45 +235,14 @@ export default function PatientProfilePage() {
   const [historyRecord, setHistoryRecord] = useState<any>(null);
   const [isSavingRecord, setIsSavingRecord] = useState(false);
 
-interface AndrologyFormData {
-  collection_date: string;
-  abstinence_days: number | string;
-  volume_ml: number | string;
-  liquefaction_time_min: number | string;
-  ph: number | string;
-  pre_conc_million_ml: number | string;
-  total_motility_pct: number | string;
-  progressive_motility_pct: number | string;
-  normal_forms_pct: number | string;
-  dfi_total_pct: number | string;
-  impression: string;
-}
-
-  // Embedded Andrology Sub-states
-  const [andrologyForm, setAndrologyForm] = useState<AndrologyFormData>({
-    collection_date: new Date().toISOString().split('T')[0],
-    abstinence_days: 3,
-    volume_ml: '',
-    liquefaction_time_min: '',
-    ph: '',
-    pre_conc_million_ml: '',
-    total_motility_pct: '',
-    progressive_motility_pct: '',
-    normal_forms_pct: '',
-    dfi_total_pct: '',
-    impression: '',
-  });
-  const [isSavingAndrology, setIsSavingAndrology] = useState(false);
-  const [andrologyHistory, setAndrologyHistory] = useState<any[]>([]);
 
   // Invoices Sub-states
   const [invoices, setInvoices] = useState<any[]>([]);
 
-  // Consents & Documents State
+  // Consents & Documents State (Multi-document Upload Builder)
   const [selectedConsentDoc, setSelectedConsentDoc] = useState<any>(null);
   const [patientDocs, setPatientDocs] = useState<any[]>([]);
-  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
-  const [uploadDocForm, setUploadDocForm] = useState({ file_name: '', file_path: '', category: 'report' });
+
 
   const loadData = () => {
     setIsLoading(true);
@@ -147,22 +250,7 @@ interface AndrologyFormData {
       .then((res: any) => {
         setPatient(res.primary_patient);
         setPartner(res.partner);
-        if (res.primary_patient?.treating_doctor_name && user) {
-          setVisitForm((prev) => ({ ...prev, seen_by: user.name }));
-        }
 
-        // Fetch Male Partner Andrology Record if available
-        const maleId = res.primary_patient?.gender === 'male' ? res.primary_patient.id : (res.partner?.gender === 'male' ? res.partner?.id : null);
-        if (maleId) {
-          andrologyApi.list({ patient_id: maleId }).then((andRes: any) => {
-            if (andRes && andRes.length > 0) {
-              setAndrologyHistory(andRes);
-              if (andRes[0].data) {
-                setAndrologyForm((prev: AndrologyFormData) => ({ ...prev, ...andRes[0].data }));
-              }
-            }
-          }).catch((err) => console.error("Failed to load andrology data", err));
-        }
       })
       .catch((err) => {
         console.error(err);
@@ -220,6 +308,23 @@ interface AndrologyFormData {
     documentsApi.list(patientId)
       .then((docs: any) => setPatientDocs(docs || []))
       .catch((err) => console.error("Failed to load documents", err));
+
+    // Fetch patient appointments for active appointment & triage resolution
+    appointmentsApi.list({ patient_id: patientId })
+      .then((res: any) => {
+        const appts = res?.appointments || (Array.isArray(res) ? res : []);
+        if (appts.length > 0) {
+          const activeAppt =
+            (appointmentIdFromUrl ? appts.find((a: any) => a.id === appointmentIdFromUrl) : null) ||
+            appts.find((a: any) => a.metadata?.triage || a.metadata_?.triage) ||
+            appts.find((a: any) => a.status === 'scheduled' || a.status === 'in_consultation' || a.status === 'arrived') ||
+            appts[0];
+          if (activeAppt) {
+            setActiveAppointment(activeAppt);
+          }
+        }
+      })
+      .catch((err) => console.error("Failed to load patient appointments", err));
   };
 
   useEffect(() => {
@@ -287,66 +392,8 @@ interface AndrologyFormData {
     }
   };
 
-  const handleSaveAndrologyDirect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const maleId = patient?.gender === 'male' ? patient.id : partner?.id;
-    if (!maleId || !user) {
-      alert('No male partner linked to record andrology data.');
-      return;
-    }
-    setIsSavingAndrology(true);
-    try {
-      await andrologyApi.create({
-        patient_id: maleId,
-        record_type: 'casa_semen_analysis',
-        data: andrologyForm,
-        created_by: user.id,
-      });
-      alert('CASA Semen Analysis diagnostic report saved successfully!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to save andrology report');
-    } finally {
-      setIsSavingAndrology(false);
-    }
-  };
 
-  const handleAddMedication = (target: 'wife' | 'husband' | 'patient') => {
-    if (target === 'wife') {
-      setVisitForm({
-        ...visitForm,
-        wife_medications: [...visitForm.wife_medications, { drug: '', dose: '1 tab', route: 'Oral', freq: 'OD', duration: '10 days', instructions: 'After meals' }],
-      });
-    } else if (target === 'husband') {
-      setVisitForm({
-        ...visitForm,
-        husband_medications: [...visitForm.husband_medications, { drug: '', dose: '1 tab', route: 'Oral', freq: 'OD', duration: '30 days', instructions: 'After meals' }],
-      });
-    } else {
-      setVisitForm({
-        ...visitForm,
-        patient_medications: [...visitForm.patient_medications, { drug: '', dose: '1 tab', route: 'Oral', freq: 'OD', duration: '10 days', instructions: 'After meals' }],
-      });
-    }
-  };
 
-  const handleRemoveMedication = (target: 'wife' | 'husband' | 'patient', idx: number) => {
-    if (target === 'wife') {
-      setVisitForm({
-        ...visitForm,
-        wife_medications: visitForm.wife_medications.filter((_, i) => i !== idx),
-      });
-    } else if (target === 'husband') {
-      setVisitForm({
-        ...visitForm,
-        husband_medications: visitForm.husband_medications.filter((_, i) => i !== idx),
-      });
-    } else {
-      setVisitForm({
-        ...visitForm,
-        patient_medications: visitForm.patient_medications.filter((_, i) => i !== idx),
-      });
-    }
-  };
 
   const handleAddMedicationToCycle = async (dayNumber: number) => {
     if (!newMedForm.drug_name.trim() || !activeCycle) return;
@@ -371,89 +418,9 @@ interface AndrologyFormData {
     }
   };
 
-  const handleSaveVisit = async (e?: React.FormEvent, andPrint = false) => {
-    if (e) e.preventDefault();
-    if (!user) return;
-    try {
-      const saved = await fertilityApi.saveRecord({
-        patient_id: patientId,
-        record_type: 'visit_consultation',
-        data: {
-          ...visitForm,
-          seen_by: visitForm.seen_by || user.name,
-        },
-        created_by: user.id,
-      });
 
-      // Auto-Link to Billing if investigations were ordered
-      const allInvs = [...visitForm.wife_investigations, ...visitForm.husband_investigations];
-      if (allInvs.length > 0) {
-        await billingApi.createInvoice({
-          patient_id: patientId,
-          appointment_source: 'Lab',
-          reason_for_attendance: `Consultation Investigations: ${allInvs.join(', ')}`,
-          items: allInvs.map((inv) => ({
-            description: inv,
-            quantity: 1,
-            unit_price: 1500,
-            total: 1500,
-          })),
-          payment_method: 'pending',
-          created_by: user.id,
-        }).catch(() => {});
-      }
 
-      setVisitLogs((prev) => [saved, ...prev]);
-      setShowVisitModal(false);
 
-      if (andPrint) {
-        setPrintablePrescription({
-          patient,
-          doctor: { name: visitForm.seen_by || user.name },
-          visitDate: visitForm.visit_date,
-          chiefComplaint: visitForm.chief_complaint,
-          hopi: visitForm.history_of_illness,
-          pastHistory: visitForm.past_medical_history,
-          vitals: {
-            bp: visitForm.vitals_bp,
-            pulse: visitForm.vitals_pulse,
-            weight: visitForm.vitals_weight,
-          },
-          diagnosis: visitForm.provisional_diagnosis,
-          medications: hasPartner ? visitForm.wife_medications : (visitForm.patient_medications.length > 0 ? visitForm.patient_medications : visitForm.wife_medications),
-          partnerMedications: hasPartner ? visitForm.husband_medications : [],
-          partnerName: partner?.name,
-          advice: visitForm.summary,
-          nextFollowUp: visitForm.next_follow_up,
-        });
-      } else {
-        alert('Consultation visit saved and prescription recorded!');
-      }
-
-      loadData();
-    } catch (err: any) {
-      alert(err.message || 'Failed to save consultation');
-    }
-  };
-
-  const handleDepositWallet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    try {
-      await walletApi.deposit({
-        patient_id: patientId,
-        amount: parseFloat(depositAmount) || 0,
-        payment_mode: depositMode,
-        notes: 'Patient Advance Deposit at Front Desk',
-        created_by: user.id,
-      });
-      setShowDepositModal(false);
-      walletApi.getWallet(patientId).then((w: any) => setWalletInfo(w)).catch(() => {});
-      alert(`Successfully credited ₹${depositAmount} to Advance Wallet!`);
-    } catch (err: any) {
-      alert(err.message || 'Deposit failed');
-    }
-  };
 
   const handleSendToOPD = async () => {
     if (!user || !patient) return;
@@ -493,193 +460,311 @@ interface AndrologyFormData {
   const femalePartner = patient.gender === 'female' ? patient : partner;
   const malePartner = patient.gender === 'male' ? patient : partner;
 
-  const currentTabs = tabs.map((t) => {
+  const currentTabs = tabs.filter((t) => {
+    if (t.id === 'andrology') {
+      return patient.gender?.toLowerCase() === 'male' || hasPartner;
+    }
+    return true;
+  }).map((t) => {
     if (t.id === 'overview') {
       return hasPartner
-        ? { ...t, label: 'Couple 360', icon: '👫' }
-        : { ...t, label: 'Patient 360', icon: patient.gender === 'male' ? '👨' : '👩' };
+        ? { ...t, label: 'Couple 360', icon: Users }
+        : { ...t, label: 'Patient 360', icon: Users };
     }
     return t;
   });
 
   return (
     <div className="w-full px-3 sm:px-6 py-6 space-y-6">
-      {/* === PATIENT / COUPLE 360 HEADER CARDS === */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-black text-xl flex items-center justify-center shadow-md shadow-indigo-500/20">
-              {hasPartner ? '👫' : patient.gender === 'male' ? '👨' : '👩'}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                  {patient.name} {hasPartner ? `& ${partner.name}` : ''}
+      {/* === FIXED / STICKY TOP PATIENT SUMMARY & TAB RAIL === */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm -mx-3 sm:-mx-6 -mt-6 px-4 sm:px-6 py-2.5 space-y-2">
+        {/* Row 1: Compact Summary Bar (Default Collapsed View) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          {/* Left: Patient Name, Color-coded Gender, VID & Quick Stats */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap sm:flex-nowrap">
+            {patient.photo_url ? (
+              <img
+                src={patient.photo_url}
+                alt={patient.name}
+                className="w-9 h-9 rounded-full object-cover border border-slate-300 shadow-2xs flex-shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-md bg-[rgb(var(--clr-primary)/0.1)] text-[rgb(var(--clr-primary))] font-bold flex items-center justify-center flex-shrink-0">
+                <Users className="w-4 h-4" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base font-bold text-slate-900 leading-none truncate">
+                  {viewMode === 'couple' ? (
+                    <>
+                      {patient.name}
+                      {hasPartner && <span className="text-slate-400 font-normal"> &amp; </span>}
+                      {hasPartner && <span className="text-slate-800">{partner.name}</span>}
+                    </>
+                  ) : (
+                    <span>{patient.name}</span>
+                  )}
                 </h1>
                 <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
                   {patient.vid}
                 </span>
+
+                {/* Color Coded Female Partner Badge */}
+                {femalePartner && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-full">
+                    <span className="text-rose-600 font-black text-sm leading-none">♀</span>
+                    <span>{femalePartner.age ? `${femalePartner.age}y` : ''} · {femalePartner.blood_group || '—'}</span>
+                  </span>
+                )}
+
+                {/* Color Coded Male Partner Badge */}
+                {hasPartner && malePartner && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200/80 px-2 py-0.5 rounded-full">
+                    <span className="text-sky-600 font-black text-sm leading-none">♂</span>
+                    <span>{malePartner.age ? `${malePartner.age}y` : ''} · {malePartner.blood_group || '—'}</span>
+                  </span>
+                )}
+
+                {!hasPartner && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                    Individual Patient
+                  </span>
+                )}
+
+                {patient.phone && (
+                  <span className="text-xs text-slate-500 font-mono hidden lg:inline">
+                    📞 {patient.phone}
+                  </span>
+                )}
+
+                {patient.treating_doctor_name && (
+                  <span className="text-xs text-slate-500 hidden xl:inline">
+                    Doctor: <strong className="text-slate-700">{patient.treating_doctor_name}</strong>
+                  </span>
+                )}
+
+                {patient.alert_notes?.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded">
+                    <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
+                    {patient.alert_notes.length} {patient.alert_notes.length === 1 ? 'Alert' : 'Alerts'}
+                  </span>
+                )}
               </div>
-              <p className="text-slate-500 text-xs mt-0.5">
-                Area: {patient.area || '—'} · Treating Doctor: <strong className="text-slate-700">{patient.treating_doctor_name || 'Unassigned (Assign at OPD)'}</strong>
-              </p>
             </div>
           </div>
 
-          {/* Quick Actions Header */}
-          <div className="flex items-center gap-2">
+          {/* Right: Actions & Collapse/Expand Toggle */}
+          <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-center flex-wrap">
+
+            {/* Jump to Partner's Chart */}
+            {hasPartner && partner && (
+              <Link
+                href={`/patients/${partner.id}`}
+                className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1"
+                title={`Open ${partner.name}'s individual medical record`}
+              >
+                <span>Switch to {partner.name} →</span>
+              </Link>
+            )}
+
+            {/* Unlink Partner Button */}
+            {hasPartner && partner && (
+              <button
+                type="button"
+                onClick={handleUnlinkPartner}
+                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1"
+                title="Unlink partner and make both records separate"
+              >
+                <X className="w-3 h-3" />
+                <span>Unlink</span>
+              </button>
+            )}
+
+            {/* Link Partner Button (When Single / Unlinked) */}
+            {!hasPartner && (
+              <button
+                type="button"
+                onClick={() => setShowLinkPartnerModal(true)}
+                className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1"
+                title="Link an existing patient as partner"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Link Partner</span>
+              </button>
+            )}
+
             {activeCycle && (
-              <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black rounded-xl flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Active Cycle: {activeCycle.cycle_id} ({activeCycle.treatment_type})
+              <span className="px-2 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold rounded-md flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Active: {activeCycle.cycle_id}
               </span>
             )}
             <button
               onClick={handleSendToOPD}
-              className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors shadow-sm"
+              className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors shadow-2xs"
+              title="Add this patient to today's OPD waiting queue in Appointments"
             >
-              Move to OPD
+              Add to Queue
             </button>
             <button
-              onClick={() => setShowVisitModal(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-colors shadow-sm"
+              onClick={() => {
+                setActiveTab('workbench');
+                router.replace(`/patients/${patientId}?tab=workbench`);
+              }}
+              className={`px-3 py-1.5 font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1.5 ${
+                activeTab === 'workbench'
+                  ? 'bg-[rgb(var(--clr-primary))] text-white'
+                  : 'bg-[rgb(var(--clr-primary)/0.1)] text-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.18)]'
+              }`}
             >
-              + Log Visit & Rx
+              <Stethoscope className="w-3.5 h-3.5" />
+              OPD Workbench
+            </button>
+
+            {/* Expand / Collapse Header Details Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
+              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors flex items-center gap-1 shadow-2xs border border-slate-200/80"
+              title={isHeaderExpanded ? 'Hide expanded details' : 'Show full details & photo'}
+            >
+              <span>{isHeaderExpanded ? 'Hide' : 'Details'}</span>
+              {isHeaderExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
             </button>
           </div>
         </div>
 
-        {/* Demographics Area: Unified Single Patient OR Dual Partner Grid */}
-        {!hasPartner ? (
-          <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{patient.gender === 'male' ? '👨' : '👩'}</span>
-                <div>
-                  <h3 className="font-black text-base text-slate-900">{patient.name}</h3>
-                  <p className="text-xs font-mono text-indigo-700 font-bold">{patient.vid}</p>
-                </div>
-              </div>
-              <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">
-                Individual Patient ({patient.registration_type || 'General OPD'})
+        {/* Row 1.5: Notice when viewing in Individual Mode */}
+        {hasPartner && viewMode === 'individual' && (
+          <div className="p-2.5 bg-indigo-50/90 border border-indigo-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-indigo-950">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 flex-shrink-0" />
+              <span>
+                <strong>Individual Patient View:</strong> Managing <strong>{patient.name}</strong> independently. Linked Partner: <strong>{partner.name}</strong> ({partner.vid}).
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-700 bg-white p-3.5 rounded-xl border border-slate-200">
-              <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Gender</span> <strong>{patient.gender || '—'}</strong></div>
-              <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Age</span> <strong>{patient.age ? `${patient.age} yrs` : '—'}</strong></div>
-              <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Blood Group</span> <strong>{patient.blood_group || '—'}</strong></div>
-              <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Phone</span> <strong>{patient.phone || '—'}</strong></div>
-              {patient.email && <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Email</span> <strong>{patient.email}</strong></div>}
-              {patient.area && <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Area</span> <strong>{patient.area}</strong></div>}
-              {patient.address && <div className="sm:col-span-2"><span className="text-slate-400 block text-[10px] uppercase font-bold">Address</span> <strong>{patient.address}</strong></div>}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode('couple')}
+                className="text-indigo-700 hover:underline font-bold text-xs"
+              >
+                Switch to Couple 360 View →
+              </button>
+              <span className="text-indigo-300">|</span>
+              <Link
+                href={`/patients/${partner.id}`}
+                className="text-sky-700 hover:underline font-bold text-xs"
+              >
+                Open {partner.name}&apos;s Chart →
+              </Link>
             </div>
-            {patient.alert_notes?.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-xs font-bold text-amber-800">Clinical Alerts:</span>
-                {patient.alert_notes.map((a: string, i: number) => (
-                  <span key={i} className="text-xs font-bold px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-lg">
-                    ⚠️ {a}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Side-by-Side Dual Partner Demographics Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Female Partner Card */}
-            {femalePartner ? (
-              <div className="bg-pink-50/40 border border-pink-100 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">👩</span>
-                    <div>
-                      <h3 className="font-bold text-sm text-pink-950">{femalePartner.name}</h3>
-                      <p className="text-[11px] font-mono text-pink-700 font-bold">{femalePartner.vid}</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold bg-pink-100 text-pink-800 px-2 py-0.5 rounded-full">
-                    Female Partner
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-700 bg-white/70 p-2.5 rounded-xl border border-pink-100">
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Age</span> <strong>{femalePartner.age} yrs</strong></div>
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Blood Group</span> <strong>{femalePartner.blood_group || '—'}</strong></div>
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Phone</span> <strong>{femalePartner.phone}</strong></div>
-                </div>
-                {femalePartner.alert_notes?.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {femalePartner.alert_notes.map((a: string, i: number) => (
-                      <span key={i} className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-800 rounded">
-                        ⚠️ {a}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 text-center text-xs text-slate-400 flex items-center justify-center">
-                No female partner registered
-              </div>
-            )}
-
-            {/* Male Partner Card */}
-            {malePartner ? (
-              <div className="bg-blue-50/40 border border-blue-100 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">👨</span>
-                    <div>
-                      <h3 className="font-bold text-sm text-blue-950">{malePartner.name}</h3>
-                      <p className="text-[11px] font-mono text-blue-700 font-bold">{malePartner.vid}</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                    Male Partner
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-700 bg-white/70 p-2.5 rounded-xl border border-blue-100">
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Age</span> <strong>{malePartner.age} yrs</strong></div>
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Blood Group</span> <strong>{malePartner.blood_group || '—'}</strong></div>
-                  <div><span className="text-slate-400 block text-[10px] uppercase font-bold">Phone</span> <strong>{malePartner.phone}</strong></div>
-                </div>
-                {malePartner.alert_notes?.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {malePartner.alert_notes.map((a: string, i: number) => (
-                      <span key={i} className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded">
-                        ⚠️ {a}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 text-center text-xs text-slate-400 flex items-center justify-center">
-                No male partner linked to couple
-              </div>
-            )}
           </div>
         )}
 
-        {/* Tab Navigation Pill Rail */}
-        <div className="flex p-1 bg-slate-100 rounded-2xl overflow-x-auto gap-1">
-          {currentTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => {
-                setActiveTab(t.id);
-                router.replace(`/patients/${patientId}?tab=${t.id}`);
-              }}
-              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                activeTab === t.id
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-              }`}
-            >
-              <span>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
+        {/* Row 2: Expanded Header Details Drawer (When Opened) */}
+        {isHeaderExpanded && (
+          <div className="bg-slate-50/90 border border-slate-200 rounded-lg p-3.5 grid grid-cols-1 md:grid-cols-12 gap-4 text-xs animate-in fade-in slide-in-from-top-1">
+            {/* Column 1: Patient Photo Preview & Upload/Change Action */}
+            <div className="md:col-span-3 flex items-center gap-3 border-b md:border-b-0 md:border-r border-slate-200 pb-3 md:pb-0 pr-0 md:pr-3">
+              <div className="relative group flex-shrink-0">
+                {patient.photo_url ? (
+                  <img
+                    src={patient.photo_url}
+                    alt={patient.name}
+                    className="w-16 h-16 rounded-lg object-cover border border-slate-300 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex flex-col items-center justify-center text-xs">
+                    <Camera className="w-5 h-5 text-indigo-400 mb-0.5" />
+                    <span>No Photo</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-slate-800 text-xs">Patient Photo</p>
+                <p className="text-[10px] text-slate-500">Upload profile image directly</p>
+                <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-indigo-600 rounded text-[11px] font-bold cursor-pointer transition-colors shadow-2xs">
+                  <Camera className="w-3 h-3" />
+                  <span>{isUploadingPhoto ? 'Uploading...' : patient.photo_url ? 'Change Photo' : 'Upload Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={isUploadingPhoto}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Column 2: Personal & Contact Information */}
+            <div className="md:col-span-5 space-y-1.5 border-b md:border-b-0 md:border-r border-slate-200 pb-3 md:pb-0 pr-0 md:pr-3">
+              <p className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Contact &amp; Demographics</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                <div><span className="text-slate-400 font-medium">DOB / Age:</span> <strong className="text-slate-700">{patient.dob || '—'} ({patient.age || '—'}y)</strong></div>
+                <div><span className="text-slate-400 font-medium">Marital Status:</span> <strong className="text-slate-700 capitalize">{patient.marital_status || 'Married'}</strong></div>
+                <div><span className="text-slate-400 font-medium">Phone:</span> <strong className="text-slate-700">{patient.phone || '—'}</strong></div>
+                <div><span className="text-slate-400 font-medium">Email:</span> <strong className="text-slate-700">{patient.email || '—'}</strong></div>
+                <div className="col-span-2">
+                  <span className="text-slate-400 font-medium">Address:</span> <span className="text-slate-700">{patient.address ? `${patient.address}, ` : ''}{patient.area || ''}{patient.city ? `, ${patient.city}` : ''}{patient.pincode ? ` - ${patient.pincode}` : ''}</span>
+                </div>
+                {patient.emergency_contact_name && (
+                  <div className="col-span-2">
+                    <span className="text-slate-400 font-medium">Emergency:</span> <span className="text-slate-700 font-semibold">{patient.emergency_contact_name} ({patient.emergency_contact_relation || 'Relation'}) · {patient.emergency_contact_phone || ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Referral & Hospital Doctor Info */}
+            <div className="md:col-span-4 space-y-1.5">
+              <p className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Hospital &amp; Referral Details</p>
+              <div className="space-y-1 text-[11px]">
+                <div><span className="text-slate-400 font-medium">Treating Doctor:</span> <strong className="text-slate-800">{patient.treating_doctor_name || 'Unassigned'}</strong></div>
+                <div><span className="text-slate-400 font-medium">Referring Doctor:</span> <strong className="text-slate-800">{patient.referring_doctor || 'Direct / Walk-in'}</strong></div>
+                <div><span className="text-slate-400 font-medium">Marketing Person:</span> <strong className="text-slate-800">{patient.marketing_person_name || 'None'}</strong></div>
+                <div><span className="text-slate-400 font-medium">Registered:</span> <span className="text-slate-600">{formatDate(patient.created_at)}</span></div>
+                {patient.alert_notes?.length > 0 && (
+                  <div className="pt-1">
+                    <span className="text-slate-400 font-medium block">Allergies &amp; Alerts:</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {patient.alert_notes.map((a: string, i: number) => (
+                        <span key={i} className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Row 3: Tab Navigation Rail */}
+        <div className="flex p-0.5 bg-slate-100/90 rounded-md overflow-x-auto gap-1">
+          {currentTabs.map((t) => {
+            const TabIcon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setActiveTab(t.id);
+                  router.replace(`/patients/${patientId}?tab=${t.id}`);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded transition-all whitespace-nowrap ${
+                  activeTab === t.id
+                    ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <TabIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -688,60 +773,129 @@ interface AndrologyFormData {
         {/* === TAB 1: OVERVIEW === */}
         {activeTab === 'overview' && (
           <div className="space-y-6 w-full">
-            {/* Active Cycles Card */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3">
-                <h3 className="font-black text-sm text-slate-900">Treatment Cycles Overview</h3>
-                <button
-                  onClick={() => setShowNewCycleModal(true)}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-colors"
+            {/* Couple 360 Side-by-Side Profiles */}
+            {hasPartner && viewMode === 'couple' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
+                {/* Primary Patient Card */}
+                <div 
+                  onClick={() => setViewMode('individual')}
+                  className="bg-white border-2 border-transparent hover:border-indigo-300 rounded-xl p-5 shadow-sm hover:shadow-md cursor-pointer transition-all relative group"
                 >
-                  + Add New Cycle
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold">Focus Individual Chart →</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {patient.photo_url ? (
+                      <img src={patient.photo_url} alt={patient.name} className="w-16 h-16 rounded-full object-cover shadow-sm border border-slate-200" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xl">
+                        {patient.name?.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-lg">{patient.name}</h3>
+                      <p className="text-xs text-slate-500 font-medium">Primary Patient • {patient.gender}</p>
+                      <div className="mt-1 flex gap-2 text-xs font-mono text-slate-600">
+                        <span>{patient.vid}</span>
+                        <span>{patient.age ? `${patient.age}y` : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Partner Card */}
+                <Link
+                  href={`/patients/${partner.id}`}
+                  className="bg-slate-50 border-2 border-transparent hover:border-sky-300 rounded-xl p-5 shadow-sm hover:shadow-md cursor-pointer transition-all relative group"
+                >
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] bg-sky-100 text-sky-700 px-2 py-1 rounded font-bold">Open Partner Chart →</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {partner.photo_url ? (
+                      <img src={partner.photo_url} alt={partner.name} className="w-16 h-16 rounded-full object-cover shadow-sm border border-slate-200" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-sky-100 text-sky-600 font-bold flex items-center justify-center text-xl">
+                        {partner.name?.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-lg">{partner.name}</h3>
+                      <p className="text-xs text-slate-500 font-medium">Linked Partner • {partner.gender}</p>
+                      <div className="mt-1 flex gap-2 text-xs font-mono text-slate-600">
+                        <span>{partner.vid}</span>
+                        <span>{partner.age ? `${partner.age}y` : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            {/* Active Cycles Card (Collapsible) */}
+            <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => setIsCyclesCardExpanded(!isCyclesCardExpanded)}
+                >
+                  <h3 className="font-bold text-sm text-slate-900">Treatment Cycles Overview</h3>
+                  <button type="button" className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                    {isCyclesCardExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveTab('treatment');
+                    setIsCreatingCycle(true);
+                    router.replace(`/patients/${patientId}?tab=treatment`);
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add New Cycle</span>
                 </button>
               </div>
 
-              {cycles.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-4">No active or completed cycles on file.</p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {cycles.map((c) => (
-                    <div key={c.id} className="py-3 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-indigo-700">{c.cycle_id}</span>
-                          <strong className="text-slate-900">{c.treatment_type} (Attempt #{c.attempt_number})</strong>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                            {c.status}
-                          </span>
+              {isCyclesCardExpanded && (
+                cycles.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4">No active or completed cycles on file.</p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {cycles.map((c) => (
+                      <div key={c.id} className="py-3 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-indigo-700">{c.cycle_id}</span>
+                            <strong className="text-slate-900">{c.treatment_type} (Attempt #{c.attempt_number})</strong>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                              {c.status}
+                            </span>
+                          </div>
+                          <p className="text-slate-400 mt-1">Stimulation Start: {c.sentinel_dates?.stim_start || '—'} · OPU: {c.sentinel_dates?.opu || '—'}</p>
                         </div>
-                        <p className="text-slate-400 mt-1">Stimulation Start: {c.sentinel_dates?.stim_start || '—'} · OPU: {c.sentinel_dates?.opu || '—'}</p>
+                        <button
+                          onClick={() => { setActiveCycle(c); setActiveTab('treatment'); }}
+                          className="font-bold text-indigo-600 hover:underline"
+                        >
+                          View Calendar →
+                        </button>
                       </div>
-                      <button
-                        onClick={() => { setActiveCycle(c); setActiveTab('treatment'); }}
-                        className="font-bold text-indigo-600 hover:underline"
-                      >
-                        View Calendar →
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
 
             {/* Advance Wallet Card */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-3xl p-6 shadow-xl flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Patient Advance Deposit Wallet</p>
-                <p className="text-3xl font-black mt-1">₹{walletInfo ? walletInfo.balance.toLocaleString() : '0'}</p>
-                <p className="text-xs text-slate-400 mt-1">Available credit balance for treatment packages & procedure invoices</p>
-              </div>
-              <button
-                onClick={() => setShowDepositModal(true)}
-                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-emerald-500/25"
-              >
-                💳 Deposit Advance Funds
-              </button>
-            </div>
+            <FertilityWalletCard
+              patientId={patientId}
+              patientName={patient?.name}
+              patientVid={patient?.vid}
+              invoices={invoices}
+              onWalletUpdated={loadData}
+              compact={true}
+            />
           </div>
         )}
 
@@ -749,9 +903,9 @@ interface AndrologyFormData {
         {activeTab === 'timeline' && (
           <div className="space-y-6 w-full max-w-3xl mx-auto py-4">
             <div className="flex items-center gap-2 mb-6">
-              <span className="text-2xl">🕒</span>
+              <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500"><Clock className="w-5 h-5" /></div>
               <div>
-                <h2 className="text-lg font-black text-slate-900">Patient Journey Timeline</h2>
+                <h2 className="text-lg font-bold text-slate-900">Patient Journey Timeline</h2>
                 <p className="text-xs text-slate-500">Chronological history of all touchpoints</p>
               </div>
             </div>
@@ -767,10 +921,10 @@ interface AndrologyFormData {
                     ev.type === 'invoice' ? 'bg-blue-600' :
                     'bg-amber-500'
                   }`} />
-                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="bg-white border border-slate-100 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{formatDate(ev.created_at)}</p>
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                         ev.type === 'registration' ? 'bg-teal-50 text-teal-700 border border-teal-200' :
                         ev.type === 'appointment' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
                         ev.type === 'clinical_record' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
@@ -781,7 +935,7 @@ interface AndrologyFormData {
                         {ev.type.replace('_', ' ')}
                       </span>
                     </div>
-                    <h4 className="text-sm font-black text-slate-900 capitalize">{ev.title}</h4>
+                    <h4 className="text-sm font-bold text-slate-900 capitalize">{ev.title}</h4>
                     <p className="text-xs text-slate-600 mt-1 font-medium">{ev.description}</p>
                     {ev.type === 'appointment' && ev.metadata?.triage && (
                       <div className="mt-3 text-[10px] bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-slate-600 font-mono grid grid-cols-2 gap-2">
@@ -801,147 +955,42 @@ interface AndrologyFormData {
           </div>
         )}
 
-        {/* === TAB 2: VISITS & RX === */}
-        {activeTab === 'visits' && (
-          <div className="space-y-6 w-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Consultation Visit History</h2>
-                <p className="text-xs text-slate-500">Record clinical advice, investigations & dual partner prescriptions</p>
-              </div>
-              <button
-                onClick={() => setShowVisitModal(true)}
-                className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                + Log Consultation Visit
-              </button>
-            </div>
-
-            {visitLogs.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
-                No consultations logged yet. Click "+ Log Consultation Visit".
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {visitLogs.map((v) => (
-                  <div key={v.id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b pb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900">
-                          {v.data?.visit_type || (v.record_type === 'opd_consultation' ? 'OPD Consultation' : 'Consultation')}
-                        </span>
-                        <span className="text-xs text-slate-400">· {formatDate(v.created_at)}</span>
-                      </div>
-                      <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full">
-                        Dr. {v.data?.seen_by || 'Consultant'}
-                      </span>
-                    </div>
-
-                    {v.record_type === 'opd_consultation' ? (
-                      <div className="space-y-3">
-                        {v.data?.chief_complaints && (
-                          <div>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Chief Complaints</p>
-                            <p className="text-xs text-slate-800">{v.data.chief_complaints}</p>
-                          </div>
-                        )}
-                        {v.data?.clinical_notes && (
-                          <div>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Clinical Notes</p>
-                            <p className="text-xs text-slate-800">{v.data.clinical_notes}</p>
-                          </div>
-                        )}
-                        {v.data?.investigations_ordered && (
-                          <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-3.5">
-                            <p className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider mb-2">🔬 Investigations Ordered</p>
-                            <p className="text-xs text-slate-800 whitespace-pre-wrap">{v.data.investigations_ordered}</p>
-                          </div>
-                        )}
-                        {v.data?.plan && (
-                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3.5">
-                            <p className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider mb-2">📋 Treatment Plan / Rx</p>
-                            <p className="text-xs text-slate-800 whitespace-pre-wrap">{v.data.plan}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-xs text-slate-700"><strong>Advice / Summary:</strong> {v.data?.summary || 'Routine review.'}</p>
-
-                        {/* Prescriptions */}
-                        {v.data?.wife_medications?.length > 0 && (
-                          <div className="bg-pink-50/50 border border-pink-100 rounded-2xl p-3.5 space-y-2">
-                            <p className="text-[11px] font-bold text-pink-900 uppercase tracking-wider">👩 Wife Prescription</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {v.data.wife_medications.map((m: any, i: number) => (
-                                <div key={i} className="bg-white p-2 rounded-xl text-xs border border-pink-100 font-medium">
-                                  <strong>{m.drug}</strong> — {m.dose} ({m.freq}) for {m.duration}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {v.data?.next_follow_up ? `Next Follow-up: ${v.data.next_follow_up}` : ''}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setPrintablePrescription({
-                            patient,
-                            doctor: { name: v.data?.seen_by || patient.treating_doctor_name || user?.name },
-                            visitDate: v.created_at,
-                            chiefComplaint: v.data?.chief_complaint || v.data?.chief_complaints,
-                            hopi: v.data?.history_of_illness,
-                            pastHistory: v.data?.past_medical_history,
-                            vitals: {
-                              bp: v.data?.vitals_bp || (v.data?.blood_pressure_systolic ? `${v.data?.blood_pressure_systolic}/${v.data?.blood_pressure_diastolic}` : undefined),
-                              pulse: v.data?.vitals_pulse || v.data?.heart_rate,
-                              weight: v.data?.vitals_weight || v.data?.weight,
-                            },
-                            diagnosis: v.data?.provisional_diagnosis,
-                            medications: hasPartner ? (v.data?.wife_medications || []) : (v.data?.patient_medications || v.data?.wife_medications || (v.data?.plan ? [{ drug: v.data.plan }] : [])),
-                            partnerMedications: hasPartner ? (v.data?.husband_medications || []) : [],
-                            partnerName: partner?.name,
-                            advice: v.data?.summary || v.data?.plan,
-                            nextFollowUp: v.data?.next_follow_up,
-                          });
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl transition-colors shadow-sm"
-                      >
-                        <span>🖨️</span> Print Prescription (Rx)
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* === TAB 2: OPD CLINICAL WORKBENCH & RX === */}
+        {activeTab === 'workbench' && (
+          <div className="w-full bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+            <OPDWorkbench
+              patientId={patientId}
+              appointment={activeAppointment}
+              triageData={activeAppointment?.metadata_?.triage || activeAppointment?.metadata?.triage}
+              onBack={() => {
+                setActiveTab('overview');
+                router.replace(`/patients/${patientId}?tab=overview`);
+                loadData();
+              }}
+            />
           </div>
         )}
 
         {/* === TAB 3: INVESTIGATIONS & USG === */}
         {activeTab === 'investigations' && (
           <div className="space-y-6 w-full">
-            <div className="flex items-center justify-between bg-white border border-slate-200 p-2 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between bg-white border border-slate-200 p-2 rounded-lg shadow-sm">
               <div className="flex gap-2">
                 <button
                   onClick={() => { setInvestigationGender('female'); setActiveSchemaType('follicular_scan'); }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                     investigationGender === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  👩 Female Scans & Reports
+                  ♀ Female Scans & Reports
                 </button>
                 <button
                   onClick={() => { setInvestigationGender('male'); setActiveSchemaType('casa_semen_analysis'); }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                     investigationGender === 'male' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  👨 Male Diagnostic Reports
+                  ♂ Male Diagnostic Reports
                 </button>
               </div>
 
@@ -970,7 +1019,7 @@ interface AndrologyFormData {
             </div>
 
             {activeSchema && (
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
                 <DynamicForm
                   schema={activeSchema}
                   initialData={historyRecord?.data || {}}
@@ -986,24 +1035,128 @@ interface AndrologyFormData {
         {/* === TAB 4: TREATMENT CYCLES === */}
         {activeTab === 'treatment' && (
           <div className="space-y-6 w-full">
-            {activeCycle ? (
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b pb-4">
+            {isCreatingCycle ? (
+              <div className="space-y-4 w-full animate-in fade-in">
+                <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-5 py-3 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-md bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">Initiate New Treatment Cycle</h2>
+                      <p className="text-[11px] text-slate-500">Configure stimulation protocol, sentinel milestone dates &amp; gonadotropins</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingCycle(false)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors flex items-center gap-1.5 shadow-2xs border border-slate-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cancel &amp; Return</span>
+                  </button>
+                </div>
+
+                <TreatmentCycleWizard
+                  patientId={patientId}
+                  partnerId={partner?.id}
+                  userId={user?.id || ''}
+                  onCancel={() => setIsCreatingCycle(false)}
+                  onSuccess={(newCycle) => {
+                    setIsCreatingCycle(false);
+                    loadData();
+                    if (newCycle) {
+                      setActiveCycle(newCycle);
+                      treatmentCyclesApi.getCalendar(newCycle.id).then((cal: any) => setCycleCalendar(cal)).catch(() => {});
+                    }
+                  }}
+                />
+              </div>
+            ) : activeCycle ? (
+              <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
                   <div>
-                    <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">
-                      {activeCycle.cycle_id}
-                    </span>
-                    <h2 className="text-xl font-black text-slate-900 mt-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
+                        {activeCycle.cycle_id}
+                      </span>
+                      {cycles.length > 1 && (
+                        <select
+                          value={activeCycle.id}
+                          onChange={(e) => {
+                            const found = cycles.find((c) => c.id === e.target.value);
+                            if (found) {
+                              setActiveCycle(found);
+                              treatmentCyclesApi.getCalendar(found.id).then((cal: any) => setCycleCalendar(cal)).catch(() => {});
+                            }
+                          }}
+                          className="text-xs font-bold bg-slate-100 border border-slate-200 rounded px-2 py-0.5 text-slate-700 cursor-pointer"
+                        >
+                          {cycles.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.cycle_id} — {c.treatment_type} (Attempt #{c.attempt_number})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900 mt-1">
                       {activeCycle.treatment_type} Cycle (Attempt #{activeCycle.attempt_number})
                     </h2>
                     <p className="text-xs text-slate-500">Stimulation Start: {activeCycle.sentinel_dates?.stim_start || '—'} · OPU: {activeCycle.sentinel_dates?.opu || '—'}</p>
                   </div>
-                  <button
-                    onClick={() => router.push(`/ivf-lab?cycle_id=${activeCycle.id}`)}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
-                  >
-                    Open in IVF Lab 🧫 →
-                  </button>
+                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setShowConsentModal(true)}
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Statutory Consent Forms"
+                    >
+                      <FileCheck className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Consents</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowOpuModal(true)}
+                      className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Egg Retrieval / OPU Aspiration Report"
+                    >
+                      <Activity className="w-3.5 h-3.5 text-purple-600" />
+                      <span>OPU Report</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmbryologyModal(true)}
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Master Embryology & Insemination Form"
+                    >
+                      <FlaskConical className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Embryology Form</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEtDischargeModal(true)}
+                      className="px-2.5 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Embryo Transfer Discharge Protocol"
+                    >
+                      <Users className="w-3.5 h-3.5 text-pink-600" />
+                      <span>ET Protocol</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingCycle(true)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Cycle</span>
+                    </button>
+                    <button
+                      onClick={() => router.push(`/ivf-lab?cycle_id=${activeCycle.id}`)}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-xs transition-colors shadow-sm flex items-center gap-1"
+                    >
+                      <span>IVF Lab →</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Day by Day Timetable */}
@@ -1014,7 +1167,7 @@ interface AndrologyFormData {
                       {cycleCalendar.days?.map((d: any) => (
                         <div
                           key={d.day_number}
-                          className={`p-3 rounded-2xl border ${
+                          className={`p-3 rounded-lg border ${
                             d.milestone ? 'border-indigo-400 bg-indigo-50/40 shadow-sm' : 'border-slate-200 bg-white'
                           }`}
                         >
@@ -1022,7 +1175,7 @@ interface AndrologyFormData {
                             <span className="font-bold text-xs text-slate-800">{d.display_date}</span>
                             <span className="text-[10px] text-slate-400">{d.day_of_week}</span>
                           </div>
-                          {d.milestone && <p className="text-xs font-black text-indigo-800 mb-1">{d.milestone}</p>}
+                          {d.milestone && <p className="text-xs font-bold text-indigo-800 mb-1">{d.milestone}</p>}
                           {d.medications?.map((m: any, idx: number) => (
                             <div key={idx} className="bg-slate-50 p-1.5 rounded text-[11px] font-medium text-slate-700 mt-1">
                               <strong>{m.drug_name}</strong> — {m.dose} ({m.frequency})
@@ -1031,7 +1184,7 @@ interface AndrologyFormData {
                           ))}
 
                           {addingMedDay === d.day_number ? (
-                            <div className="mt-2 p-2 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2 text-xs">
+                            <div className="mt-2 p-2 bg-indigo-50/70 rounded-md border border-indigo-200 space-y-2 text-xs">
                               <input
                                 type="text"
                                 placeholder="Drug name (e.g. Inj. Recagon 225 IU)"
@@ -1097,8 +1250,20 @@ interface AndrologyFormData {
                 )}
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 text-xs">
-                No active cycle selected. Click "+ Add New Cycle" to start.
+              <div className="bg-white border border-slate-200 rounded-lg p-12 text-center space-y-3">
+                <Activity className="w-8 h-8 text-indigo-500 mx-auto opacity-70" />
+                <h3 className="text-sm font-bold text-slate-800">No Treatment Cycle Active</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  No active IVF, ICSI, or IUI treatment cycle is currently recorded for this patient. Start a new cycle to configure stimulation protocols, sentinel milestones, and medication timetables.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingCycle(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-xs transition-colors shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add New Cycle</span>
+                </button>
               </div>
             )}
           </div>
@@ -1107,144 +1272,39 @@ interface AndrologyFormData {
         {/* === TAB 5: EMBEDDED ANDROLOGY === */}
         {activeTab === 'andrology' && (
           <div className="space-y-6 w-full">
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
-              <div className="flex items-center justify-between border-b pb-4">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                    Partner Andrology Diagnostics
-                  </span>
-                  <h2 className="text-lg font-black text-slate-900 mt-1">
-                    CASA Semen Analysis & DFI: {malePartner?.name || patient.name}
-                  </h2>
-                  <p className="text-xs text-slate-500">WHO 6th Edition reference standards</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
-                >
-                  🖨️ Print Andrology Report
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveAndrologyDirect} className="space-y-5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Abstinence (Days)</label>
-                    <input
-                      type="number"
-                      value={andrologyForm.abstinence_days}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, abstinence_days: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Volume (mL)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={andrologyForm.volume_ml}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, volume_ml: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Concentration (M/mL)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={andrologyForm.pre_conc_million_ml}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, pre_conc_million_ml: e.target.value })}
-                      className="vmd-input text-xs font-bold text-indigo-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Progressive (PR) %</label>
-                    <input
-                      type="number"
-                      value={andrologyForm.progressive_motility_pct}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, progressive_motility_pct: e.target.value })}
-                      className="vmd-input text-xs font-bold text-emerald-800"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Normal Forms % (Kruger)</label>
-                    <input
-                      type="number"
-                      value={andrologyForm.normal_forms_pct}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, normal_forms_pct: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Sperm DFI % (Halosperm)</label>
-                    <input
-                      type="number"
-                      value={andrologyForm.dfi_total_pct}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, dfi_total_pct: e.target.value })}
-                      className="vmd-input text-xs font-bold text-violet-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Impression</label>
-                    <input
-                      type="text"
-                      value={andrologyForm.impression}
-                      onChange={(e) => setAndrologyForm({ ...andrologyForm, impression: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingAndrology}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
-                >
-                  {isSavingAndrology ? 'Saving...' : '💾 Save Andrology Metrics'}
-                </button>
-              </form>
+            <AndrologyDataEntry patientId={malePartner?.id || patient.id} patientName={malePartner?.name || patient.name} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowSpermPrepModal(true)}
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md font-bold text-xs transition-colors"
+              >
+                + Semen Wash &amp; IUI
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSpermFreezingModal(true)}
+                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md font-bold text-xs transition-colors"
+              >
+                + Semen Freezing
+              </button>
             </div>
-
-            {/* Andrology History Records */}
-            {andrologyHistory.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                <h3 className="text-sm font-black text-slate-900 border-b pb-3">📋 Previous Semen Analysis Reports</h3>
-                <div className="space-y-3">
-                  {andrologyHistory.map((rec: any, idx: number) => (
-                    <div key={rec.id || idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-bold text-slate-700">
-                          🗓 {rec.data?.collection_date || new Date(rec.created_at).toLocaleDateString('en-IN')}
-                        </p>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          rec.data?.impression?.toLowerCase().includes('normal') ? 'bg-emerald-100 text-emerald-800' :
-                          rec.data?.impression?.toLowerCase().includes('asthen') ? 'bg-amber-100 text-amber-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>{rec.data?.impression || 'Report on File'}</span>
-                      </div>
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-[11px] text-slate-700">
-                        <div><span className="text-slate-400 block font-bold">Volume</span><strong>{rec.data?.volume_ml ?? '—'} mL</strong></div>
-                        <div><span className="text-slate-400 block font-bold">Conc (M/mL)</span><strong>{rec.data?.pre_conc_million_ml ?? '—'}</strong></div>
-                        <div><span className="text-slate-400 block font-bold">PR Motility</span><strong>{rec.data?.progressive_motility_pct ?? '—'}%</strong></div>
-                        <div><span className="text-slate-400 block font-bold">Normal Forms</span><strong>{rec.data?.normal_forms_pct ?? '—'}%</strong></div>
-                        <div><span className="text-slate-400 block font-bold">DFI %</span><strong>{rec.data?.dfi_total_pct ?? '—'}%</strong></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {/* === TAB 6: BILLING & WALLET === */}
         {activeTab === 'billing' && (
           <div className="space-y-6 w-full">
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <FertilityWalletCard
+              patientId={patientId}
+              patientName={patient?.name}
+              patientVid={patient?.vid}
+              invoices={invoices}
+              onWalletUpdated={loadData}
+              compact={false}
+            />
+
+            <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="text-base font-bold text-slate-900">Patient Billing & Invoices</h3>
                 <Link href="/billing" className="text-xs text-indigo-600 font-bold hover:underline">
@@ -1294,87 +1354,35 @@ interface AndrologyFormData {
         {activeTab === 'documents' && (
           <div className="space-y-6 w-full">
             {/* Upload New Report Form */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3">
+            <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">📁 Patient Documents & Investigation Reports</h2>
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5"><FolderOpen className="w-4 h-4 text-slate-600" /> Patient Documents & Investigation Reports</h2>
                   <p className="text-xs text-slate-500">Upload or link lab reports, scan images, consent forms, and regulatory documents</p>
-                </div>
-              </div>
-
-              {/* Quick Upload Form */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide">📤 Register New Document</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Document / File Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Day 3 FSH Report Aug 2026"
-                      value={uploadDocForm.file_name}
-                      onChange={(e) => setUploadDocForm({ ...uploadDocForm, file_name: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">File URL / Reference</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. https://drive.google.com/... or /uploads/..."
-                      value={uploadDocForm.file_path}
-                      onChange={(e) => setUploadDocForm({ ...uploadDocForm, file_path: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Category</label>
-                    <select
-                      value={uploadDocForm.category}
-                      onChange={(e) => setUploadDocForm({ ...uploadDocForm, category: e.target.value })}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="report">Lab Report</option>
-                      <option value="scan">Ultrasound / Scan</option>
-                      <option value="consent">Consent Form</option>
-                      <option value="prescription">Prescription</option>
-                      <option value="referral">Referral Letter</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
                 </div>
                 <button
                   type="button"
-                  disabled={isUploadingDoc || !uploadDocForm.file_name || !uploadDocForm.file_path}
-                  onClick={async () => {
-                    if (!uploadDocForm.file_name || !uploadDocForm.file_path) return;
-                    setIsUploadingDoc(true);
-                    try {
-                      await documentsApi.create({
-                        patient_id: patientId,
-                        file_name: uploadDocForm.file_name,
-                        file_path: uploadDocForm.file_path,
-                        category: uploadDocForm.category,
-                      });
-                      const docs = await documentsApi.list(patientId);
-                      setPatientDocs(docs || []);
-                      setUploadDocForm({ file_name: '', file_path: '', category: 'report' });
-                    } catch (err: any) {
-                      alert('Failed to upload: ' + (err.message || 'Unknown error'));
-                    } finally {
-                      setIsUploadingDoc(false);
-                    }
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors disabled:opacity-50"
+                  onClick={() => setShowConsentModal(true)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5 self-start sm:self-auto"
                 >
-                  {isUploadingDoc ? 'Saving...' : '📤 Register Document'}
+                  <span className="flex items-center gap-1.5"><FileCheck className="w-3.5 h-3.5 text-amber-700" /> Digital ART Consent (Forms 8, 11, 13, 15)</span>
                 </button>
               </div>
 
-              {/* Documents List */}
+              {/* Multi-Document Upload Builder (Extracted Component) */}
+              <MultiDocumentUploader
+                primaryPatientId={patient.id}
+                primaryPatientName={patient.name}
+                partnerId={partner?.id}
+                partnerName={partner?.name}
+                onUploadComplete={loadData}
+              />
+
+          {/* Documents List */}
               {patientDocs.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {patientDocs.map((doc: any) => (
-                    <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-2 hover:border-indigo-300 transition-colors">
+                    <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-lg space-y-2 hover:border-indigo-300 transition-colors">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs font-bold text-slate-800 flex-1 leading-tight">{doc.file_name}</p>
                         <button
@@ -1386,16 +1394,28 @@ interface AndrologyFormData {
                           }}
                           className="text-rose-400 hover:text-rose-600 text-xs font-bold flex-shrink-0"
                           title="Remove"
-                        >✕</button>
+                        ><X className="w-3.5 h-3.5" /></button>
                       </div>
-                      <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        doc.category === 'report' ? 'bg-blue-100 text-blue-800' :
-                        doc.category === 'scan' ? 'bg-purple-100 text-purple-800' :
-                        doc.category === 'consent' ? 'bg-emerald-100 text-emerald-800' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {doc.category?.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          doc.category === 'report' ? 'bg-blue-100 text-blue-800' :
+                          doc.category === 'scan' ? 'bg-purple-100 text-purple-800' :
+                          doc.category === 'consent' ? 'bg-emerald-100 text-emerald-800' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {doc.category?.toUpperCase()}
+                        </span>
+                        {hasPartner && doc.patient_id === partner?.id && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">
+                            Partner: {partner.name}
+                          </span>
+                        )}
+                        {hasPartner && doc.patient_id === patient?.id && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                            Self: {patient.name}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 font-medium">{new Date(doc.created_at).toLocaleDateString('en-IN')}</p>
                       <a
                         href={doc.file_path}
@@ -1403,7 +1423,7 @@ interface AndrologyFormData {
                         rel="noopener noreferrer"
                         className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold underline block truncate"
                       >
-                        🔗 Open / View Document
+                        <ExternalLink className="w-3.5 h-3.5 inline mr-1" /> Open / View Document
                       </a>
                     </div>
                   ))}
@@ -1418,436 +1438,166 @@ interface AndrologyFormData {
         )}
       </div>
 
-      {/* New Treatment Cycle Modal */}
-      {showNewCycleModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <TreatmentCycleWizard
-            patientId={patientId}
-            partnerId={partner?.id}
-            userId={user?.id || ''}
-            onCancel={() => setShowNewCycleModal(false)}
-            onSuccess={() => {
-              setShowNewCycleModal(false);
-              loadData();
-            }}
-          />
-        </div>
+
+
+
+
+      {showConsentModal && (
+        <StatutoryConsentModal
+          patient={patient}
+          partner={partner}
+          cycle={cycles?.[0]}
+          onClose={() => setShowConsentModal(false)}
+          onConsentSaved={() => {
+            documentsApi.list(patientId).then((docs: any) => setPatientDocs(docs || []));
+            loadData();
+          }}
+        />
       )}
 
-      {/* Deposit Modal */}
-      {showDepositModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="font-bold text-base text-slate-900">💳 Deposit Funds to Advance Wallet</h3>
-            <form onSubmit={handleDepositWallet} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Deposit Amount (₹)</label>
-                <input
-                  type="number"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  className="vmd-input text-base font-black text-indigo-700"
-                  min="100"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Payment Method</label>
-                <select
-                  value={depositMode}
-                  onChange={(e) => setDepositMode(e.target.value)}
-                  className="vmd-input text-xs"
-                >
-                  <option value="upi">UPI (GPay / PhonePe)</option>
-                  <option value="card">Credit / Debit Card</option>
-                  <option value="cash">Cash</option>
-                  <option value="bank_transfer">NEFT / Bank Transfer</option>
-                </select>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700">
-                  Confirm Advance Deposit
-                </button>
-                <button type="button" onClick={() => setShowDepositModal(false)} className="px-4 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* OPU Aspiration Report Modal */}
+      {showOpuModal && (
+        <OPUAspirationReportModal
+          cycle={activeCycle || cycles?.[0]}
+          patient={patient}
+          partner={partner}
+          onClose={() => setShowOpuModal(false)}
+          onSaved={() => {
+            loadData();
+          }}
+        />
       )}
 
-      {/* Log Visit & Prescription Modal with Dynamic Medication Row Manager */}
-      {showVisitModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full max-h-[92vh] overflow-y-auto space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
+      {/* Master Embryology Record Modal */}
+      {showEmbryologyModal && (
+        <MasterEmbryologyRecordModal
+          cycle={activeCycle || cycles?.[0]}
+          patient={patient}
+          partner={partner}
+          onClose={() => setShowEmbryologyModal(false)}
+          onSaved={() => {
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Embryo Transfer Discharge Modal */}
+      {showEtDischargeModal && (
+        <EmbryoTransferDischargeModal
+          cycle={activeCycle || cycles?.[0]}
+          patient={patient}
+          partner={partner}
+          onClose={() => setShowEtDischargeModal(false)}
+          onSaved={() => {
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Sperm Preparation & IUI Wash Modal */}
+      {showSpermPrepModal && (
+        <SpermPreparationModal
+          patient={partner || patient}
+          partner={partner ? patient : undefined}
+          onClose={() => setShowSpermPrepModal(false)}
+          onSaved={() => {
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Sperm Cryopreservation Freezing Modal */}
+      {showSpermFreezingModal && (
+        <SpermFreezingModal
+          cycle={activeCycle || cycles?.[0]}
+          patient={partner || patient}
+          partner={partner ? patient : undefined}
+          onClose={() => setShowSpermFreezingModal(false)}
+          onSaved={() => {
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Link Existing Patient as Partner Modal */}
+      {showLinkPartnerModal && (
+        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b pb-2">
               <div>
-                <h3 className="font-bold text-base text-slate-900">
-                  {hasPartner ? 'Log Consultation Visit & Couple Prescription' : 'Log Consultation Visit & Prescription'}
-                </h3>
-                <p className="text-xs text-slate-500">Record clinical findings, vitals, diagnosis, and issue printable Rx.</p>
+                <h3 className="font-bold text-base text-slate-900">Link Existing Patient as Partner</h3>
+                <p className="text-xs text-slate-500">Search and link a partner to {patient?.name} ({patient?.vid})</p>
               </div>
-              <button onClick={() => setShowVisitModal(false)} className="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+              <button onClick={() => setShowLinkPartnerModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={(e) => handleSaveVisit(e, false)} className="space-y-4">
-              {/* Doctor & Visit Type */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Attending Doctor / Specialist</label>
-                  <input
-                    type="text"
-                    value={visitForm.seen_by}
-                    onChange={(e) => setVisitForm({ ...visitForm, seen_by: e.target.value })}
-                    className="vmd-input text-xs"
-                    placeholder="Doctor Name (e.g. Dr. Ramesh)"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Visit Date</label>
-                  <input
-                    type="date"
-                    value={visitForm.visit_date}
-                    onChange={(e) => setVisitForm({ ...visitForm, visit_date: e.target.value })}
-                    className="vmd-input text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Vitals & Diagnosis */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3">
-                <span className="text-xs font-black text-slate-700 uppercase tracking-wide">🩺 Vitals & Examination</span>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">BP (mmHg)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 120/80"
-                      value={visitForm.vitals_bp}
-                      onChange={(e) => setVisitForm({ ...visitForm, vitals_bp: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Pulse (bpm)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 74"
-                      value={visitForm.vitals_pulse}
-                      onChange={(e) => setVisitForm({ ...visitForm, vitals_pulse: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Weight (kg)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 62"
-                      value={visitForm.vitals_weight}
-                      onChange={(e) => setVisitForm({ ...visitForm, vitals_weight: e.target.value })}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Provisional / Working Diagnosis</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Primary Infertility, Diminished Ovarian Reserve"
-                    value={visitForm.provisional_diagnosis}
-                    onChange={(e) => setVisitForm({ ...visitForm, provisional_diagnosis: e.target.value })}
-                    className="vmd-input text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Chief Complaints & HOPI */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Chief Complaints</label>
-                  <textarea
-                    rows={2}
-                    value={visitForm.chief_complaint}
-                    onChange={(e) => setVisitForm({ ...visitForm, chief_complaint: e.target.value })}
-                    placeholder="e.g. Trying to conceive for 3 years, irregular cycles..."
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">History of Present Illness (HOPI)</label>
-                  <textarea
-                    rows={2}
-                    value={visitForm.history_of_illness}
-                    onChange={(e) => setVisitForm({ ...visitForm, history_of_illness: e.target.value })}
-                    placeholder="e.g. Prior failed IUI cycle in 2024. Normal AMH..."
-                    className="vmd-input text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Past Medical History & Consultation Advice */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Past Medical / Surgical History</label>
-                  <textarea
-                    rows={2}
-                    value={visitForm.past_medical_history}
-                    onChange={(e) => setVisitForm({ ...visitForm, past_medical_history: e.target.value })}
-                    placeholder="e.g. Hypothyroidism on Thyronorm 50mcg, Diagnostic laparoscopy in 2023..."
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Consultation Advice / Summary *</label>
-                  <textarea
-                    value={visitForm.summary}
-                    onChange={(e) => setVisitForm({ ...visitForm, summary: e.target.value })}
-                    required
-                    rows={2}
-                    className="vmd-input text-xs"
-                    placeholder="Clinical evaluation and treatment plan summary..."
-                  />
-                </div>
-              </div>
-
-              {/* Prescription Section - Dynamic for Couple or Single Patient */}
-              {hasPartner ? (
-                <>
-                  {/* Wife Medications */}
-                  <div className="bg-pink-50/50 border border-pink-100 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-pink-900 uppercase">👩 Wife Medications</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddMedication('wife')}
-                        className="text-xs text-pink-700 font-bold hover:underline"
-                      >
-                        + Add Medication Row
-                      </button>
-                    </div>
-                    {visitForm.wife_medications.map((m, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Drug Name (e.g. Inj. Recagon 150 IU)"
-                          value={m.drug}
-                          onChange={(e) => {
-                            const updated = [...visitForm.wife_medications];
-                            updated[idx].drug = e.target.value;
-                            setVisitForm({ ...visitForm, wife_medications: updated });
-                          }}
-                          className="vmd-input text-xs flex-1"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Dose"
-                          value={m.dose}
-                          onChange={(e) => {
-                            const updated = [...visitForm.wife_medications];
-                            updated[idx].dose = e.target.value;
-                            setVisitForm({ ...visitForm, wife_medications: updated });
-                          }}
-                          className="vmd-input text-xs w-20"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Freq"
-                          value={m.freq}
-                          onChange={(e) => {
-                            const updated = [...visitForm.wife_medications];
-                            updated[idx].freq = e.target.value;
-                            setVisitForm({ ...visitForm, wife_medications: updated });
-                          }}
-                          className="vmd-input text-xs w-20"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedication('wife', idx)}
-                          className="text-rose-500 font-bold hover:text-rose-700 text-xs px-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    {visitForm.wife_medications.length === 0 && (
-                      <p className="text-[11px] text-pink-400 italic">No medications added yet. Click + Add Medication Row.</p>
-                    )}
-                  </div>
-
-                  {/* Husband Medications */}
-                  <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-blue-900 uppercase">👨 Husband Medications</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddMedication('husband')}
-                        className="text-xs text-blue-700 font-bold hover:underline"
-                      >
-                        + Add Medication Row
-                      </button>
-                    </div>
-                    {visitForm.husband_medications.map((m, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Drug Name (e.g. Tab. CoQ10 100mg)"
-                          value={m.drug}
-                          onChange={(e) => {
-                            const updated = [...visitForm.husband_medications];
-                            updated[idx].drug = e.target.value;
-                            setVisitForm({ ...visitForm, husband_medications: updated });
-                          }}
-                          className="vmd-input text-xs flex-1"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Dose"
-                          value={m.dose}
-                          onChange={(e) => {
-                            const updated = [...visitForm.husband_medications];
-                            updated[idx].dose = e.target.value;
-                            setVisitForm({ ...visitForm, husband_medications: updated });
-                          }}
-                          className="vmd-input text-xs w-20"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Freq"
-                          value={m.freq}
-                          onChange={(e) => {
-                            const updated = [...visitForm.husband_medications];
-                            updated[idx].freq = e.target.value;
-                            setVisitForm({ ...visitForm, husband_medications: updated });
-                          }}
-                          className="vmd-input text-xs w-20"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedication('husband', idx)}
-                          className="text-rose-500 font-bold hover:text-rose-700 text-xs px-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    {visitForm.husband_medications.length === 0 && (
-                      <p className="text-[11px] text-blue-400 italic">No medications added yet. Click + Add Medication Row.</p>
-                    )}
-                  </div>
-                </>
-              ) : (
-                /* Single Patient Medications */
-                <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-indigo-900 uppercase">💊 Prescribed Medications</span>
-                    <button
-                      type="button"
-                      onClick={() => handleAddMedication('patient')}
-                      className="text-xs text-indigo-700 font-bold hover:underline"
-                    >
-                      + Add Medication Row
-                    </button>
-                  </div>
-                  {visitForm.patient_medications.map((m, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        placeholder="Drug Name (e.g. Tab. Paracetamol 650mg)"
-                        value={m.drug}
-                        onChange={(e) => {
-                          const updated = [...visitForm.patient_medications];
-                          updated[idx].drug = e.target.value;
-                          setVisitForm({ ...visitForm, patient_medications: updated });
-                        }}
-                        className="vmd-input text-xs flex-1"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Dose"
-                        value={m.dose}
-                        onChange={(e) => {
-                          const updated = [...visitForm.patient_medications];
-                          updated[idx].dose = e.target.value;
-                          setVisitForm({ ...visitForm, patient_medications: updated });
-                        }}
-                        className="vmd-input text-xs w-20"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Freq"
-                        value={m.freq}
-                        onChange={(e) => {
-                          const updated = [...visitForm.patient_medications];
-                          updated[idx].freq = e.target.value;
-                          setVisitForm({ ...visitForm, patient_medications: updated });
-                        }}
-                        className="vmd-input text-xs w-20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedication('patient', idx)}
-                        className="text-rose-500 font-bold hover:text-rose-700 text-xs px-1"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {visitForm.patient_medications.length === 0 && (
-                    <p className="text-[11px] text-indigo-400 italic">No medications added yet. Click + Add Medication Row.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Next Follow-up */}
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Next Follow-Up / Review Instructions</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Search by Name, Phone, or VID</label>
                 <input
                   type="text"
-                  value={visitForm.next_follow_up}
-                  onChange={(e) => setVisitForm({ ...visitForm, next_follow_up: e.target.value })}
+                  value={partnerSearchQuery}
+                  onChange={(e) => handleSearchPartner(e.target.value)}
+                  placeholder="e.g. Rahul, +91-98765, VH-VMD-00002"
                   className="vmd-input text-xs"
-                  placeholder="e.g. Review after 5 days with USG Follicular Scan report"
+                  autoFocus
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 shadow-sm transition-all"
-                >
-                  Save Consultation Record
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleSaveVisit(e, true)}
-                  className="py-3 px-5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm flex items-center gap-1.5 transition-all"
-                >
-                  🖨️ Save & Print Rx
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowVisitModal(false)}
-                  className="px-4 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition-all"
-                >
-                  Cancel
-                </button>
+              {isSearchingPartner && (
+                <div className="py-4 text-center text-xs text-slate-500">Searching patients...</div>
+              )}
+
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {partnerSearchResults.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 border border-slate-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-slate-900">{p.name}</span>
+                        <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {p.vid}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                          {p.gender} · {p.age ? `${p.age}y` : ''}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{p.phone} {p.area ? `· ${p.area}` : ''}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isLinkingPartner}
+                      onClick={() => handleLinkPartner(p.id, p.name)}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow-xs transition-colors whitespace-nowrap disabled:opacity-50"
+                    >
+                      {isLinkingPartner ? 'Linking...' : 'Link as Partner'}
+                    </button>
+                  </div>
+                ))}
+                {!isSearchingPartner && partnerSearchQuery.length >= 2 && partnerSearchResults.length === 0 && (
+                  <p className="py-6 text-center text-xs text-slate-400">
+                    No matching patients found. Ensure the partner is registered first.
+                  </p>
+                )}
               </div>
-            </form>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setShowLinkPartnerModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Printable Prescription Modal */}
-      {printablePrescription && (
-        <PrintablePrescription
-          {...printablePrescription}
-          onClose={() => setPrintablePrescription(null)}
-        />
       )}
     </div>
   );

@@ -10,10 +10,10 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+} from '@/shared/ui/table';
+import { Button } from '@/shared/ui/button';
+import { Badge } from '@/shared/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import WitnessSignoffDialog from './WitnessSignoffDialog';
 import {
   ShieldAlert,
@@ -24,6 +24,7 @@ import {
   CheckCircle,
   Plus,
   Loader2,
+  Activity,
 } from 'lucide-react';
 
 interface OocyteGridTableProps {
@@ -141,59 +142,59 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
     <div className="space-y-4">
       {/* LIVE KPI HEADER CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-200">
+        <Card className="bg-white border-slate-200 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Fertilization Rate (2PN/MII)</p>
-              <h3 className="text-2xl font-extrabold text-indigo-700 mt-0.5">{kpis.fertilization_rate_pct}%</h3>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Fertilization Rate (2PN/MII)</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{kpis.fertilization_rate_pct}%</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-              <Percent className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold">
+              <Percent className="w-4 h-4" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-200">
+        <Card className="bg-white border-slate-200 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cleavage Rate (Day 2-3)</p>
-              <h3 className="text-2xl font-extrabold text-emerald-700 mt-0.5">{kpis.cleavage_rate_pct}%</h3>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Cleavage Rate (Day 2-3)</p>
+              <h3 className="text-2xl font-bold text-emerald-700 mt-0.5">{kpis.cleavage_rate_pct}%</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-              <Layers className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center font-bold">
+              <Layers className="w-4 h-4" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200">
+        <Card className="bg-white border-slate-200 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Blastocyst Rate (Day 5-6)</p>
-              <h3 className="text-2xl font-extrabold text-purple-700 mt-0.5">{kpis.blastocyst_rate_pct}%</h3>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Blastocyst Rate (Day 5-6)</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{kpis.blastocyst_rate_pct}%</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold">
+              <Activity className="w-4 h-4 text-slate-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200">
+        <Card className="bg-white border-slate-200 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Embryo Utilization Rate</p>
-              <h3 className="text-2xl font-extrabold text-blue-700 mt-0.5">{kpis.utilization_rate_pct}%</h3>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Embryo Utilization Rate</p>
+              <h3 className="text-2xl font-bold text-sky-800 mt-0.5">{kpis.utilization_rate_pct}%</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-              <CheckCircle className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-md bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center font-bold">
+              <CheckCircle className="w-4 h-4" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* DUAL-WITNESSING GATE STATUS BAR */}
-      <div className="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-indigo-600" />
+          <ShieldCheck className="w-5 h-5 text-[rgb(var(--clr-primary))]" />
           <div>
             <h4 className="text-xs font-bold text-slate-900">Dual-Witnessing Gate Status</h4>
             <p className="text-[10px] text-slate-500">Every day step requires 2 independent embryologists sign-off</p>
@@ -242,7 +243,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
 
       {/* DENSE OOCYTE TRACKING GRID TABLE */}
       {oocytes.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl space-y-3">
+        <div className="p-12 text-center bg-white border border-slate-200 rounded-lg space-y-3">
           <p className="text-sm font-semibold text-slate-600">No oocytes recorded for this cycle yet (Day 0 OPU).</p>
           <Button
             onClick={() => batchCreateMutation.mutate()}
@@ -254,7 +255,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
           </Button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow className="text-[11px]">

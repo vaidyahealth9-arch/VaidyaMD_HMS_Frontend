@@ -6,7 +6,8 @@ import { billingApi, patientsApi, walletApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
-import { Printer, X, Building2 } from 'lucide-react';
+import { Printer, X, Building2, FileText, Package, Receipt, Zap } from 'lucide-react';
+import PrintableInvoice from '@/components/common/PrintableInvoice';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -70,6 +71,7 @@ export default function BillingPage() {
   // Filters
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState(statusParam || '');
+  const [genderFilter, setGenderFilter] = useState('');
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -95,6 +97,11 @@ export default function BillingPage() {
   const [selectedPatientWallet, setSelectedPatientWallet] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Service catalog autocomplete
+  const [serviceCatalog, setServiceCatalog] = useState<any[]>([]);
+  const [itemSearches, setItemSearches] = useState<string[]>(['']);
+  const [itemDropdowns, setItemDropdowns] = useState<boolean[]>([false]);
+
   // Quick Payment Modal
   const [paymentModalInv, setPaymentModalInv] = useState<any>(null);
   const [receiptModalInv, setReceiptModalInv] = useState<any>(null);
@@ -103,23 +110,37 @@ export default function BillingPage() {
 
   const loadData = () => {
     setIsLoading(true);
-    Promise.all([
+    Promise.allSettled([
       billingApi.listInvoices({
         appointment_source: sourceFilter || undefined,
         status: statusFilter || undefined,
       }),
       billingApi.listPackages(),
       patientsApi.list({ per_page: 500 }),
-    ]).then(([invData, pkgData, patData]: any) => {
-      setInvoices(invData || []);
-      setPackages(pkgData || []);
-      setPatients(patData.patients || patData.items || []);
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/core'}/billing/service-catalog`, {
+        headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}` },
+      }).then((r) => r.json()),
+    ]).then(([invResult, pkgResult, patResult, catalogResult]) => {
+      if (invResult.status === 'fulfilled') setInvoices((invResult.value as any) || []);
+      if (pkgResult.status === 'fulfilled') setPackages((pkgResult.value as any) || []);
+      if (patResult.status === 'fulfilled') {
+        const v = patResult.value as any;
+        setPatients(v.patients || v.items || []);
+      }
+      if (catalogResult.status === 'fulfilled') setServiceCatalog((catalogResult.value as any) || []);
     }).catch(() => {}).finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
     loadData();
   }, [sourceFilter, statusFilter]);
+
+  const filteredInvoices = invoices.filter((inv: any) => {
+    if (!genderFilter) return true;
+    const p = patients.find((pat: any) => pat.id === inv.patient_id);
+    const pGender = (p?.gender || '').toLowerCase();
+    return pGender === genderFilter.toLowerCase();
+  });
 
   // When selected patient changes in new invoice modal, fetch wallet balance
   useEffect(() => {
@@ -141,6 +162,17 @@ export default function BillingPage() {
     });
   };
 
+  const handleSelectService = (idx: number, svc: any) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      const qty = updated[idx]?.quantity || 1;
+      updated[idx] = { ...updated[idx], description: svc.name, unit_price: svc.cost, total: svc.cost * qty };
+      return updated;
+    });
+    setItemSearches((prev) => { const s = [...prev]; s[idx] = svc.name; return s; });
+    setItemDropdowns((prev) => { const d = [...prev]; d[idx] = false; return d; });
+  };
+
   const handleSelectTariff = (idx: number, tariffCode: string) => {
     const tariff = TARIFF_CATALOG.find((t) => t.code === tariffCode);
     if (!tariff) return;
@@ -159,11 +191,15 @@ export default function BillingPage() {
 
   const addItemRow = () => {
     setItems([...items, { description: '', quantity: 1, unit_price: 0, total: 0 }]);
+    setItemSearches((prev) => [...prev, '']);
+    setItemDropdowns((prev) => [...prev, false]);
   };
 
   const removeItemRow = (idx: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== idx));
+      setItemSearches((prev) => prev.filter((_, i) => i !== idx));
+      setItemDropdowns((prev) => prev.filter((_, i) => i !== idx));
     }
   };
 
@@ -238,34 +274,35 @@ export default function BillingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Fertility Billing & Financial Hub</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Fertility Billing & Financial Hub</h1>
           <p className="text-slate-500 text-sm mt-1">Multi-source invoicing, advance wallets & treatment packages</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowNewInvoice(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-indigo-500/30"
+            className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-md transition-opacity hover:opacity-90 shadow-sm"
+            style={{ background: 'rgb(var(--clr-primary))' }}
           >
-            📄 Generate Invoice
+            + Generate Invoice
           </button>
         </div>
       </div>
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Billed</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">₹{totalBilled.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">₹{totalBilled.toLocaleString()}</p>
           <p className="text-[11px] text-slate-500 mt-1">{invoices.length} invoices generated</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
           <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Total Collected</p>
-          <p className="text-2xl font-black text-emerald-700 mt-1">₹{totalCollected.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-emerald-700 mt-1">₹{totalCollected.toLocaleString()}</p>
           <p className="text-[11px] text-emerald-600/80 mt-1">Bank, UPI & Advance Wallet deductions</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
           <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Outstanding Balance</p>
-          <p className="text-2xl font-black text-rose-700 mt-1">₹{totalPending.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-rose-700 mt-1">₹{totalPending.toLocaleString()}</p>
           <p className="text-[11px] text-rose-600/80 mt-1">Pending collections across departments</p>
         </div>
       </div>
@@ -273,8 +310,8 @@ export default function BillingPage() {
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-2">
         {[
-          { id: 'invoices', label: '📑 Invoices & Receipts' },
-          { id: 'packages', label: '📦 Treatment Packages' },
+          { id: 'invoices', label: 'Invoices & Receipts' },
+          { id: 'packages', label: 'Treatment Packages' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -294,7 +331,7 @@ export default function BillingPage() {
       {activeTab === 'invoices' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter by Department / Source</label>
               <select
@@ -321,15 +358,28 @@ export default function BillingPage() {
                 <option value="pending">Pending</option>
               </select>
             </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter by Gender</label>
+              <select
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-bold"
+              >
+                <option value="">All Genders</option>
+                <option value="female">Female ♀</option>
+                <option value="male">Male ♂</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
           </div>
 
           {/* Invoices Table */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
             {isLoading ? (
               <div className="p-12 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : invoices.length === 0 ? (
+            ) : filteredInvoices.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs">
                 No invoices found matching criteria.
               </div>
@@ -350,7 +400,7 @@ export default function BillingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {invoices.map((inv) => (
+                    {filteredInvoices.map((inv) => (
                       <tr key={inv.id} className="hover:bg-slate-50">
                         <td className="p-3.5 font-mono font-bold text-indigo-700">{inv.invoice_number}</td>
                         <td className="p-3.5">
@@ -391,7 +441,7 @@ export default function BillingPage() {
                               className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-bold text-[10px] transition-colors"
                               title="View & Print Invoice Receipt"
                             >
-                              📄 Receipt
+                              Receipt
                             </button>
                           </div>
                         </td>
@@ -409,12 +459,12 @@ export default function BillingPage() {
       {activeTab === 'packages' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {packages.map((pkg) => (
-            <div key={pkg.id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-4">
+            <div key={pkg.id} className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between space-y-4">
               <div className="space-y-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                   {pkg.plugin_id} Package
                 </span>
-                <h3 className="text-base font-black text-slate-900">{pkg.name}</h3>
+                <h3 className="text-base font-bold text-slate-900">{pkg.name}</h3>
                 <p className="text-xs text-slate-500">{pkg.description}</p>
                 <div className="pt-2 border-t space-y-1">
                   {pkg.items?.map((item: any, idx: number) => (
@@ -429,7 +479,7 @@ export default function BillingPage() {
               <div className="pt-3 border-t flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase font-bold">Package Price</span>
-                  <span className="text-xl font-black text-slate-900">₹{parseFloat(pkg.base_price).toLocaleString()}</span>
+                  <span className="text-xl font-bold text-slate-900">₹{parseFloat(pkg.base_price).toLocaleString()}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -453,154 +503,21 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Invoice Printable Receipt Modal */}
+      {/* Invoice Print Modal — using extracted PrintableInvoice component */}
       {receiptModalInv && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:p-0 print:static print:bg-transparent print:z-auto">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl border border-slate-200 print:shadow-none print:border-none print:p-6 print:max-w-none print:w-full print:rounded-none">
-            <div className="flex items-center justify-between border-b pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-sm print:border print:border-slate-800">
-                  <Building2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">VaidyaMD Advanced Hospital & Fertility Centre</h2>
-                  <p className="text-xs text-slate-500 font-medium">Road No. 36, Jubilee Hills, Hyderabad · Phone: +91 40 2345 6789</p>
-                  <p className="text-[11px] text-slate-400 font-mono">GSTIN: 36AAAAA0000A1Z5 · Reg No: TS/MED/2024/9876</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase ${
-                  parseFloat(receiptModalInv.pending_due) <= 0
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : parseFloat(receiptModalInv.paid_amount) > 0
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                    : 'bg-rose-100 text-rose-800 border border-rose-300'
-                }`}>
-                  {parseFloat(receiptModalInv.pending_due) <= 0 ? 'PAID IN FULL' : parseFloat(receiptModalInv.paid_amount) > 0 ? 'PARTIAL PAYMENT' : 'UNPAID'}
-                </span>
-                <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">Hospital Tax Invoice</p>
-                <button onClick={() => setReceiptModalInv(null)} className="no-print ml-2 text-slate-400 hover:text-slate-700 font-bold">✕</button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100 print:bg-white print:border-slate-300">
-              <div>
-                <p className="text-slate-400 font-bold uppercase text-[10px]">Patient Information</p>
-                <p className="text-slate-900 font-black text-sm">{receiptModalInv.patient_name || 'Patient'}</p>
-                <p className="font-mono text-slate-600 font-medium">VID / MRN: {receiptModalInv.patient_vid || '—'}</p>
-                {receiptModalInv.reason_for_attendance && (
-                  <p className="text-slate-500 mt-0.5"><span className="font-semibold">Reason:</span> {receiptModalInv.reason_for_attendance}</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-slate-400 font-bold uppercase text-[10px]">Invoice Summary</p>
-                <p className="font-mono font-bold text-indigo-700 text-sm">{receiptModalInv.invoice_number}</p>
-                <p className="text-slate-600 font-medium">Date: {formatDate(receiptModalInv.created_at)}</p>
-                <p className="text-slate-500">Dept / Source: <span className="font-bold text-slate-700">{receiptModalInv.appointment_source || 'OPD'}</span></p>
-              </div>
-            </div>
-
-            {/* Line Items */}
-            <table className="w-full text-xs text-left border-collapse">
-              <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider print:bg-slate-200">
-                <tr>
-                  <th className="p-2.5 border-b border-slate-200">Item / Procedure Description</th>
-                  <th className="p-2.5 text-center border-b border-slate-200">Qty</th>
-                  <th className="p-2.5 text-right border-b border-slate-200">Unit Rate (₹)</th>
-                  <th className="p-2.5 text-right border-b border-slate-200">Total (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {receiptModalInv.items?.map((it: any, i: number) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="p-2.5 text-slate-800 font-semibold">{it.description}</td>
-                    <td className="p-2.5 text-center text-slate-600">{it.quantity}</td>
-                    <td className="p-2.5 text-right font-mono text-slate-600">₹{parseFloat(it.unit_price).toLocaleString()}</td>
-                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">₹{parseFloat(it.total).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Summary Totals */}
-            <div className="border-t pt-4 space-y-1.5 text-xs text-right">
-              <div className="flex justify-between text-slate-500">
-                <span>Subtotal / Gross Amount:</span>
-                <span className="font-mono font-semibold">₹{parseFloat(receiptModalInv.subtotal || receiptModalInv.total_amount).toLocaleString()}</span>
-              </div>
-              {parseFloat(receiptModalInv.discount) > 0 && (
-                <div className="flex justify-between text-rose-600 font-bold">
-                  <span>Concession / Discount:</span>
-                  <span className="font-mono">- ₹{parseFloat(receiptModalInv.discount).toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-slate-400 text-[11px]">
-                <span>GST (Healthcare Services - Exempted):</span>
-                <span className="font-mono">₹0.00 (0%)</span>
-              </div>
-              {parseFloat(receiptModalInv.wallet_amount_used) > 0 && (
-                <div className="flex justify-between text-emerald-700 font-bold">
-                  <span>Deducted from Advance Wallet:</span>
-                  <span className="font-mono">- ₹{parseFloat(receiptModalInv.wallet_amount_used).toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-black text-slate-900 border-t pt-2">
-                <span>Net Total Billable:</span>
-                <span className="font-mono text-indigo-900">₹{parseFloat(receiptModalInv.total_amount).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-emerald-700 font-bold">
-                <span>Total Amount Paid:</span>
-                <span className="font-mono">₹{parseFloat(receiptModalInv.paid_amount).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-rose-700 font-black text-sm">
-                <span>Balance Due:</span>
-                <span className="font-mono">₹{parseFloat(receiptModalInv.pending_due).toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Signature & Terms */}
-            <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-4 items-end text-[11px] text-slate-400">
-              <div>
-                <p className="font-semibold text-slate-600">Terms & Conditions:</p>
-                <p>1. Payments received are non-refundable.</p>
-                <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
-                <p className="mt-2 text-[10px]">This is a computer-generated invoice and requires no physical stamp.</p>
-              </div>
-              <div className="text-right space-y-1">
-                <div className="border-b border-slate-300 w-40 ml-auto h-10"></div>
-                <p className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Authorized Signatory</p>
-                <p className="text-[10px] text-slate-500">VaidyaMD Accounts Billing Desk</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t no-print">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
-              >
-                🖨️ Print Tax Invoice (A4)
-              </button>
-              <button
-                onClick={() => setReceiptModalInv(null)}
-                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <PrintableInvoice invoice={receiptModalInv} onClose={() => setReceiptModalInv(null)} />
       )}
 
       {/* New Invoice Modal */}
       {showNewInvoice && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-xl" style={{ border: '1px solid rgb(var(--clr-border))' }}>
+            <div className="flex items-center justify-between pb-3" style={{ borderBottom: '1px solid rgb(var(--clr-border))' }}>
               <div>
-                <h3 className="font-black text-lg text-slate-900">Generate Multi-Department Invoice</h3>
-                <p className="text-xs text-slate-500">Add billable services, procedures, or select standard tariffs</p>
+                <h3 className="font-semibold text-base" style={{ color: 'rgb(var(--clr-text))' }}>Generate Multi-Department Invoice</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--clr-text-muted))' }}>Add billable services, procedures, or select standard tariffs</p>
               </div>
-              <button onClick={() => setShowNewInvoice(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+              <button onClick={() => setShowNewInvoice(false)} className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors"><X className="w-4 h-4" /></button>
             </div>
 
             <form onSubmit={handleCreateInvoice} className="space-y-4">
@@ -653,69 +570,103 @@ export default function BillingPage() {
               {/* Line Items */}
               <div className="space-y-3 pt-2 border-t">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">Billable Services & Procedures</label>
-                  <span className="text-[11px] text-slate-400">Select standard tariff or enter custom service</span>
+                  <label className="block text-xs font-bold text-slate-700">Billable Services &amp; Procedures</label>
+                  <span className="text-[11px] text-slate-400">Type to search real clinic catalog · price auto-fills</span>
                 </div>
-                {items.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                    <div className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-12 sm:col-span-4">
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) handleSelectTariff(idx, e.target.value);
-                          }}
-                          defaultValue=""
-                          className="vmd-input text-xs bg-white text-slate-600 font-medium"
-                        >
-                          <option value="">⚡ Select Tariff Master...</option>
-                          {TARIFF_CATALOG.map((t) => (
-                            <option key={t.code} value={t.code}>
-                              [{t.category}] {t.description} (₹{t.price})
-                            </option>
-                          ))}
-                        </select>
+                {items.map((item, idx) => {
+                  const search = itemSearches[idx] || '';
+                  const filtered = search.length >= 1
+                    ? serviceCatalog.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10)
+                    : [];
+                  const isOpen = itemDropdowns[idx] && filtered.length > 0;
+
+                  return (
+                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="grid grid-cols-12 gap-2 items-start">
+                        {/* Service search autocomplete */}
+                        <div className="col-span-12 sm:col-span-5 relative">
+                          <input
+                            type="text"
+                            placeholder="Search service… (e.g. ICSI, OPU, Scan)"
+                            value={search}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setItemSearches((prev) => { const s = [...prev]; s[idx] = v; return s; });
+                              setItemDropdowns((prev) => { const d = [...prev]; d[idx] = true; return d; });
+                              if (!v) updateItem(idx, 'description', '');
+                            }}
+                            onFocus={() => setItemDropdowns((prev) => { const d = [...prev]; d[idx] = true; return d; })}
+                            onBlur={() => setTimeout(() => setItemDropdowns((prev) => { const d = [...prev]; d[idx] = false; return d; }), 150)}
+                            className="vmd-input text-xs w-full"
+                          />
+                          {isOpen && (
+                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                              {filtered.map((svc: any, si: number) => (
+                                <button
+                                  key={si}
+                                  type="button"
+                                  onMouseDown={() => handleSelectService(idx, svc)}
+                                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+                                >
+                                  <div>
+                                    <span className="text-xs font-semibold text-slate-800">{svc.name}</span>
+                                    <span className="text-[10px] text-slate-400 ml-2 uppercase">{svc.type}</span>
+                                  </div>
+                                  <span className="text-xs font-bold text-emerald-700 ml-2 flex-shrink-0">₹{(svc.cost || 0).toLocaleString()}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Description (editable after selection) */}
+                        <div className="col-span-12 sm:col-span-3">
+                          <input
+                            type="text"
+                            placeholder="Description / Notes"
+                            value={item.description}
+                            onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                            className="vmd-input text-xs bg-white"
+                          />
+                        </div>
+                        <div className="col-span-4 sm:col-span-1">
+                          <input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                            min={1}
+                            className="vmd-input text-xs bg-white text-center"
+                          />
+                        </div>
+                        <div className="col-span-6 sm:col-span-2">
+                          <input
+                            type="number"
+                            placeholder="Rate ₹"
+                            value={item.unit_price}
+                            onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                            className="vmd-input text-xs bg-white font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removeItemRow(idx)}
+                            className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors mt-0.5"
+                            title="Remove Item"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="col-span-12 sm:col-span-4">
-                        <input
-                          type="text"
-                          placeholder="Service Description (Select from Tariff)"
-                          value={item.description}
-                          readOnly
-                          className="vmd-input text-xs bg-slate-100 text-slate-600 cursor-not-allowed border-slate-300"
-                        />
-                      </div>
-                      <div className="col-span-4 sm:col-span-1">
-                        <input
-                          type="number"
-                          placeholder="Qty"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
-                          min={1}
-                          className="vmd-input text-xs bg-white text-center"
-                        />
-                      </div>
-                      <div className="col-span-6 sm:col-span-2">
-                        <input
-                          type="number"
-                          placeholder="Rate ₹"
-                          value={item.unit_price}
-                          readOnly
-                          className="vmd-input text-xs bg-slate-100 text-slate-600 font-mono cursor-not-allowed border-slate-300"
-                        />
-                      </div>
-                      <div className="col-span-2 sm:col-span-1 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeItemRow(idx)}
-                          className="text-rose-500 font-bold hover:text-rose-700 text-sm px-2 py-1 rounded hover:bg-rose-50"
-                          title="Remove Item"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      {item.description && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pl-1">
+                          <span>{item.description}</span>
+                          <span className="font-bold text-slate-700">Total: ₹{(item.total || 0).toLocaleString()}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <button
                   type="button"
                   onClick={addItemRow}
@@ -726,7 +677,7 @@ export default function BillingPage() {
               </div>
 
               {/* Totals & Payments */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 pt-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3 pt-3">
                 <div className="flex justify-between text-xs text-slate-600">
                   <span>Gross Subtotal:</span>
                   <span className="font-bold font-mono">₹{subtotal.toLocaleString()}</span>
@@ -768,7 +719,7 @@ export default function BillingPage() {
                   </div>
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200">
                     <label className="block text-[10px] font-bold uppercase text-slate-400">Total Billable Amount</label>
-                    <p className="text-xl font-black text-slate-900 font-mono">₹{totalAmount.toLocaleString()}</p>
+                    <p className="text-xl font-bold text-slate-900 font-mono">₹{totalAmount.toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -821,9 +772,10 @@ export default function BillingPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-md"
+                  className="flex-1 py-3 font-semibold text-xs rounded-md text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'rgb(var(--clr-primary))' }}
                 >
-                  {isSaving ? 'Generating...' : '✅ Generate Invoice'}
+                  {isSaving ? 'Generating...' : 'Generate Invoice'}
                 </button>
                 <button
                   type="button"
@@ -840,8 +792,8 @@ export default function BillingPage() {
 
       {/* Record Payment Modal */}
       {paymentModalInv && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full space-y-4 shadow-xl" style={{ border: '1px solid rgb(var(--clr-border))' }}>
             <h3 className="font-bold text-base text-slate-900">Record Payment for {paymentModalInv.invoice_number}</h3>
             <p className="text-xs text-slate-500">Patient: {paymentModalInv.patient_name} · Total Due: ₹{paymentModalInv.pending_due}</p>
             <form onSubmit={handleRecordPayment} className="space-y-4">
@@ -865,10 +817,10 @@ export default function BillingPage() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700">
+                <button type="submit" className="flex-1 py-3 font-semibold text-xs rounded-md text-white transition-opacity hover:opacity-90" style={{ background: 'rgb(var(--clr-success))' }}>
                   Confirm Payment
                 </button>
-                <button type="button" onClick={() => setPaymentModalInv(null)} className="px-4 py-3 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl">
+                <button type="button" onClick={() => setPaymentModalInv(null)} className="px-4 py-3 text-xs rounded-md font-medium" style={{ background: 'rgb(var(--clr-surface-muted))', color: 'rgb(var(--clr-text-muted))' }}>
                   Cancel
                 </button>
               </div>

@@ -20,11 +20,11 @@ import {
   HeartPulse,
   DollarSign,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
+import { Badge } from '@/shared/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
 import {
   Sheet,
   SheetContent,
@@ -32,7 +32,7 @@ import {
   SheetTitle,
   SheetDescription,
   SheetFooter,
-} from '@/components/ui/sheet';
+} from '@/shared/ui/sheet';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 
 export default function IPDBedboardPage() {
@@ -186,11 +186,11 @@ export default function IPDBedboardPage() {
       {/* Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+          <div className="w-10 h-10 rounded-lg bg-[rgb(var(--clr-primary)/0.08)] border border-[rgb(var(--clr-primary)/0.2)] flex items-center justify-center text-[rgb(var(--clr-primary))]">
             <BedDouble className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 leading-tight">IPD Bedboard & Nursing Station</h1>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">IPD Bedboard & Nursing Station</h1>
             <p className="text-xs text-slate-500 font-medium">Real-time bed occupancy, admissions, and nursing shift checklists</p>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function IPDBedboardPage() {
             size="sm"
             onClick={() => accrualMutation.mutate()}
             disabled={accrualMutation.isPending}
-            className="gap-1.5 text-xs font-bold bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 h-9 rounded-xl shadow-sm"
+            className="gap-1.5 text-xs font-bold bg-white text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] h-9 rounded-md shadow-sm"
           >
             <DollarSign className="w-4 h-4 text-emerald-600" />
             <span>{accrualMutation.isPending ? 'Accruing...' : 'Daily Bed Charge Accrual'}</span>
@@ -210,7 +210,7 @@ export default function IPDBedboardPage() {
       </div>
 
       {actionMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span>{actionMessage}</span>
         </div>
@@ -222,9 +222,9 @@ export default function IPDBedboardPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-slate-500 uppercase">Total Ward Capacity</p>
-              <h3 className="text-2xl font-black text-slate-900 mt-0.5">{beds.length} Beds</h3>
+              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{beds.length} Beds</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
               <BedDouble className="w-5 h-5" />
             </div>
           </CardContent>
@@ -234,9 +234,9 @@ export default function IPDBedboardPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-emerald-700 uppercase">Available / Vacant</p>
-              <h3 className="text-2xl font-black text-emerald-700 mt-0.5">{vacantCount} Beds</h3>
+              <h3 className="text-2xl font-bold text-emerald-700 mt-0.5">{vacantCount} Beds</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
               <CheckCircle2 className="w-5 h-5" />
             </div>
           </CardContent>
@@ -246,9 +246,9 @@ export default function IPDBedboardPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-red-700 uppercase">Occupied (Admitted)</p>
-              <h3 className="text-2xl font-black text-red-700 mt-0.5">{occupiedCount} Beds</h3>
+              <h3 className="text-2xl font-bold text-red-700 mt-0.5">{occupiedCount} Beds</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-md bg-red-100 text-red-600 flex items-center justify-center font-bold">
               <Users className="w-5 h-5" />
             </div>
           </CardContent>
@@ -258,9 +258,9 @@ export default function IPDBedboardPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold text-amber-700 uppercase">Cleaning / Turnover</p>
-              <h3 className="text-2xl font-black text-amber-700 mt-0.5">{cleaningCount} Beds</h3>
+              <h3 className="text-2xl font-bold text-amber-700 mt-0.5">{cleaningCount} Beds</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
               <RefreshCw className="w-5 h-5" />
             </div>
           </CardContent>
@@ -269,7 +269,7 @@ export default function IPDBedboardPage() {
 
       {/* Main Tabs: Visual Bedboard, Nursing Checklist, Inpatient Register */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-xl h-11">
+        <TabsList className="bg-slate-100 p-1 rounded-md h-11">
           <TabsTrigger value="bedboard" className="rounded-lg text-xs font-bold gap-1.5">
             <BedDouble className="w-3.5 h-3.5" />
             <span>Visual Bedboard Grid</span>
@@ -290,9 +290,9 @@ export default function IPDBedboardPage() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setSelectedWardId('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
                 selectedWardId === 'all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
                   : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
@@ -302,9 +302,9 @@ export default function IPDBedboardPage() {
               <button
                 key={w.id}
                 onClick={() => setSelectedWardId(w.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
                   selectedWardId === w.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
               >
@@ -334,7 +334,7 @@ export default function IPDBedboardPage() {
                   <CardHeader className="p-3.5 pb-2 border-b border-slate-100 flex flex-row items-center justify-between">
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">{bed.bed_type} Bed</span>
-                      <CardTitle className="text-sm font-black text-slate-900">{bed.bed_number}</CardTitle>
+                      <CardTitle className="text-sm font-bold text-slate-900">{bed.bed_number}</CardTitle>
                     </div>
                     <Badge
                       variant={isOccupied ? 'destructive' : isCleaning ? 'warning' : 'success'}
@@ -347,9 +347,9 @@ export default function IPDBedboardPage() {
                   <CardContent className="p-3.5 space-y-3">
                     {isOccupied && bed.current_admission ? (
                       <div className="space-y-2 text-xs">
-                        <div className="bg-white p-2.5 rounded-xl border border-red-100 shadow-sm">
+                        <div className="bg-white p-2.5 rounded-md border border-red-100 shadow-sm">
                           <p className="font-bold text-slate-900 text-sm truncate">{bed.current_admission.patient_name}</p>
-                          <p className="text-[11px] text-indigo-600 font-semibold">{bed.current_admission.patient_mrn}</p>
+                          <p className="text-[11px] text-[rgb(var(--clr-primary))] font-semibold">{bed.current_admission.patient_mrn}</p>
                           <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">Dx: {bed.current_admission.diagnosis || 'Observation'}</p>
                         </div>
 
@@ -433,7 +433,7 @@ export default function IPDBedboardPage() {
                       size="sm"
                       onClick={() => completeTaskMutation.mutate(t.id)}
                       disabled={completeTaskMutation.isPending}
-                      className="h-8 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-1.5"
+                      className="h-8 px-4 rounded-md text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white shadow-sm gap-1.5"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Complete Task</span>
@@ -471,7 +471,7 @@ export default function IPDBedboardPage() {
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {admissions.map((adm: any) => (
                     <tr key={adm.id} className="hover:bg-slate-50">
-                      <td className="p-3.5 font-mono font-bold text-indigo-700">{adm.admission_number}</td>
+                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{adm.admission_number}</td>
                       <td className="p-3.5">
                         <p className="font-bold text-slate-900">{adm.patient_name}</p>
                         <p className="text-[11px] text-slate-500">{adm.patient_mrn}</p>
@@ -529,7 +529,7 @@ export default function IPDBedboardPage() {
                   const match = patients.find((p: any) => `${p.name} (${p.mrn || p.vid})` === e.target.value);
                   setSelectedPatientId(match ? match.id : e.target.value);
                 }}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
               />
               <datalist id="ipdPatientsList">
                 {patients.map((p: any) => (
@@ -558,7 +558,7 @@ export default function IPDBedboardPage() {
               />
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1 text-xs">
               <div className="flex justify-between">
                 <span className="text-slate-500">Daily Bed Rate:</span>
                 <span className="font-bold text-slate-900">{formatCurrency(selectedBedForAdmission?.daily_rate || 2000)} / day</span>
@@ -576,7 +576,7 @@ export default function IPDBedboardPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 placeholder="e.g. Strict fluid balance chart, bed rest for 24h, notify if BP < 100/60."
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-md p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
               />
             </div>
           </div>
@@ -586,14 +586,14 @@ export default function IPDBedboardPage() {
               variant="outline"
               size="sm"
               onClick={() => setAdmitSheetOpen(false)}
-              className="rounded-xl h-9 text-xs"
+              className="rounded-md h-9 text-xs"
             >
               Cancel
             </Button>
             <Button
               onClick={() => admitMutation.mutate()}
               disabled={admitMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 rounded-xl shadow-md gap-1.5"
+              className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{admitMutation.isPending ? 'Admitting...' : 'Confirm Admission'}</span>

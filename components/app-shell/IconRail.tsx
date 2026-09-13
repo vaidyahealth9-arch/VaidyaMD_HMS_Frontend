@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { roleColors, roleLabels } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -16,98 +18,297 @@ import {
   ReceiptText,
   TrendingUp,
   Settings,
+  Sparkles,
+  Activity,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 
 const navItems = [
-  { id: 'dashboard', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'doctor', 'nurse', 'receptionist', 'embryologist', 'andrologist', 'pharma'] },
-  { id: 'opd', href: '/opd', icon: Stethoscope, label: 'OPD Workbench', roles: ['admin', 'doctor', 'nurse'] },
-  { id: 'patients', href: '/patients', icon: Users, label: 'Patients & EMR', roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-  { id: 'appointments', href: '/appointments', icon: Calendar, label: 'Appointments', roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-  { id: 'ivf-lab', href: '/ivf-lab', icon: Microscope, label: 'IVF Embryology', roles: ['admin', 'doctor', 'embryologist', 'andrologist'], badge: 'ART' },
-  { id: 'ipd', href: '/ipd', icon: BedDouble, label: 'IPD Bedboard', roles: ['admin', 'doctor', 'nurse', 'receptionist'] },
-  { id: 'pharmacy', href: '/pharmacy', icon: Pill, label: 'Pharmacy & Stock', roles: ['admin', 'pharma', 'doctor'] },
-  { id: 'lims', href: '/lims', icon: FlaskConical, label: 'LIMS & HL7 Lab', roles: ['admin', 'doctor', 'andrologist', 'embryologist'] },
-  { id: 'billing', href: '/billing', icon: ReceiptText, label: 'Billing & Cashier', roles: ['admin', 'receptionist', 'doctor'] },
-  { id: 'analytics', href: '/analytics', icon: TrendingUp, label: 'Revenue & Leakage', roles: ['admin', 'doctor'] },
+  { id: 'dashboard',        href: '/dashboard',                 icon: LayoutDashboard, label: 'Dashboard',          roles: ['admin','doctor','nurse','receptionist','embryologist','andrologist','pharma'] },
+  { id: 'patients',         href: '/patients',                  icon: Users,           label: 'Patients & EMR',     roles: ['admin','doctor','nurse','receptionist'] },
+  { id: 'appointments',     href: '/appointments',              icon: Calendar,        label: 'Appointments',       roles: ['admin','doctor','nurse','receptionist'] },
+  { id: 'cosgyn',           href: '/cosgyn',                    icon: Sparkles,        label: 'Cosmetic Gynae',     roles: ['admin','doctor','nurse','receptionist'] },
+  { id: 'treatment-board',  href: '/fertility/treatment-board', icon: Activity,        label: 'Treatment Board',    roles: ['admin','doctor','nurse','embryologist','receptionist'], badge: 'Live' },
+  { id: 'ivf-lab',          href: '/ivf-lab',                   icon: Microscope,      label: 'IVF Lab',     roles: ['admin','doctor','embryologist','andrologist'], badge: 'ART' },
+  { id: 'ipd',              href: '/ipd',                       icon: BedDouble,       label: 'IPD Bedboard',       roles: ['admin','doctor','nurse','receptionist'] },
+  { id: 'pharmacy',         href: '/pharmacy',                  icon: Pill,            label: 'Pharmacy & Stock',   roles: ['admin','pharma','doctor'] },
+  { id: 'lims',             href: '/lims',                      icon: FlaskConical,    label: 'LIMS & HL7 Lab',     roles: ['admin','doctor','andrologist','embryologist'] },
+  { id: 'billing',          href: '/billing',                   icon: ReceiptText,     label: 'Billing & Cashier',  roles: ['admin','receptionist','doctor'] },
 ];
 
 export default function IconRail() {
   const pathname = usePathname();
-  const { user, activeRole } = useAuth();
+  const { user, activeRole, currentBranch } = useAuth();
+  const { isExpanded, toggleSidebar } = useSidebar();
 
   const visibleItems = navItems.filter((item) => item.roles.includes(activeRole || 'admin'));
-  const activeItem = visibleItems.find((item) => pathname.startsWith(item.href));
+  const activeItem   = visibleItems.find((item) => pathname.startsWith(item.href));
 
   return (
-    <aside className="w-16 bg-slate-900 flex flex-col items-center py-4 border-r border-slate-800 z-20 shadow-xl flex-shrink-0 h-screen sticky top-0 print:hidden">
-      {/* Logo */}
-      <Link href="/dashboard" className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-xl flex items-center justify-center font-bold text-sm mb-6 shadow-lg shadow-indigo-500/30 flex-shrink-0 hover:scale-105 transition-transform">
-        VM
-      </Link>
+    <aside
+      className={`flex flex-col border-r z-20 flex-shrink-0 h-screen sticky top-0 print:hidden transition-[width] duration-200 ease-in-out ${
+        isExpanded ? 'w-60' : 'w-[60px]'
+      }`}
+      style={{
+        background: 'rgb(var(--clr-rail-bg))',
+        borderColor: 'rgba(255,255,255,0.07)',
+      }}
+    >
+      {/* Top Header / Brand */}
+      {isExpanded ? (
+        <div className="px-3.5 pt-3.5 pb-2.5 flex items-center justify-between gap-2 border-b border-white/10">
+          <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0 flex-1 group">
+            <div className="w-8 h-8 rounded-[6px] flex items-center justify-center flex-shrink-0 overflow-hidden bg-white/5 group-hover:bg-white/10 transition-colors">
+              <Image src="/logo.svg" alt="VaidyaMD" width={28} height={28} priority />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-tight leading-none text-white">
+                Vaidya<span style={{ color: 'rgb(var(--clr-accent))' }}>MD</span>
+              </p>
+              <p className="text-[10px] leading-tight text-white/40 font-medium truncate mt-1">
+                Fertility &amp; ART HMS
+              </p>
+            </div>
+          </Link>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Collapse sidebar (Compact Mode)"
+            aria-label="Collapse sidebar"
+            className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 cursor-pointer"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center pt-3 pb-2 flex-shrink-0">
+          <Link
+            href="/dashboard"
+            className="w-9 h-9 flex items-center justify-center mb-2 flex-shrink-0 rounded-[7px] overflow-hidden hover:opacity-90 transition-opacity"
+            title="VaidyaMD HMS Dashboard"
+          >
+            <Image src="/logo.svg" alt="VaidyaMD" width={34} height={34} priority />
+          </Link>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Expand sidebar (Full Menu)"
+            aria-label="Expand sidebar"
+            className="p-1 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+          <div className="w-8 h-px mt-2" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        </div>
+      )}
 
-      {/* Nav Icons */}
-      <nav className="flex-1 w-full flex flex-col gap-1.5 px-2 overflow-y-auto hide-scrollbar">
+      {/* Nav Items */}
+      <nav className="flex-1 w-full flex flex-col gap-1 p-2 overflow-y-auto hide-scrollbar">
         {visibleItems.map((item) => {
           const isActive = activeItem?.id === item.id;
           const Icon = item.icon;
+
+          if (isExpanded) {
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="relative flex items-center justify-between px-3 py-2 rounded-md transition-all duration-150 group"
+                style={{
+                  color:      isActive ? '#FFFFFF' : 'rgba(255,255,255,0.65)',
+                  background: isActive ? 'rgba(200,151,79,0.18)' : 'transparent',
+                  fontWeight: isActive ? 600 : 400,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.color      = '#FFFFFF';
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.color      = 'rgba(255,255,255,0.65)';
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }
+                }}
+              >
+                {/* Left Active Accent Bar */}
+                {isActive && (
+                  <span
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                    style={{ background: 'rgb(var(--clr-accent))' }}
+                  />
+                )}
+
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon
+                    className="w-[18px] h-[18px] flex-shrink-0"
+                    strokeWidth={isActive ? 2 : 1.75}
+                    style={{ color: isActive ? 'rgb(var(--clr-accent))' : undefined }}
+                  />
+                  <span className="text-xs truncate">{item.label}</span>
+                </div>
+
+                {item.badge && (
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0"
+                    style={{
+                      background: 'rgba(200,151,79,0.20)',
+                      color: 'rgb(var(--clr-accent))',
+                      border: '1px solid rgba(200,151,79,0.35)',
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          }
+
+          // Collapsed Icon Rail item with Tooltip
           return (
             <Tooltip key={item.id}>
               <TooltipTrigger asChild>
                 <Link
                   href={item.href}
-                  className={`
-                    w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 group relative
-                    ${isActive
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  className="relative w-full aspect-square flex items-center justify-center rounded-md transition-colors duration-150"
+                  style={{
+                    color:      isActive ? 'rgb(var(--clr-accent))' : 'rgba(255,255,255,0.50)',
+                    background: isActive ? 'rgba(200,151,79,0.14)'  : 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLElement).style.color      = '#FFFFFF';
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
                     }
-                  `}
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLElement).style.color      = 'rgba(255,255,255,0.50)';
+                      (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }
+                  }}
                 >
-                  <Icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                  <Icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2 : 1.75} />
                   {isActive && (
-                    <span className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-400 rounded-full" />
+                    <span
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                      style={{ background: 'rgb(var(--clr-accent))' }}
+                    />
                   )}
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
-                <p className="font-semibold">{item.label}</p>
-                {item.badge && <span className="text-[10px] text-indigo-400 font-bold">{item.badge}</span>}
+                <p className="font-semibold text-xs">{item.label}</p>
+                {item.badge && (
+                  <span className="text-[10px] font-bold" style={{ color: 'rgb(var(--clr-accent))' }}>
+                    {item.badge}
+                  </span>
+                )}
               </TooltipContent>
             </Tooltip>
           );
         })}
       </nav>
 
-      {/* Bottom: Settings (Admin Only) + User Avatar */}
-      <div className="w-full px-2 flex flex-col gap-2 mt-auto pt-2 border-t border-slate-800">
+      {/* Bottom: Settings + User Section */}
+      <div
+        className="w-full p-2 flex flex-col gap-1.5 mt-auto"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {/* Admin Master Settings */}
         {user?.role === 'admin' && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/settings"
-                className="w-full aspect-square text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all flex items-center justify-center"
-              >
-                <Settings className="w-5 h-5" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={10}>
-              <p className="font-semibold">Master Settings</p>
-            </TooltipContent>
-          </Tooltip>
+          isExpanded ? (
+            <Link
+              href="/settings"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors text-white/60 hover:text-white hover:bg-white/10 text-xs"
+            >
+              <Settings className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
+              <span className="truncate">Master Settings</span>
+            </Link>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/settings"
+                  className="w-full aspect-square flex items-center justify-center rounded-md transition-colors duration-150 text-white/50 hover:text-white hover:bg-white/10"
+                >
+                  <Settings className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p className="font-semibold text-xs">Master Settings</p>
+              </TooltipContent>
+            </Tooltip>
+          )
         )}
 
-        {/* User avatar */}
-        <div className="relative mx-auto cursor-pointer group" title={`${user?.name || 'Doctor'} (${roleLabels[activeRole] || activeRole})`}>
-          {user?.avatar_url ? (
-            <img src={user.avatar_url} alt={user.name} className="w-9 h-9 rounded-full object-cover border-2 border-slate-700 shadow-md" />
-          ) : (
-            <div className={`w-9 h-9 rounded-full border-2 border-slate-700 flex items-center justify-center text-white text-xs font-bold ${roleColors[activeRole] || 'bg-indigo-600'}`}>
-              {user?.name?.slice(0, 2).toUpperCase() || 'DR'}
+        {/* User Card / Avatar */}
+        {isExpanded ? (
+          <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2.5">
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                style={{ border: '1.5px solid rgba(255,255,255,0.2)' }}
+              />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
+                style={{
+                  background: 'rgb(var(--clr-primary-mid))',
+                  border: '1.5px solid rgba(255,255,255,0.2)',
+                }}
+              >
+                {user?.name?.slice(0, 2).toUpperCase() || 'DR'}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-white truncate leading-tight">
+                {user?.name || 'Doctor'}
+              </p>
+              <p className="text-[10px] text-white/50 truncate leading-tight mt-0.5">
+                {roleLabels[activeRole] || activeRole}
+              </p>
             </div>
-          )}
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900 pulse-dot" />
-        </div>
+          </div>
+        ) : (
+          <div className="mx-auto mt-0.5" title={`${user?.name || 'Doctor'} (${roleLabels[activeRole] || activeRole})`}>
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                className="w-8 h-8 rounded-full object-cover"
+                style={{ border: '1.5px solid rgba(255,255,255,0.15)' }}
+              />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
+                style={{
+                  background: 'rgb(var(--clr-primary-mid))',
+                  border: '1.5px solid rgba(255,255,255,0.15)',
+                }}
+              >
+                {user?.name?.slice(0, 2).toUpperCase() || 'DR'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom Collapse Button (Expanded Mode Only) */}
+        {isExpanded && (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <PanelLeftClose className="w-3.5 h-3.5" />
+            <span>Collapse Menu</span>
+          </button>
+        )}
       </div>
     </aside>
   );

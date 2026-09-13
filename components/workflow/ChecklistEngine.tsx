@@ -18,7 +18,7 @@ export default function ChecklistEngine({ title, items, completedItems, onToggle
   const totalComplete = items.filter((i) => completedItems.includes(i.id)).length;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center gap-3">
         {stepNumber && (

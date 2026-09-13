@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { patientsApi, authApi } from '@/lib/api';
+import { patientsApi, authApi, documentsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { toast } from '@/contexts/ToastContext';
+import { Building2, Building, User, Users, AlertTriangle, X, Check, Camera, FileText, UploadCloud, Trash2 } from 'lucide-react';
+
+import { isUserDoctor, getUserRoleDisplay } from '@/lib/utils';
 
 export default function RegisterPatientPage() {
   const { user, currentBranch } = useAuth();
@@ -18,7 +21,7 @@ export default function RegisterPatientPage() {
   useEffect(() => {
     authApi.listUsers().then((u: any) => {
       if (Array.isArray(u)) {
-        setDoctorsList(u.filter((x: any) => x.is_doctor || x.role === 'doctor' || x.role === 'DOCTOR'));
+        setDoctorsList(u.filter((x: any) => isUserDoctor(x)));
       }
     }).catch(() => {});
   }, []);
@@ -42,11 +45,14 @@ export default function RegisterPatientPage() {
     nationality: 'Indian',
     mother_tongue: '',
     blood_group: 'B+ve',
+    photo_url: '',
     identity_type: 'aadhaar',
     aadhaar_number: '',
     abha_number: '',
     referred_by_type: 'walk_in',
     referred_by_name: '',
+    referring_doctor: '',
+    marketing_person_name: '',
     area: '',
     treating_doctor_id: '',
     financial_type: 'self_pay',
@@ -59,6 +65,31 @@ export default function RegisterPatientPage() {
     serology_status: 'Non-Reactive (All Negative)',
     karyotype_status: '46,XX Normal',
   });
+
+  const [documentFile, setDocumentFile] = useState<{ name: string; dataUrl: string; type: string; size: string } | null>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => update('photo_url', reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocumentFile({
+        name: file.name,
+        dataUrl: reader.result as string,
+        type: file.type || 'application/pdf',
+        size: (file.size / 1024).toFixed(1) + ' KB',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [partnerForm, setPartnerForm] = useState({
     title: '',
@@ -118,7 +149,18 @@ export default function RegisterPatientPage() {
     if (data.abha_number) payload.abha_number = data.abha_number.trim();
     if (data.area) payload.area = data.area.trim();
     if (data.referred_by_type) payload.referred_by_type = data.referred_by_type;
-    if (data.referred_by_name) payload.referred_by_name = data.referred_by_name.trim();
+    if (data.photo_url) payload.photo_url = data.photo_url;
+    if (data.referring_doctor) {
+      payload.referring_doctor = data.referring_doctor.trim();
+      payload.referred_by_name = data.referring_doctor.trim();
+      payload.referred_by_type = 'doctor';
+    } else if (data.referred_by_name) {
+      payload.referred_by_name = data.referred_by_name.trim();
+    }
+    if (data.marketing_person_name) {
+      payload.marketing_person_name = data.marketing_person_name.trim();
+      if (!payload.referred_by_type) payload.referred_by_type = 'marketing_person';
+    }
     if (data.financial_type) payload.financial_type = data.financial_type;
     if (data.is_surrogate) payload.is_surrogate = Boolean(data.is_surrogate);
 
@@ -140,6 +182,21 @@ export default function RegisterPatientPage() {
       const primaryPayload = buildPayload(form, false);
       const primaryPatient: any = await patientsApi.create(primaryPayload);
 
+      // If an identity document was selected during registration, attach it
+      if (documentFile) {
+        try {
+          await documentsApi.create({
+            patient_id: primaryPatient.id,
+            file_name: documentFile.name,
+            file_path: documentFile.dataUrl,
+            category: 'identity_proof',
+            mime_type: documentFile.type,
+          });
+        } catch (docErr) {
+          console.error('Failed to attach document during registration:', docErr);
+        }
+      }
+
       // If registered as couple and partner details are entered
       if (form.registration_type === 'patient' && registrationMode === 'couple' && partnerForm.name.trim()) {
         const partnerPayload = {
@@ -150,6 +207,8 @@ export default function RegisterPatientPage() {
           area: form.area?.trim() || undefined,
           referred_by_type: form.referred_by_type || undefined,
           referred_by_name: form.referred_by_name?.trim() || undefined,
+          referring_doctor: form.referring_doctor?.trim() || undefined,
+          marketing_person_name: form.marketing_person_name?.trim() || undefined,
         };
 
         const partner: any = await patientsApi.create(partnerPayload);
@@ -170,16 +229,16 @@ export default function RegisterPatientPage() {
 
   const getPrimaryCardTitle = () => {
     if (form.registration_type === 'donor_bank') {
-      return { icon: '🏦', title: 'ART Bank Donor Details', subtitle: 'National ART Registry & Bank Form 23' };
+      return { icon: Building2, title: 'ART Bank Donor Details', subtitle: 'National ART Registry & Bank Form 23' };
     }
     if (form.registration_type === 'donor_hospital') {
-      return { icon: '🏥', title: 'Hospital Altruistic Donor Details', subtitle: 'Hospital Clinical & Genetic Screening' };
+      return { icon: Building, title: 'Hospital Altruistic Donor Details', subtitle: 'Hospital Clinical & Genetic Screening' };
     }
     if (registrationMode === 'couple') {
-      return { icon: '👩', title: 'Female Partner / Wife', subtitle: 'Primary Commissioning Patient' };
+      return { icon: User, title: 'Female Partner / Wife', subtitle: 'Primary Commissioning Patient' };
     }
     return {
-      icon: form.gender === 'male' ? '👨' : form.gender === 'female' ? '👩' : '👤',
+      icon: User,
       title: 'Patient Details',
       subtitle: 'Universal Patient Registration (OPD / GYN / General)',
     };
@@ -192,7 +251,7 @@ export default function RegisterPatientPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Registration Portal</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Registration Portal</h1>
           <p className="text-slate-500 text-xs mt-1">Register new fertility couples, individual patients, or gamete donors</p>
         </div>
         <Link href="/patients" className="text-xs font-bold text-slate-500 hover:text-slate-800">
@@ -201,23 +260,23 @@ export default function RegisterPatientPage() {
       </div>
 
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold flex items-center justify-between">
-          <span>⚠️ {error}</span>
-          <button onClick={() => setError('')} className="text-rose-500 font-bold">✕</button>
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-md text-xs font-semibold flex items-center justify-between">
+          <span className="flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-rose-600" /> {error}</span>
+          <button onClick={() => setError('')} className="text-rose-500 p-1 rounded-md hover:bg-rose-100 transition-colors"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Registration Category Selector */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
+        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-3">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             1. Registration Category
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { value: 'patient', label: '👤 Clinical Patient / Couple', desc: 'Standard fertility treatments' },
-              { value: 'donor_bank', label: '🏦 ART Bank Donor', desc: 'Commercial/Bank gamete donor' },
-              { value: 'donor_hospital', label: '🏥 Hospital Donor', desc: 'Altruistic hospital donor' },
+              { value: 'patient', label: 'Clinical Patient / Couple', desc: 'Standard fertility treatments' },
+              { value: 'donor_bank', label: 'ART Bank Donor', desc: 'Commercial/Bank gamete donor' },
+              { value: 'donor_hospital', label: 'Hospital Donor', desc: 'Altruistic hospital donor' },
             ].map((cat) => (
               <button
                 key={cat.value}
@@ -228,9 +287,9 @@ export default function RegisterPatientPage() {
                     setRegistrationMode('individual');
                   }
                 }}
-                className={`p-3.5 rounded-2xl text-left border transition-all ${
+                className={`p-3.5 rounded-md text-left border transition-all ${
                   form.registration_type === cat.value
-                    ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20 shadow-sm'
+                    ? 'border-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.05)] ring-2 ring-[rgb(var(--clr-primary)/0.2)] shadow-sm'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
@@ -248,24 +307,24 @@ export default function RegisterPatientPage() {
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('couple')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                     registrationMode === 'couple'
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  👫 Couple (Wife & Husband)
+                  Couple (Wife & Husband)
                 </button>
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('individual')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                     registrationMode === 'individual'
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  👤 Individual Patient
+                  Individual Patient
                 </button>
               </div>
             </div>
@@ -273,20 +332,20 @@ export default function RegisterPatientPage() {
         </div>
 
         {/* Primary Patient / Donor Form Card */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>{cardHeader.icon}</span> {cardHeader.title}
+              <cardHeader.icon className="w-4 h-4 text-slate-500 inline mr-1" /> {cardHeader.title}
               <span className="text-[11px] font-normal text-slate-400">({cardHeader.subtitle})</span>
             </h2>
-            <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+            <span className="text-[10px] text-[rgb(var(--clr-primary))] font-semibold bg-[rgb(var(--clr-primary)/0.08)] px-2.5 py-0.5 rounded-md border border-[rgb(var(--clr-primary)/0.2)]">
               Auto VID Generated
             </span>
           </div>
 
           {/* Donor-Specific Fields */}
           {form.registration_type !== 'patient' && (
-            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-md grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-purple-900 mb-1">Gamete Donor Type</label>
                 <select
@@ -303,8 +362,8 @@ export default function RegisterPatientPage() {
                   }}
                   className="vmd-input text-xs"
                 >
-                  <option value="oocyte_donor">🥚 Oocyte Donor (Female)</option>
-                  <option value="semen_donor">🔬 Semen / Sperm Donor (Male)</option>
+                  <option value="oocyte_donor">Oocyte Donor (Female)</option>
+                  <option value="semen_donor">Semen / Sperm Donor (Male)</option>
                 </select>
               </div>
               <div>
@@ -448,8 +507,8 @@ export default function RegisterPatientPage() {
             </div>
           </div>
 
-          {/* Aadhaar & Doctor */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Aadhaar, Doctor & Referral Details */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Aadhaar Number</label>
               <input
@@ -471,28 +530,120 @@ export default function RegisterPatientPage() {
               >
                 <option value="">— Assign Doctor Later at OPD —</option>
                 {doctorsList.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name} ({d.specialization || 'Doctor'})</option>
+                  <option key={d.id} value={d.id}>
+                    Dr. {d.name} ({d.specialization || (d.role === 'admin' && d.is_doctor ? 'Admin + Doctor' : 'Doctor')})
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Referred By</label>
-              <select
-                value={form.referred_by_type}
-                onChange={(e) => update('referred_by_type', e.target.value)}
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Referring Doctor / Clinic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={form.referring_doctor}
+                onChange={(e) => update('referring_doctor', e.target.value)}
                 className="vmd-input text-xs"
-              >
-                <option value="walk_in">Walk-in / Self</option>
-                <option value="doctor">Referring Doctor</option>
-                <option value="marketing_person">Marketing Camp</option>
-              </select>
+                placeholder="e.g. Dr. A. Sharma / City Clinic"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Marketing Person / Lead <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={form.marketing_person_name}
+                onChange={(e) => update('marketing_person_name', e.target.value)}
+                className="vmd-input text-xs"
+                placeholder="e.g. Rahul Kumar (Field Lead)"
+              />
+            </div>
+          </div>
+
+          {/* Non-Mandatory Patient Photo & Identity Document Upload */}
+          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Patient Photo */}
+            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-slate-500" /> Patient Photo <span className="text-[10px] text-slate-400 font-normal">(Optional — can upload later)</span>
+                </label>
+                {form.photo_url && (
+                  <button
+                    type="button"
+                    onClick={() => update('photo_url', '')}
+                    className="text-[10px] text-rose-600 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Remove
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {form.photo_url ? (
+                  <img src={form.photo_url} alt="Patient Preview" className="w-14 h-14 rounded-full object-cover border border-slate-300 shadow-xs" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-slate-200 border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
+                    <User className="w-6 h-6" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">JPG, PNG format (Max 2MB)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Document / Aadhaar Upload */}
+            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-slate-500" /> Aadhaar / Identity Proof <span className="text-[10px] text-slate-400 font-normal">(Optional — can upload later)</span>
+                </label>
+                {documentFile && (
+                  <button
+                    type="button"
+                    onClick={() => setDocumentFile(null)}
+                    className="text-[10px] text-rose-600 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Remove
+                  </button>
+                )}
+              </div>
+              <div className="flex-1">
+                {documentFile ? (
+                  <div className="flex items-center justify-between bg-white p-2 rounded border border-emerald-200 text-xs">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="font-semibold text-slate-800 truncate">{documentFile.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">({documentFile.size})</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={handleDocumentUpload}
+                      className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">PDF or image of Aadhaar / ID proof</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Clinical Alerts & Drug Allergies Field */}
           <div className="pt-3 border-t border-slate-100">
             <label className="block text-xs font-bold text-amber-800 mb-1 flex items-center gap-1.5">
-              <span>⚠️</span> Clinical Alerts & Drug Allergies <span className="text-[10px] text-slate-400 font-normal">(Optional — leave blank if none)</span>
+              <AlertTriangle className="w-4 h-4 text-amber-600 inline mr-1" /> Clinical Alerts & Drug Allergies <span className="text-[10px] text-slate-400 font-normal">(Optional — leave blank if none)</span>
             </label>
             <input
               type="text"
@@ -506,10 +657,10 @@ export default function RegisterPatientPage() {
 
         {/* Partner Card (Only if registering a couple) */}
         {form.registration_type === 'patient' && registrationMode === 'couple' && (
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
+          <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span>👨</span> Male Partner / Husband Details
+                <User className="w-4 h-4 text-slate-500 inline mr-1" /> Male Partner / Husband Details
               </h2>
               <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
                 Bidirectional Couple Link
@@ -586,13 +737,13 @@ export default function RegisterPatientPage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition-colors"
+            className="flex-1 py-3.5 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-md shadow-sm transition-colors"
           >
-            {isSaving ? 'Registering...' : '✅ Complete Registration'}
+            {isSaving ? 'Registering...' : 'Complete Registration'}
           </button>
           <Link
             href="/patients"
-            className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-2xl transition-colors text-center"
+            className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-md transition-colors text-center"
           >
             Cancel
           </Link>

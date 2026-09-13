@@ -2,7 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { treatmentCyclesApi, protocolsApi, authApi } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, isUserDoctor } from '@/lib/utils';
+import StimulationCalendarGrid from '@/components/fertility/StimulationCalendarGrid';
+import {
+  Target,
+  Dna,
+  Microscope,
+  Calendar,
+  BarChart2,
+  Pill,
+  CheckCircle2,
+  Droplet,
+  Search,
+  Syringe,
+  Zap,
+  FlaskConical,
+  Heart,
+  Lightbulb,
+  X,
+  Play,
+  Clock,
+  Activity,
+} from 'lucide-react';
 
 interface TreatmentCycleWizardProps {
   patientId: string;
@@ -13,13 +34,13 @@ interface TreatmentCycleWizardProps {
 }
 
 const steps = [
-  { id: 1, label: 'Intended Treatment', icon: '🎯' },
-  { id: 2, label: 'Gamete Source', icon: '🧬' },
-  { id: 3, label: 'PGS / PGD', icon: '🔬' },
-  { id: 4, label: 'Protocol & Sentinel Dates', icon: '📅' },
-  { id: 5, label: 'Endometrial Monitoring', icon: '📊' },
-  { id: 6, label: 'Medication Calendar', icon: '💊' },
-  { id: 7, label: 'Summary & Submit', icon: '✅' },
+  { id: 1, label: 'Intended Treatment', icon: Target },
+  { id: 2, label: 'Gamete Source', icon: Dna },
+  { id: 3, label: 'PGS / PGD', icon: Microscope },
+  { id: 4, label: 'Protocol & Sentinel Dates', icon: Calendar },
+  { id: 5, label: 'Endometrial Monitoring', icon: BarChart2 },
+  { id: 6, label: 'Medication Calendar', icon: Pill },
+  { id: 7, label: 'Summary & Submit', icon: CheckCircle2 },
 ];
 
 interface EndometrialMonitoringRow {
@@ -40,12 +61,20 @@ interface CycleFormState {
   previous_centre_name: string;
   protocol_template_id: string;
   sentinel_dates: {
-    lmp_day1: string;
-    baseline_scan: string;
-    stim_start: string;
-    trigger: string;
-    opu: string;
-    et: string;
+    lmp_day1?: string;
+    baseline_scan?: string;
+    stim_start?: string;
+    trigger?: string;
+    opu?: string;
+    et?: string;
+    d12_scan?: string;
+    p0_date?: string;
+    p0_time?: string;
+    embryo_stage?: string;
+    planned_estrogen_days?: number;
+    beta_hcg_date?: string;
+    is_hrt_fet?: boolean;
+    [key: string]: any;
   };
   gametes_source: {
     oocyte: string;
@@ -75,6 +104,8 @@ export default function TreatmentCycleWizard({
   const [doctors, setDoctors] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarPreview, setCalendarPreview] = useState<any>(null);
+  const [cycleTypes, setCycleTypes] = useState<{id: string; name: string}[]>([]);
+  const [typeSearch, setTypeSearch] = useState('');
 
   const [form, setForm] = useState<CycleFormState>({
     treatment_type: 'ICSI',
@@ -119,12 +150,17 @@ export default function TreatmentCycleWizard({
 
     authApi.listUsers().then((u: any) => {
       if (Array.isArray(u)) {
-        const docs = u.filter((x: any) => x.is_doctor || x.role === 'doctor');
+        const docs = u.filter((x: any) => isUserDoctor(x));
         setDoctors(docs);
         if (docs.length > 0) {
           setForm((prev) => ({ ...prev, treating_doctor_id: docs[0].id }));
         }
       }
+    }).catch(() => {});
+
+    // Fetch dynamic treatment cycle types
+    treatmentCyclesApi.listTypes().then((types: any) => {
+      if (Array.isArray(types)) setCycleTypes(types);
     }).catch(() => {});
   }, []);
 
@@ -201,18 +237,41 @@ export default function TreatmentCycleWizard({
       return res.toISOString().split('T')[0];
     };
 
-    setForm((prev) => ({
-      ...prev,
-      sentinel_dates: {
-        ...prev.sentinel_dates,
-        lmp_day1: lmpDate,
-        baseline_scan: addDays(lmp, 1), // Day 2
-        stim_start: addDays(lmp, 2),    // Day 3
-        trigger: addDays(lmp, 11),      // Day 12
-        opu: addDays(lmp, 13),          // Day 14
-        et: addDays(lmp, 18),           // Day 19
-      },
-    }));
+    const isFetCycle = ['FET', 'ICSI_FET'].includes(form.treatment_type);
+    const isDay3 = form.sentinel_dates?.embryo_stage === 'Day 3';
+    const estrogenDays = Number(form.sentinel_dates?.planned_estrogen_days || 13);
+    const p0Date = addDays(lmp, estrogenDays);
+
+    if (isFetCycle) {
+      setForm((prev) => ({
+        ...prev,
+        sentinel_dates: {
+          ...prev.sentinel_dates,
+          lmp_day1: lmpDate,
+          baseline_scan: addDays(lmp, 1),
+          d12_scan: addDays(lmp, 11),
+          p0_date: p0Date,
+          p0_time: prev.sentinel_dates?.p0_time || '08:00 AM',
+          embryo_stage: prev.sentinel_dates?.embryo_stage || 'Day 5',
+          et: addDays(new Date(p0Date), isDay3 ? 3 : 5),
+          beta_hcg_date: addDays(lmp, 22),
+          is_hrt_fet: true,
+        },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        sentinel_dates: {
+          ...prev.sentinel_dates,
+          lmp_day1: lmpDate,
+          baseline_scan: addDays(lmp, 1), // Day 2
+          stim_start: addDays(lmp, 2),    // Day 3
+          trigger: addDays(lmp, 11),      // Day 12
+          opu: addDays(lmp, 13),          // Day 14
+          et: addDays(lmp, 18),           // Day 19
+        },
+      }));
+    }
   };
 
   const handleAddEndometrialRow = () => {
@@ -318,6 +377,7 @@ export default function TreatmentCycleWizard({
         gametes_source: form.gametes_source,
         pgs_pgd_data: form.pgs_pgd_data,
         endometrial_monitoring: form.endometrial_monitoring,
+        medication_calendar: calendarPreview?.days || [],
         remarks: cycleRemarks,
         created_by: userId,
       });
@@ -330,35 +390,38 @@ export default function TreatmentCycleWizard({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden max-w-6xl w-full max-h-[92vh] flex flex-col">
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden w-full flex flex-col">
       {/* Header & Steps Bar */}
       <div className="bg-slate-900 text-white p-6 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-black">Add New Treatment Cycle</h2>
+            <h2 className="text-xl font-bold">Add New Treatment Cycle</h2>
             <p className="text-xs text-slate-400">Step {currentStep} of {steps.length}: {steps[currentStep - 1].label}</p>
           </div>
-          <button onClick={onCancel} className="text-slate-400 hover:text-white text-lg">✕</button>
+          <button onClick={onCancel} className="text-slate-400 hover:text-white p-1 rounded-md transition-colors"><X className="w-4 h-4" /></button>
         </div>
 
         {/* Step Progress Pills */}
         <div className="flex gap-1 overflow-x-auto hide-scrollbar">
-          {steps.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setCurrentStep(s.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                currentStep === s.id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
-                  : currentStep > s.id
-                  ? 'bg-slate-800 text-emerald-400'
-                  : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <span>{s.icon}</span>
-              <span>{s.label}</span>
-            </button>
-          ))}
+          {steps.map((s) => {
+            const StepIcon = s.icon;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setCurrentStep(s.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${
+                  currentStep === s.id
+                    ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
+                    : currentStep > s.id
+                    ? 'bg-slate-800 text-emerald-400'
+                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                <StepIcon className="w-3.5 h-3.5" />
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -367,24 +430,53 @@ export default function TreatmentCycleWizard({
         {/* Step 1: Intended Treatment */}
         {currentStep === 1 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">🎯 Intended Treatment & Clinical Factors</h3>
+            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Intended Treatment & Clinical Factors</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Treatment Type</label>
-                <select
-                  value={form.treatment_type}
-                  onChange={(e) => setForm({ ...form, treatment_type: e.target.value })}
-                  className="vmd-input"
-                >
-                  <option value="ICSI">ICSI (Intracytoplasmic Sperm Injection)</option>
-                  <option value="IVF">Conventional IVF</option>
-                  <option value="ICSI_FET">ICSI + Freeze-All + FET</option>
-                  <option value="FET">Frozen Embryo Transfer (FET)</option>
-                  <option value="IUI_H">IUI — Husband (IUI-H)</option>
-                  <option value="IUI_D">IUI — Donor (IUI-D)</option>
-                  <option value="EGG_FREEZING">Social / Medical Oocyte Freezing</option>
-                  <option value="SURROGACY">Surrogacy ART Cycle</option>
-                </select>
+                {cycleTypes.length > 0 ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search treatment type…"
+                      value={typeSearch || form.treatment_type}
+                      onChange={(e) => {
+                        setTypeSearch(e.target.value);
+                      }}
+                      list="cycle-type-options"
+                      onBlur={(e) => {
+                        const match = cycleTypes.find((t) => t.name === e.target.value);
+                        if (match) { setForm({ ...form, treatment_type: match.name }); setTypeSearch(''); }
+                      }}
+                      className="vmd-input text-xs"
+                    />
+                    <datalist id="cycle-type-options">
+                      {cycleTypes
+                        .filter((t) => !typeSearch || t.name.toLowerCase().includes(typeSearch.toLowerCase()))
+                        .map((t) => (
+                          <option key={t.id} value={t.name} />
+                        ))}
+                    </datalist>
+                    {form.treatment_type && (
+                      <p className="text-[11px] text-indigo-600 font-semibold mt-1">✓ {form.treatment_type}</p>
+                    )}
+                  </>
+                ) : (
+                  <select
+                    value={form.treatment_type}
+                    onChange={(e) => setForm({ ...form, treatment_type: e.target.value })}
+                    className="vmd-input"
+                  >
+                    <option value="ICSI">ICSI (Intracytoplasmic Sperm Injection)</option>
+                    <option value="IVF">Conventional IVF</option>
+                    <option value="ICSI_FET">ICSI + Freeze-All + FET</option>
+                    <option value="FET">Frozen Embryo Transfer (FET)</option>
+                    <option value="IUI_H">IUI — Husband (IUI-H)</option>
+                    <option value="IUI_D">IUI — Donor (IUI-D)</option>
+                    <option value="EGG_FREEZING">Social / Medical Oocyte Freezing</option>
+                    <option value="SURROGACY">Surrogacy ART Cycle</option>
+                  </select>
+                )}
               </div>
 
               <div>
@@ -446,9 +538,9 @@ export default function TreatmentCycleWizard({
         {/* Step 2: Gametes */}
         {currentStep === 2 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">🧬 Gametes Source (ART Act 2021 Alignment)</h3>
+            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Gametes Source (ART Act 2021 Alignment)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-pink-50/50 border border-pink-200 rounded-2xl p-4 space-y-3">
+              <div className="bg-pink-50/50 border border-pink-200 rounded-lg p-4 space-y-3">
                 <h4 className="font-bold text-xs text-pink-800">Oocyte Source</h4>
                 <div className="flex gap-4 text-xs font-semibold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -486,7 +578,7 @@ export default function TreatmentCycleWizard({
                 )}
               </div>
 
-              <div className="bg-blue-50/50 border border-blue-200 rounded-2xl p-4 space-y-3">
+              <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4 space-y-3">
                 <h4 className="font-bold text-xs text-blue-800">Sperm Source</h4>
                 <div className="flex flex-wrap gap-4 text-xs font-semibold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -528,14 +620,14 @@ export default function TreatmentCycleWizard({
         {/* Step 3: PGS/PGD */}
         {currentStep === 3 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">🔬 Preimplantation Genetic Testing (PGT)</h3>
+            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Preimplantation Genetic Testing (PGT)</h3>
             
             {!['ICSI', 'IVF', 'ICSI_FET', 'SURROGACY'].includes(form.treatment_type) ? (
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-500 text-xs">
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-lg p-6 text-center text-slate-500 text-xs">
                 PGT is not applicable for the selected treatment type ({form.treatment_type}).
               </div>
             ) : (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -594,13 +686,53 @@ export default function TreatmentCycleWizard({
         {/* Step 4: Protocol & Sentinel Dates */}
         {currentStep === 4 && (
           <div className="space-y-4">
-            <div className="border-b pb-2">
-              <h3 className="text-sm font-black text-slate-900">📅 Stimulation Protocol & Sentinel Dates</h3>
-              <p className="text-[11px] text-slate-500">Set Day 1 (LMP) to auto-calculate milestones, or customize dates individually.</p>
+            <div className="border-b pb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'HRT FET Protocol & Timing Anchors' : 'Stimulation Protocol & Sentinel Dates'}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  {['FET', 'ICSI_FET'].includes(form.treatment_type)
+                    ? 'Day 1 Bleed Date, Day 12 Endometrial Scan, and P0 Progesterone Start timing anchor (aligned with Excel template)'
+                    : 'Set Day 1 (LMP) to auto-calculate milestones, or customize dates individually.'}
+                </p>
+              </div>
+
+              {['FET', 'ICSI_FET'].includes(form.treatment_type) && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 px-1">Stage:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateSentinel('embryo_stage', 'Day 3');
+                      handleLmpChange(form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0]);
+                    }}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                      form.sentinel_dates?.embryo_stage === 'Day 3' ? 'bg-[#2F6F8F] text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Day 3
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateSentinel('embryo_stage', 'Day 5');
+                      handleLmpChange(form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0]);
+                    }}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                      form.sentinel_dates?.embryo_stage !== 'Day 3' ? 'bg-[#2F6F8F] text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Day 5
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Select Stimulation Protocol</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                {['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'Select FET Protocol Template' : 'Select Stimulation Protocol'}
+              </label>
               <select
                 value={form.protocol_template_id}
                 onChange={(e) => setForm({ ...form, protocol_template_id: e.target.value })}
@@ -612,25 +744,38 @@ export default function TreatmentCycleWizard({
               </select>
             </div>
 
-            <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-xs text-indigo-800 flex items-center gap-2">
-              <span>💡</span>
-              <span>
-                <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, and Day 19 ET. You can adjust any date manually.
-              </span>
-            </div>
+            {['FET', 'ICSI_FET'].includes(form.treatment_type) ? (
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-md text-xs text-teal-900 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-teal-700 inline shrink-0" />
+                <span>
+                  <strong>HRT-FET Auto-Calculation:</strong> Cycle Day 1 sets Baseline Scan (D2), D12 Endometrial Assessment, Day 14 P0 Progesterone Start, Embryo Transfer on <strong>{form.sentinel_dates?.embryo_stage === 'Day 3' ? 'P+3' : 'P+5'}</strong>, and Serum β-hCG on Day 23.
+                </span>
+              </div>
+            ) : (
+              <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-md text-xs text-indigo-800 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-600 inline mr-1" />
+                <span>
+                  <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, and Day 19 ET. You can adjust any date manually.
+                </span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
               {[
-                { key: 'lmp_day1', label: 'Day 1 (LMP Date)', icon: '🩸', show: true },
-                { key: 'baseline_scan', label: 'Baseline Scan Date', icon: '🔍', show: true },
-                { key: 'stim_start', label: 'Stimulation Start Date', icon: '💉', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
-                { key: 'trigger', label: 'Estimated Trigger Date', icon: '⚡', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY', 'IUI_H', 'IUI_D'].includes(form.treatment_type) },
-                { key: 'opu', label: 'Planned OPU Retrieval', icon: '🧫', show: ['ICSI', 'IVF', 'ICSI_FET', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
-                { key: 'et', label: 'Planned Embryo Transfer', icon: '👶', show: ['ICSI', 'IVF', 'FET', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'lmp_day1', label: 'Day 1 (LMP / Bleed Date)', icon: Droplet, show: true },
+                { key: 'baseline_scan', label: 'Baseline Scan Date (D2)', icon: Search, show: true },
+                { key: 'd12_scan', label: 'Endometrial Assessment (D12)', icon: Search, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
+                { key: 'p0_date', label: 'Progesterone Start (P0)', icon: Clock, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
+                { key: 'stim_start', label: 'Stimulation Start Date', icon: Syringe, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'trigger', label: 'Estimated Trigger Date', icon: Zap, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY', 'IUI_H', 'IUI_D'].includes(form.treatment_type) },
+                { key: 'opu', label: 'Planned OPU Retrieval', icon: FlaskConical, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'et', label: `Planned Transfer (${form.sentinel_dates?.embryo_stage || 'Day 5'})`, icon: Heart, show: ['ICSI', 'IVF', 'FET', 'ICSI_FET', 'SURROGACY'].includes(form.treatment_type) },
+                { key: 'beta_hcg_date', label: 'Serum β-hCG Test Date (D23)', icon: Activity, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
               ].filter(s => s.show).map((s) => (
-                <div key={s.key} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    {s.icon} {s.label}
+                <div key={s.key} className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 mb-1">
+                    <s.icon className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{s.label}</span>
                   </label>
                   <input
                     type="date"
@@ -655,19 +800,19 @@ export default function TreatmentCycleWizard({
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <div>
-                <h3 className="text-sm font-black text-slate-900">📊 Serial Endometrial & Follicular Monitoring</h3>
+                <h3 className="text-sm font-bold text-slate-900">Serial Endometrial & Follicular Monitoring</h3>
                 <p className="text-[11px] text-slate-500">Track endometrial thickness, echo-pattern, and sub-endometrial vascularity zones</p>
               </div>
               <button
                 type="button"
                 onClick={handleAddEndometrialRow}
-                className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors shadow-sm"
+                className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-md hover:bg-indigo-100 transition-colors shadow-sm"
               >
                 + Add Scan Date
               </button>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                   <tr>
@@ -735,10 +880,10 @@ export default function TreatmentCycleWizard({
                         <button
                           type="button"
                           onClick={() => handleRemoveEndometrialRow(idx)}
-                          className="text-rose-500 hover:text-rose-700 font-bold px-2 py-1 text-xs"
+                          className="text-rose-500 hover:text-rose-700 p-1 text-xs"
                           title="Delete Scan Record"
                         >
-                          ✕
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>
@@ -759,110 +904,23 @@ export default function TreatmentCycleWizard({
         {/* Step 6: Medication Calendar */}
         {currentStep === 6 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <div>
-                <h3 className="text-sm font-black text-slate-900">💊 Patient Day-by-Day Medication Calendar</h3>
-                <p className="text-[11px] text-slate-500">Auto-generated schedule calculated by Stimulation Rules Engine</p>
-              </div>
-              <button
-                type="button"
-                onClick={handlePrintCalendar}
-                className="px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors shadow-sm"
-              >
-                🖨️ Print for Patient
-              </button>
-            </div>
-
-            {calendarPreview && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-1">
-                {calendarPreview.days?.map((d: any) => (
-                  <div
-                    key={d.day_number}
-                    className={`p-3 rounded-2xl border transition-all ${
-                      d.milestone
-                        ? 'border-indigo-400 bg-indigo-50/40 shadow-sm ring-1 ring-indigo-300'
-                        : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
-                      <span className="font-bold text-xs text-slate-800">{d.display_date}</span>
-                      <span className="text-[10px] font-bold text-slate-400">{d.day_of_week.slice(0, 3)}</span>
-                    </div>
-
-                    {d.stim_day_label && (
-                      <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-100/60 px-1.5 py-0.5 rounded mr-1">
-                        {d.stim_day_label}
-                      </span>
-                    )}
-
-                    {d.milestone && (
-                      <p className="text-[11px] font-bold text-indigo-800 mt-1">
-                        {d.milestone}
-                      </p>
-                    )}
-
-                    <div className="mt-2 space-y-1.5">
-                      {d.medications?.length > 0 ? (
-                        d.medications.map((m: any, mIdx: number) => (
-                          <div key={mIdx} className="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-[11px] group relative">
-                            <div className="flex items-start justify-between">
-                              <input
-                                type="text"
-                                value={m.drug_name}
-                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'drug_name', e.target.value)}
-                                className="font-bold text-slate-800 text-[11px] bg-transparent border-none p-0 focus:outline-none w-full"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDayMedication(d.day_number, mIdx)}
-                                className="text-slate-400 hover:text-rose-500 font-bold ml-1 text-[10px]"
-                                title="Remove medication"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <div className="flex gap-1 text-[10px] text-slate-500 mt-1">
-                              <input
-                                type="text"
-                                value={m.dose}
-                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'dose', e.target.value)}
-                                className="bg-white border border-slate-200 rounded px-1 py-0.5 text-[10px] w-20"
-                                placeholder="Dose"
-                              />
-                              <input
-                                type="text"
-                                value={m.frequency}
-                                onChange={(e) => handleUpdateDayMedication(d.day_number, mIdx, 'frequency', e.target.value)}
-                                className="bg-white border border-slate-200 rounded px-1 py-0.5 text-[10px] w-14"
-                                placeholder="Freq"
-                              />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-slate-400 italic">No scheduled meds</p>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleAddDayMedication(d.day_number)}
-                        className="w-full py-1 text-[10px] font-bold text-indigo-600 bg-indigo-50/60 hover:bg-indigo-100 rounded-lg border border-dashed border-indigo-200 transition-colors"
-                      >
-                        + Add Medication
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <StimulationCalendarGrid
+              startDate={form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1}
+              initialDays={calendarPreview?.days}
+              treatmentType={form.treatment_type}
+              sentinelDates={form.sentinel_dates}
+              onCalendarSaved={(savedDays) => {
+                setCalendarPreview({ ...(calendarPreview || {}), days: savedDays });
+              }}
+            />
           </div>
         )}
 
         {/* Step 7: Summary */}
         {currentStep === 7 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 border-b pb-2">✅ Review & Launch Treatment Cycle</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3 text-xs">
+            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Review & Launch Treatment Cycle</h3>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <p><span className="text-slate-500 font-medium">Treatment:</span> <strong className="text-slate-800">{form.treatment_type} (Attempt #{form.attempt_number})</strong></p>
                 <p><span className="text-slate-500 font-medium">Oocyte / Sperm:</span> <strong className="text-slate-800">{form.gametes_source.oocyte} / {form.gametes_source.sperm}</strong></p>
@@ -892,7 +950,7 @@ export default function TreatmentCycleWizard({
           type="button"
           disabled={currentStep === 1}
           onClick={() => setCurrentStep(currentStep - 1)}
-          className="px-5 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-100 disabled:opacity-40 text-xs transition-colors"
+          className="px-5 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-md hover:bg-slate-100 disabled:opacity-40 text-xs transition-colors"
         >
           ← Previous
         </button>
@@ -902,7 +960,7 @@ export default function TreatmentCycleWizard({
             <button
               type="button"
               onClick={() => setCurrentStep(currentStep + 1)}
-              className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 text-xs transition-colors shadow-md shadow-indigo-500/20"
+              className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 text-xs transition-colors shadow-md shadow-indigo-500/20"
             >
               Next Step →
             </button>
@@ -911,9 +969,9 @@ export default function TreatmentCycleWizard({
               type="button"
               disabled={isSubmitting}
               onClick={handleSubmit}
-              className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 text-xs transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+              className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-md hover:bg-emerald-700 text-xs transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
             >
-              {isSubmitting ? 'Starting Cycle...' : '🚀 Launch Treatment Cycle'}
+              {isSubmitting ? 'Starting Cycle...' : <><Play className="w-3.5 h-3.5 inline mr-1" /> Start Treatment Cycle</>}
             </button>
           )}
         </div>

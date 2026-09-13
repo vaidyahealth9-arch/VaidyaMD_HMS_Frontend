@@ -11,11 +11,11 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from '@/shared/ui/dialog';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
 import { ShieldCheck, UserCheck, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/shared/ui/badge';
 
 interface WitnessSignoffDialogProps {
   open: boolean;
@@ -88,7 +88,7 @@ export default function WitnessSignoffDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[rgb(var(--clr-primary)/0.1)] text-[rgb(var(--clr-primary))] flex items-center justify-center">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <DialogTitle className="text-base font-bold text-slate-900">
@@ -102,16 +102,16 @@ export default function WitnessSignoffDialog({
 
         <form onSubmit={handleVerify} className="space-y-4 py-2">
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 font-semibold">Primary Embryologist (Acting):</span>
-              <Badge variant="purple" className="text-xs font-bold">{user?.name || 'Dr. Embryologist'}</Badge>
+              <Badge variant="outline" className="text-xs font-bold">{user?.name || 'Dr. Embryologist'}</Badge>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 font-semibold">Sign-Off Target Stage:</span>
@@ -121,7 +121,7 @@ export default function WitnessSignoffDialog({
 
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-              <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <UserCheck className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
               <span>Secondary Dual-Witness (Independent User) <span className="text-red-500">*</span></span>
             </label>
             <select
@@ -130,7 +130,7 @@ export default function WitnessSignoffDialog({
                 setWitnessId(e.target.value);
                 setErrorMsg(null);
               }}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
             >
               <option value="">-- Select Secondary Witness --</option>
               {secondaryWitnesses.map((u: any) => (
@@ -143,7 +143,7 @@ export default function WitnessSignoffDialog({
 
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+              <KeyRound className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
               <span>Secondary Witness Passkey / PIN <span className="text-red-500">*</span></span>
             </label>
             <Input
@@ -172,14 +172,14 @@ export default function WitnessSignoffDialog({
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="rounded-xl h-9"
+              className="rounded-md h-9"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={signoffMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 rounded-xl shadow-md gap-1.5"
+              className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{signoffMutation.isPending ? 'Verifying...' : `Authorize Day ${dayNumber}`}</span>

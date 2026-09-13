@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { canAccessField } from '@/lib/utils';
+import { Lock, Save } from 'lucide-react';
 
 // --- Types ---
 export interface FieldSchema {
@@ -185,8 +186,9 @@ export default function DynamicForm({ schema, initialData = {}, userRole, onSave
         </div>
 
         {isDisabled ? (
-          <div className="vmd-input opacity-40 bg-slate-100 cursor-not-allowed text-slate-400 italic text-sm">
-            🔒 {field.role_badge || 'Restricted access'}
+          <div className="vmd-input opacity-60 bg-slate-100 cursor-not-allowed text-slate-500 text-xs flex items-center gap-1.5 py-2">
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <span>{field.role_badge || 'Restricted access'}</span>
           </div>
         ) : field.type === 'textarea' ? (
           <TextareaField field={field} value={value as string} onChange={(v) => updateField(field.id, v)} disabled={isDisabled} />
@@ -210,12 +212,12 @@ export default function DynamicForm({ schema, initialData = {}, userRole, onSave
         const sectionAccessible = !section.role_access || canAccessField(section.role_access, userRole);
 
         return (
-          <div key={section.id} className={`bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden ${!sectionAccessible ? 'opacity-60' : ''}`}>
+          <div key={section.id} className={`bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden ${!sectionAccessible ? 'opacity-60' : ''}`}>
             {/* Section Header */}
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">{section.title}</h3>
+            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+              <h3 className="font-semibold text-sm text-slate-900">{section.title}</h3>
               {section.role_badge && (
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded uppercase">
                   {section.role_badge}
                 </span>
               )}
@@ -240,19 +242,19 @@ export default function DynamicForm({ schema, initialData = {}, userRole, onSave
       <div className="flex justify-end gap-3 pb-4">
         <button
           type="button"
-          className="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm"
+          className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-md text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm"
         >
           Discard Changes
         </button>
         <button
           type="submit"
           disabled={isSaving}
-          className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2 disabled:opacity-60"
+          className="px-5 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md text-xs font-semibold hover:opacity-90 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-60"
         >
           {isSaving ? (
-            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
+            <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
           ) : (
-            <>💾 Save Record</>
+            <><Save className="w-3.5 h-3.5" /> Save Record</>
           )}
         </button>
       </div>

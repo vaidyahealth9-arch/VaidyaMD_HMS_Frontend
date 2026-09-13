@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { patientsApi, appointmentsApi } from '@/lib/api';
 import Link from 'next/link';
+import { Download, Plus, Search, Building2, User } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 export default function PatientsPage() {
@@ -17,6 +18,7 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [referredByType, setReferredByType] = useState('');
   const [area, setArea] = useState('');
+  const [gender, setGender] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +32,7 @@ export default function PatientsPage() {
       search: search || undefined,
       referred_by_type: referredByType || undefined,
       area: area || undefined,
+      gender: gender || undefined,
       branch_id: currentBranch?.id || undefined,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
@@ -53,7 +56,7 @@ export default function PatientsPage() {
       fetchPatients();
     }, 300);
     return () => clearTimeout(timer);
-  }, [search, referredByType, area, startDate, endDate, page, currentBranch?.id, filterParam]);
+  }, [search, referredByType, area, gender, startDate, endDate, page, currentBranch?.id, filterParam]);
 
   const handleSendToOPD = async (p: any) => {
     if (!user) return;
@@ -114,42 +117,54 @@ export default function PatientsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Fertility Patient Directory</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Fertility Patient Directory</h1>
           <p className="text-slate-500 text-sm mt-1">{total} patients registered in clinic</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-md hover:bg-slate-50 transition-colors shadow-sm"
           >
-            📥 Export CSV
+            <Download className="w-3.5 h-3.5 mr-1 inline" /> Export CSV
           </button>
           <Link
             href="/patients/register"
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-indigo-500/30"
+            className="flex items-center gap-2 px-5 py-2.5 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white text-sm font-semibold rounded-md transition-colors shadow-sm"
           >
-            ➕ Register Patient / Couple
+            <Plus className="w-4 h-4 mr-1 inline" /> Register Patient / Couple
           </Link>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <div className="lg:col-span-2 relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Search by name, VID, or phone..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
           />
+        </div>
+        <div>
+          <select
+            value={gender}
+            onChange={(e) => { setGender(e.target.value); setPage(1); }}
+            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+          >
+            <option value="">All Genders</option>
+            <option value="female">Female ♀</option>
+            <option value="male">Male ♂</option>
+            <option value="other">Other</option>
+          </select>
         </div>
         <div>
           <select
             value={referredByType}
             onChange={(e) => { setReferredByType(e.target.value); setPage(1); }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
           >
             <option value="">All Referrals</option>
             <option value="doctor">Referring Doctor</option>
@@ -164,7 +179,7 @@ export default function PatientsPage() {
             placeholder="Filter by Area / City..."
             value={area}
             onChange={(e) => { setArea(e.target.value); setPage(1); }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
           />
         </div>
         <div>
@@ -172,21 +187,21 @@ export default function PatientsPage() {
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
             title="Start Date"
           />
         </div>
       </div>
 
       {/* Patient Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-12 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[rgb(var(--clr-primary))] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : patients.length === 0 ? (
           <div className="p-12 text-center text-slate-400">
-            <p className="text-3xl mb-2">🏥</p>
+            <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
             <p className="font-semibold">No patients found</p>
             <p className="text-xs mt-1">Try adjusting search filters or register a new patient.</p>
           </div>
@@ -209,11 +224,11 @@ export default function PatientsPage() {
                   <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        <div className="w-9 h-9 rounded-md bg-slate-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
                           {p.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <Link href={`/patients/${p.id}`} className="font-bold text-slate-900 hover:text-indigo-600 text-sm leading-tight block">
+                          <Link href={`/patients/${p.id}`} className="font-bold text-slate-900 hover:text-[rgb(var(--clr-primary))] text-sm leading-tight block">
                             {p.name}
                           </Link>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -239,7 +254,7 @@ export default function PatientsPage() {
                     <td className="px-5 py-3.5">
                       {p.partner_name ? (
                         <div>
-                          <Link href={`/patients/${p.partner_id}`} className="font-bold text-slate-800 hover:text-indigo-600 block truncate max-w-[140px]">
+                          <Link href={`/patients/${p.partner_id}`} className="font-bold text-slate-800 hover:text-[rgb(var(--clr-primary))] block truncate max-w-[140px]">
                             {p.partner_name}
                           </Link>
                           <span className="font-mono text-[10px] text-slate-400">{p.partner_vid || 'Linked Partner'}</span>
@@ -256,7 +271,7 @@ export default function PatientsPage() {
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                         p.registration_type === 'donor_bank' || p.registration_type === 'donor_hospital'
                           ? 'bg-amber-100 text-amber-800'
-                          : 'bg-indigo-50 text-indigo-700'
+                          : 'bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))]'
                       }`}>
                         {p.registration_type?.replace('_', ' ') || 'Patient'}
                       </span>
@@ -273,7 +288,7 @@ export default function PatientsPage() {
                       </button>
                       <Link
                         href={`/patients/${p.id}`}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-xs transition-colors"
+                        className="px-3 py-1.5 bg-[rgb(var(--clr-primary)/0.08)] hover:bg-[rgb(var(--clr-primary)/0.12)] text-[rgb(var(--clr-primary))] rounded-md font-semibold text-xs transition-colors"
                       >
                         Open 360 →
                       </Link>

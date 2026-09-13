@@ -37,7 +37,7 @@ class VaidyaMdWebSocket {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('🔌 VaidyaMD WebSocket connected');
+
         // Register user role for role-based broadcasting
         this.ws?.send(JSON.stringify({ type: 'register', ...userInfo }));
 
@@ -60,7 +60,7 @@ class VaidyaMdWebSocket {
       };
 
       this.ws.onclose = () => {
-        console.log('🔌 VaidyaMD WebSocket disconnected');
+
         this.cleanup();
         if (this.shouldReconnect) {
           this.reconnectTimeout = setTimeout(() => {

@@ -1,60 +1,64 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { formatDate } from '@/lib/utils';
 import { Printer, X } from 'lucide-react';
+
+interface MedRow { drug: string; dose?: string; route?: string; freq?: string; duration?: string; instructions?: string; }
 
 interface PrescriptionProps {
   hospitalName?: string;
   hospitalSubtext?: string;
-  patient: {
-    name: string;
-    vid?: string;
-    mrn?: string;
-    age?: number | string;
-    gender?: string;
-    phone?: string;
-    blood_group?: string;
-    address?: string;
-  };
-  doctor: {
-    name: string;
-    qualification?: string;
-    reg_number?: string;
-    department?: string;
-  };
+  patient: { name: string; vid?: string; mrn?: string; age?: number | string; gender?: string; phone?: string; blood_group?: string; address?: string; };
+  doctor: { name: string; qualification?: string; reg_number?: string; department?: string; };
   visitDate?: string;
   chiefComplaint?: string;
   hopi?: string;
   pastHistory?: string;
-  vitals?: {
-    bp?: string;
-    pulse?: string;
-    temp?: string;
-    weight?: string;
-    spo2?: string;
-  };
+  vitals?: { bp?: string; pulse?: string; temp?: string; weight?: string; spo2?: string; };
   diagnosis?: string;
-  medications: Array<{
-    drug: string;
-    dose?: string;
-    route?: string;
-    freq?: string;
-    duration?: string;
-    instructions?: string;
-  }>;
-  partnerMedications?: Array<{
-    drug: string;
-    dose?: string;
-    route?: string;
-    freq?: string;
-    duration?: string;
-    instructions?: string;
-  }>;
+  medications: MedRow[];
+  partnerMedications?: MedRow[];
   partnerName?: string;
   advice?: string;
   nextFollowUp?: string;
   onClose: () => void;
+}
+
+function MedTable({ medications, label }: { medications: MedRow[]; label: string }) {
+  if (!medications.length) return null;
+  return (
+    <div className="space-y-1.5 page-break-avoid">
+      <div className="flex items-center gap-2 pb-1" style={{ borderBottom: '1px solid #d1d5db' }}>
+        <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '1.1rem', color: '#0B4F6C' }}>℞</span>
+        <h3 className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#374151' }}>{label}</h3>
+      </div>
+      <table className="w-full text-left text-xs border-collapse print-table">
+        <thead>
+          <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <th className="py-1.5 px-2 w-6">#</th>
+            <th className="py-1.5 px-2">Medication / Generic Name</th>
+            <th className="py-1.5 px-2">Dosage</th>
+            <th className="py-1.5 px-2">Frequency</th>
+            <th className="py-1.5 px-2">Duration</th>
+            <th className="py-1.5 px-2">Instructions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {medications.map((med, idx) => (
+            <tr key={idx} style={{ borderBottom: '0.5px solid #f3f4f6' }}>
+              <td className="py-1.5 px-2" style={{ color: '#9ca3af' }}>{idx + 1}</td>
+              <td className="py-1.5 px-2 font-semibold" style={{ color: '#111827' }}>{med.drug}</td>
+              <td className="py-1.5 px-2" style={{ color: '#374151' }}>{med.dose || '1 tab'}</td>
+              <td className="py-1.5 px-2 font-semibold" style={{ color: '#0B4F6C' }}>{med.freq || 'OD'}</td>
+              <td className="py-1.5 px-2" style={{ color: '#4b5563' }}>{med.duration || '—'}</td>
+              <td className="py-1.5 px-2 italic" style={{ color: '#6b7280', fontSize: '10px' }}>{med.instructions || 'After food'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function PrintablePrescription({
@@ -75,224 +79,166 @@ export default function PrintablePrescription({
   nextFollowUp,
   onClose,
 }: PrescriptionProps) {
-  const handlePrint = () => {
-    window.print();
-  };
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:static print:bg-white">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8 print:shadow-none print:border-none print:m-0 print:max-w-full">
-        {/* Action Header (Hidden in Print) */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between print:hidden">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🩺</span>
-            <div>
-              <h2 className="text-sm font-black">Official Medical Prescription (Rx)</h2>
-              <p className="text-[11px] text-slate-400">Preview before sending to patient or printing</p>
-            </div>
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-20 sm:pt-24 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-white"
+      style={{ background: 'rgba(0,0,0,0.65)' }}
+    >
+      <div className="bg-white max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-lg print:shadow-none print:rounded-none print:m-0 print:max-w-full border border-slate-200">
+
+        {/* Preview toolbar — hidden in print */}
+        <div className="flex items-center justify-between px-5 py-3 print:hidden"
+          style={{ background: 'rgb(var(--clr-rail-bg))', color: 'white' }}>
+          <div>
+            <p className="text-sm font-semibold">Prescription Preview</p>
+            <p className="text-xs opacity-50 mt-0.5">Review before printing or sending</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgb(var(--clr-primary))', color: 'white' }}
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Prescription (A4)</span>
+              Print (A4)
             </button>
-            <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
-              <X className="w-5 h-5" />
+            <button onClick={onClose} className="p-1 opacity-50 hover:opacity-100 transition-opacity">
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Printable Document Sheet */}
-        <div className="p-8 space-y-6 text-slate-800 text-xs printable-sheet print:p-6 print:m-0">
+        {/* ── Printable Document Sheet ── */}
+        <div className="p-8 space-y-5 printable-document print:p-6" style={{ fontFamily: 'Inter, Arial, sans-serif', fontSize: '11px', color: '#111827' }}>
+
           {/* Hospital Header */}
-          <div className="flex items-start justify-between border-b-2 border-indigo-900 pb-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-900 text-white font-black text-xl flex items-center justify-center shadow-md">
-                VM
+          <div className="flex items-start justify-between pb-3" style={{ borderBottom: '1.5px solid #0B4F6C' }}>
+            <div className="flex items-center gap-3">
+              {/* Logo box — square, tight */}
+              <div className="w-10 h-10 flex items-center justify-center rounded-md flex-shrink-0"
+                style={{ background: '#0B4F6C' }}>
+                <img src="/logo.svg" alt="VM" className="w-8 h-8" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-indigo-950 tracking-tight">{hospitalName}</h1>
-                <p className="text-[11px] text-slate-600 font-medium">{hospitalSubtext}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · Phone: +91 40 4888 9999 · Email: care@vaidyamd.com
+                <h1 className="font-bold text-base leading-tight" style={{ color: '#0B4F6C', fontFamily: 'Inter, Arial, sans-serif' }}>
+                  {hospitalName}
+                </h1>
+                <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>{hospitalSubtext}</p>
+                <p className="text-[9px] mt-0.5" style={{ color: '#9ca3af' }}>
+                  Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · +91 40 4888 9999 · care@vaidyamd.com
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <span className="font-mono text-2xl font-black text-indigo-900 italic font-serif">℞</span>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Outpatient Rx</p>
+            <div className="text-right flex-shrink-0">
+              <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '2rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
+              <p className="text-[9px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: '#9ca3af' }}>Outpatient Rx</p>
             </div>
           </div>
 
           {/* Doctor Demographics */}
-          <div className="flex justify-between items-center text-xs bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
+          <div className="flex justify-between items-center py-2" style={{ borderBottom: '0.5px solid #e5e7eb' }}>
             <div>
-              <p className="font-black text-slate-900 text-sm">{doctor.name || 'Treating Consultant'}</p>
-              <p className="text-[11px] text-indigo-800 font-medium">{doctor.qualification || 'MBBS, MS (OBG), DRM (Germany) · Senior Fertility Specialist'}</p>
+              <p className="font-semibold text-sm" style={{ color: '#111827' }}>{doctor.name || 'Treating Consultant'}</p>
+              <p className="text-[10px]" style={{ color: '#1A6E8E' }}>{doctor.qualification || 'MBBS, MS (OBG), DRM (Germany) · Senior Fertility Specialist'}</p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-slate-500 font-bold uppercase">Reg. No: {doctor.reg_number || 'TSMC/2016/54210'}</p>
-              <p className="text-[11px] text-slate-700 font-semibold">{doctor.department || 'Reproductive Medicine & ART'}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>Reg. No: {doctor.reg_number || 'TSMC/2016/54210'}</p>
+              <p className="text-[10px]" style={{ color: '#374151' }}>{doctor.department || 'Reproductive Medicine & ART'}</p>
             </div>
           </div>
 
-          {/* Patient Details Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Patient Name</span>
-              <strong className="text-slate-900">{patient.name}</strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Patient ID / VID</span>
-              <strong className="font-mono text-indigo-800">{patient.vid || patient.mrn || '—'}</strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Age / Gender</span>
-              <span className="font-semibold">{patient.age ? `${patient.age}y` : '—'} / {patient.gender || '—'}</span>
-            </div>
-            <div className="text-right sm:text-left">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Date</span>
-              <strong className="text-slate-900">{formatDate(visitDate)}</strong>
-            </div>
+          {/* Patient Strip */}
+          <div className="grid grid-cols-4 gap-3 p-3 rounded-md" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
+            {[
+              { label: 'Patient Name',   value: patient.name },
+              { label: 'Patient ID',     value: patient.vid || patient.mrn || '—', mono: true },
+              { label: 'Age / Gender',   value: `${patient.age ? patient.age + 'y' : '—'} / ${patient.gender || '—'}` },
+              { label: 'Date',           value: formatDate(visitDate) },
+            ].map(({ label, value, mono }) => (
+              <div key={label}>
+                <span className="block text-[9px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>{label}</span>
+                <span className={`font-semibold text-xs ${mono ? 'font-mono' : ''}`} style={{ color: mono ? '#0B4F6C' : '#111827' }}>{value}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Clinical Findings / Vitals Strip */}
+          {/* Clinical Findings */}
           {(vitals || chiefComplaint || diagnosis) && (
-            <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-100 space-y-1.5">
+            <div className="p-3 rounded-md space-y-1.5" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
               {vitals && (vitals.bp || vitals.weight || vitals.pulse) && (
-                <div className="flex gap-4 text-[11px] text-slate-700 font-medium">
-                  {vitals.bp && <span><strong>BP:</strong> {vitals.bp} mmHg</span>}
-                  {vitals.pulse && <span><strong>Pulse:</strong> {vitals.pulse} bpm</span>}
+                <div className="flex gap-4 text-[10px]" style={{ color: '#374151' }}>
+                  {vitals.bp     && <span><strong>BP:</strong> {vitals.bp} mmHg</span>}
+                  {vitals.pulse  && <span><strong>Pulse:</strong> {vitals.pulse} bpm</span>}
                   {vitals.weight && <span><strong>Weight:</strong> {vitals.weight} kg</span>}
-                  {vitals.spo2 && <span><strong>SpO2:</strong> {vitals.spo2}%</span>}
+                  {vitals.spo2   && <span><strong>SpO₂:</strong> {vitals.spo2}%</span>}
                 </div>
               )}
               {chiefComplaint && (
-                <p className="text-xs">
-                  <strong className="text-slate-900">Chief Complaints:</strong> <span className="text-slate-700">{chiefComplaint}</span>
-                </p>
+                <p className="text-[10px]"><strong style={{ color: '#111827' }}>Chief Complaints: </strong><span style={{ color: '#374151' }}>{chiefComplaint}</span></p>
               )}
               {diagnosis && (
-                <p className="text-xs">
-                  <strong className="text-slate-900">Provisional Diagnosis:</strong> <span className="text-indigo-950 font-bold">{diagnosis}</span>
-                </p>
+                <p className="text-[10px]"><strong style={{ color: '#111827' }}>Provisional Diagnosis: </strong><span className="font-semibold" style={{ color: '#0B4F6C' }}>{diagnosis}</span></p>
               )}
             </div>
           )}
 
-          {/* Primary Medications Table */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 border-b border-indigo-200 pb-1">
-              <span className="font-serif italic font-black text-indigo-900 text-lg">℞</span>
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                {partnerName ? `Medications for ${patient.name}` : 'Prescribed Medications'}
-              </h3>
-            </div>
+          {/* Primary Medications */}
+          <MedTable
+            medications={medications}
+            label={partnerName ? `Medications for ${patient.name}` : 'Prescribed Medications'}
+          />
 
-            {medications.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No medications prescribed for this visit.</p>
-            ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
-                    <th className="py-2 px-2 w-8">#</th>
-                    <th className="py-2 px-2">Medication / Generic</th>
-                    <th className="py-2 px-2">Dosage</th>
-                    <th className="py-2 px-2">Frequency</th>
-                    <th className="py-2 px-2">Duration</th>
-                    <th className="py-2 px-2">Instructions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {medications.map((med, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2 px-2 text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-2 px-2 font-black text-slate-900">{med.drug}</td>
-                      <td className="py-2 px-2 font-medium text-slate-700">{med.dose || '1 tab'}</td>
-                      <td className="py-2 px-2 font-bold text-indigo-700">{med.freq || 'OD'}</td>
-                      <td className="py-2 px-2 font-medium text-slate-600">{med.duration || '—'}</td>
-                      <td className="py-2 px-2 text-slate-600 italic text-[11px]">{med.instructions || 'After food'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Partner Medications Table (If Couple Visit) */}
+          {/* Partner Medications */}
           {partnerMedications.length > 0 && (
-            <div className="space-y-2 pt-3 border-t border-slate-200">
-              <div className="flex items-center gap-2 border-b border-blue-200 pb-1">
-                <span className="font-serif italic font-black text-blue-900 text-lg">℞</span>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Medications for Partner ({partnerName || 'Spouse'})
-                </h3>
-              </div>
-
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
-                    <th className="py-2 px-2 w-8">#</th>
-                    <th className="py-2 px-2">Medication</th>
-                    <th className="py-2 px-2">Dosage</th>
-                    <th className="py-2 px-2">Frequency</th>
-                    <th className="py-2 px-2">Duration</th>
-                    <th className="py-2 px-2">Instructions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {partnerMedications.map((med, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2 px-2 text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-2 px-2 font-black text-slate-900">{med.drug}</td>
-                      <td className="py-2 px-2 font-medium text-slate-700">{med.dose || '1 tab'}</td>
-                      <td className="py-2 px-2 font-bold text-blue-700">{med.freq || 'OD'}</td>
-                      <td className="py-2 px-2 font-medium text-slate-600">{med.duration || '—'}</td>
-                      <td className="py-2 px-2 text-slate-600 italic text-[11px]">{med.instructions || 'After food'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="pt-3" style={{ borderTop: '0.5px solid #e5e7eb' }}>
+              <MedTable medications={partnerMedications} label={`Medications for Partner (${partnerName || 'Spouse'})`} />
             </div>
           )}
 
-          {/* Advice & Instructions */}
+          {/* Advice */}
           {advice && (
-            <div className="space-y-1 pt-3 border-t border-slate-200">
-              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Clinical Advice & Instructions</h4>
-              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <div className="space-y-1 pt-3 page-break-avoid" style={{ borderTop: '0.5px solid #e5e7eb' }}>
+              <h4 className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: '#6b7280' }}>Clinical Advice & Instructions</h4>
+              <p className="text-[10px] leading-relaxed whitespace-pre-line p-2.5 rounded-md" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE', color: '#374151' }}>
                 {advice}
               </p>
             </div>
           )}
 
-          {/* Next Review Date & Signatory Footer */}
-          <div className="pt-6 border-t-2 border-slate-200 flex items-end justify-between">
+          {/* Footer — follow-up + signature */}
+          <div className="pt-5 flex items-end justify-between page-break-avoid" style={{ borderTop: '1px solid #d1d5db' }}>
             <div>
               {nextFollowUp && (
-                <div className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs inline-block">
-                  <span className="text-[10px] font-bold text-indigo-900 uppercase block">Next Review / Follow-Up</span>
-                  <strong className="text-indigo-950 font-bold">{nextFollowUp}</strong>
+                <div className="inline-block px-3 py-1.5 rounded-md mb-2" style={{ background: '#D1ECF7', border: '0.5px solid #1A6E8E' }}>
+                  <span className="block text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#0B4F6C' }}>Next Review / Follow-Up</span>
+                  <strong className="text-xs" style={{ color: '#083348' }}>{nextFollowUp}</strong>
                 </div>
               )}
-              <p className="text-[10px] text-slate-400 mt-3">
-                * Please bring this prescription on your next visit. In case of emergency or severe pain, contact the hospital emergency desk immediately.
+              <p className="text-[9px]" style={{ color: '#9ca3af' }}>
+                * Bring this prescription on your next visit. For emergencies, contact the hospital emergency desk immediately.
               </p>
             </div>
-
             <div className="text-right">
-              <div className="h-12 flex items-end justify-end">
-                <span className="font-serif italic text-sm text-slate-400 font-semibold">[Digital Signature Verified]</span>
-              </div>
-              <div className="border-t border-slate-400 pt-1">
-                <p className="font-black text-slate-900 text-xs">{doctor.name || 'Doctor Signature'}</p>
-                <p className="text-[10px] text-slate-500 font-medium">Authorized Signatory</p>
+              <div className="h-10" />
+              <div className="pt-1" style={{ borderTop: '0.5px solid #6b7280' }}>
+                <p className="font-semibold text-xs" style={{ color: '#111827' }}>{doctor.name || 'Doctor Signature'}</p>
+                <p className="text-[9px]" style={{ color: '#6b7280' }}>Authorized Signatory</p>
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

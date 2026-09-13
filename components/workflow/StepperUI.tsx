@@ -19,7 +19,7 @@ const statusIcons: Record<string, string> = {
 
 export default function StepperUI({ steps, onStepClick }: StepperUIProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-8">
       <div className="relative flex justify-between items-start w-full max-w-3xl mx-auto">
         {/* Background connecting line */}
         <div className="absolute left-0 top-6 w-full h-0.5 bg-slate-100 z-0 rounded" />

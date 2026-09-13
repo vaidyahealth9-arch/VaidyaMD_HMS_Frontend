@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { appointmentsApi, patientsApi, treatmentCyclesApi, billingApi } from '@/lib/api';
 import { formatDateTime, statusColors, statusLabels, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
+import { CalendarDays, Users, Activity, CreditCard, UserPlus, Calendar, Receipt, Microscope } from 'lucide-react';
+import { Badge } from '@/shared/ui/badge';
 
 export default function DashboardPage() {
   const { user, activeRole } = useAuth();
@@ -18,7 +20,6 @@ export default function DashboardPage() {
   useEffect(() => {
     setIsLoading(true);
     const today = new Date().toISOString().split('T')[0];
-
     Promise.all([
       appointmentsApi.list({ date_filter: today }).catch(() => ({ appointments: [] })),
       patientsApi.list({ per_page: 100 }).catch(() => ({ patients: [], total: 0 })),
@@ -27,10 +28,8 @@ export default function DashboardPage() {
     ]).then(([aptData, patData, cycleData, invData]: any) => {
       setAppointments(aptData?.appointments || []);
       setPatientCount(patData?.total || patData?.patients?.length || 0);
-      
       const cycles = Array.isArray(cycleData) ? cycleData : [];
       setActiveCycleCount(cycles.length);
-
       const invs = Array.isArray(invData) ? invData : [];
       setPendingInvoicesCount(invs.length);
       const dues = invs.reduce((acc: number, item: any) => acc + (parseFloat(item.pending_due) || 0), 0);
@@ -38,139 +37,165 @@ export default function DashboardPage() {
     }).finally(() => setIsLoading(false));
   }, []);
 
-  const dynamicStatCards = [
+  const statCards = [
     {
       label: "Today's Appointments",
       value: appointments.length.toString(),
-      icon: '🏥',
-      color: 'bg-indigo-50 border-indigo-100',
-      textColor: 'text-indigo-700',
-      trend: appointments.length > 0 ? `${appointments.filter(a => a.status === 'in_progress').length} currently in consultation` : 'No appointments scheduled for today',
+      icon: CalendarDays,
+      sub: appointments.length > 0
+        ? `${appointments.filter(a => a.status === 'in_progress').length} in consultation`
+        : 'No appointments today',
     },
     {
       label: 'Registered Patients',
       value: patientCount.toString(),
-      icon: '👥',
-      color: 'bg-blue-50 border-blue-100',
-      textColor: 'text-blue-700',
-      trend: patientCount > 0 ? `${patientCount} active patient/couple files` : 'Clean database — 0 patient records',
+      icon: Users,
+      sub: patientCount > 0 ? `${patientCount} active files` : 'No records yet',
     },
     {
       label: 'Active IVF / ART Cycles',
       value: activeCycleCount.toString(),
-      icon: '🧫',
-      color: 'bg-violet-50 border-violet-100',
-      textColor: 'text-violet-700',
-      trend: activeCycleCount > 0 ? `${activeCycleCount} running stimulation/FET protocols` : 'No active treatment cycles running',
+      icon: Activity,
+      sub: activeCycleCount > 0 ? `${activeCycleCount} running protocols` : 'No active cycles',
     },
     {
-      label: 'Pending Invoices & Dues',
+      label: 'Pending Dues',
       value: pendingDuesTotal > 0 ? `₹${pendingDuesTotal.toLocaleString()}` : '₹0',
-      icon: '💰',
-      color: 'bg-amber-50 border-amber-100',
-      textColor: 'text-amber-700',
-      trend: pendingInvoicesCount > 0 ? `${pendingInvoicesCount} invoices pending settlement` : 'All invoices cleared & up to date',
+      icon: CreditCard,
+      sub: pendingInvoicesCount > 0 ? `${pendingInvoicesCount} invoices outstanding` : 'All invoices cleared',
     },
   ];
 
   const quickActions = [
-    { label: 'Register Patient', href: '/patients/register', icon: '➕', color: 'bg-indigo-600 hover:bg-indigo-700 text-white' },
-    { label: 'Schedule Appointment', href: '/appointments', icon: '📅', color: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200' },
-    { label: 'Generate Invoice', href: '/billing', icon: '📄', color: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200' },
-    { label: 'IVF Lab Console', href: '/ivf-lab', icon: '🔬', color: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200' },
+    { label: 'Register Patient',        href: '/patients/register', icon: UserPlus,    primary: true },
+    { label: 'Schedule Appointment',    href: '/appointments',      icon: Calendar,    primary: false },
+    { label: 'Generate Invoice',        href: '/billing',           icon: Receipt,     primary: false },
+    { label: 'IVF Lab Console',         href: '/ivf-lab',           icon: Microscope,  primary: false },
   ];
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-8">
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="w-full px-4 sm:px-6 py-6 space-y-6 max-w-7xl">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Good {new Date().getHours() < 12 ? 'Morning' : 'Afternoon'}, {user?.name?.split(' ')[0]} 👋
+          <h1 className="text-xl font-semibold" style={{ color: 'rgb(var(--clr-text))' }}>
+            {greeting}, {user?.name?.split(' ')[0]}
           </h1>
-          <p className="text-slate-500 text-xs mt-1">
+          <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--clr-text-muted))' }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            {' · '}<span className="font-semibold text-indigo-600">{user?.hospital_name || 'VaidyaMD Fertility & ART Centre'}</span>
+            {' · '}
+            <span style={{ color: 'rgb(var(--clr-primary))' }}>
+              {user?.hospital_name || 'VaidyaMD Fertility & ART Centre'}
+            </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full w-fit">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-xs font-semibold text-indigo-700">Fertility + OPD System Live</span>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium w-fit"
+          style={{ background: 'rgb(var(--clr-success-bg))', color: 'rgb(var(--clr-success))', border: '1px solid rgb(var(--clr-success-bg))' }}>
+          <span className="status-dot-live" />
+          System Live
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-3">
-        {quickActions.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${action.color}`}
-          >
-            <span>{action.icon}</span>
-            {action.label}
-          </Link>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        {quickActions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.label}
+              href={action.href}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium transition-opacity hover:opacity-90"
+              style={
+                action.primary
+                  ? { background: 'rgb(var(--clr-primary))', color: 'white', boxShadow: 'var(--shadow-card)' }
+                  : { background: 'white', color: 'rgb(var(--clr-text))', border: '1px solid rgb(var(--clr-border))', boxShadow: 'var(--shadow-card)' }
+              }
+            >
+              <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+              {action.label}
+            </Link>
+          );
+        })}
       </div>
 
-      {/* Real Dynamic Stats Cards */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {dynamicStatCards.map((card) => (
-          <div key={card.label} className={`${card.color} border rounded-3xl p-5 space-y-3 hover:shadow-md transition-shadow`}>
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.label}</p>
-              <span className="text-2xl">{card.icon}</span>
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="rounded-lg p-4 space-y-3"
+              style={{ background: 'white', border: '1px solid rgb(var(--clr-border))', boxShadow: 'var(--shadow-card)' }}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgb(var(--clr-text-subtle))' }}>
+                  {card.label}
+                </p>
+                <div className="w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: 'rgb(var(--clr-primary-light))', }}>
+                  <Icon className="w-4 h-4" style={{ color: 'rgb(var(--clr-primary))' }} strokeWidth={1.75} />
+                </div>
+              </div>
+              <p className="text-2xl font-semibold font-mono" style={{ color: 'rgb(var(--clr-text))' }}>
+                {card.value}
+              </p>
+              <p className="text-[11px]" style={{ color: 'rgb(var(--clr-text-muted))' }}>{card.sub}</p>
             </div>
-            <p className={`text-3xl font-black ${card.textColor}`}>{card.value}</p>
-            <p className="text-xs text-slate-500">{card.trend}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Today's Schedule */}
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="rounded-lg overflow-hidden" style={{ background: 'white', border: '1px solid rgb(var(--clr-border))', boxShadow: 'var(--shadow-card)' }}>
+        <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid rgb(var(--clr-border))' }}>
           <div>
-            <h2 className="font-bold text-slate-800 text-sm">Today's Appointment Queue</h2>
-            <p className="text-xs text-slate-500">{appointments.length} appointments scheduled</p>
+            <h2 className="text-sm font-semibold" style={{ color: 'rgb(var(--clr-text))' }}>Today's Appointment Queue</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--clr-text-muted))' }}>{appointments.length} appointments scheduled</p>
           </div>
-          <Link href="/appointments" className="text-xs text-indigo-600 font-bold hover:text-indigo-800 transition-colors">
-            View Schedule Queue →
+          <Link href="/appointments" className="text-xs font-medium transition-colors hover:opacity-80"
+            style={{ color: 'rgb(var(--clr-primary))' }}>
+            View all →
           </Link>
         </div>
 
         {isLoading ? (
-          <div className="p-12 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <div className="p-10 flex items-center justify-center">
+            <div className="loading-bar" />
           </div>
         ) : appointments.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 space-y-2">
-            <p className="text-3xl">📋</p>
-            <p className="text-xs font-semibold text-slate-500">No appointments scheduled for today.</p>
-            <Link href="/appointments" className="text-xs text-indigo-600 font-bold hover:underline inline-block mt-1">
-              + Schedule New Patient Appointment
+          <div className="p-10 text-center space-y-2">
+            <CalendarDays className="w-8 h-8 mx-auto" style={{ color: 'rgb(var(--clr-text-subtle))' }} strokeWidth={1} />
+            <p className="text-xs font-medium" style={{ color: 'rgb(var(--clr-text-muted))' }}>No appointments scheduled for today.</p>
+            <Link href="/appointments" className="text-xs font-medium hover:opacity-80 inline-block"
+              style={{ color: 'rgb(var(--clr-primary))' }}>
+              + Schedule New Appointment
             </Link>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {appointments.slice(0, 5).map((apt: any) => (
-              <div key={apt.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          <div className="divide-y" style={{ '--tw-divide-opacity': 1 } as any}>
+            {appointments.slice(0, 6).map((apt: any) => (
+              <div key={apt.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 font-black flex items-center justify-center text-xs">
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0"
+                    style={{ background: 'rgb(var(--clr-primary))' }}>
                     {apt.patient_name?.charAt(0) || '?'}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-800 text-xs">{apt.patient_name}</p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-xs font-semibold" style={{ color: 'rgb(var(--clr-text))' }}>{apt.patient_name}</p>
+                    <p className="text-[11px]" style={{ color: 'rgb(var(--clr-text-muted))' }}>
                       {apt.department} · Dr. {apt.doctor_name}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-xs font-mono" style={{ color: 'rgb(var(--clr-text-muted))' }}>
                     {new Date(apt.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusColors[apt.status]}`}>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${statusColors[apt.status]}`}>
                     {statusLabels[apt.status]}
                   </span>
                 </div>
