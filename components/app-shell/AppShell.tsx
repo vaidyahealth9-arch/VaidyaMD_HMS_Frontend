@@ -5,6 +5,7 @@ import IconRail from '@/components/app-shell/IconRail';
 import BreadcrumbBar from '@/components/app-shell/BreadcrumbBar';
 import ContextSidebar from '@/components/app-shell/ContextSidebar';
 import NotificationTray from '@/components/app-shell/NotificationTray';
+import AmbientScribeWidget from '@/components/opd/AmbientScribeWidget';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { SidebarProvider } from '@/contexts/SidebarContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -78,6 +79,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
           {/* Notification Tray (overlay) */}
           <NotificationTray />
+
+          {/* Global Ambient Scribe Widget */}
+          <AmbientScribeWidget />
         </div>
       </SidebarProvider>
     </NotificationProvider>

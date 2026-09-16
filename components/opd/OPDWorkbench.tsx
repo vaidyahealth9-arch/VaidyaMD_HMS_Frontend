@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { patientsApi, opdApi, appointmentsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,13 +26,13 @@ import {
   ChevronUp,
   PanelLeftClose,
   PanelLeftOpen,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
 import { Badge } from '@/shared/ui/badge';
-import AmbientScribeWidget from './AmbientScribeWidget';
 import SmartOrderDialog from './SmartOrderDialog';
 import PrintablePrescription from '@/components/common/PrintablePrescription';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
@@ -190,7 +190,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   }, [triageData, currentAppointment, consultationHistory]);
 
   // Form Setup with Clean Non-Dummy Defaults
-  const { register, handleSubmit, setValue, watch, reset } = useForm({
+  const { register, handleSubmit, setValue, watch, reset, control } = useForm({
     defaultValues: {
       weight: '',
       height: '',
@@ -203,17 +203,28 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       spo2: '',
       chief_complaints: '',
       history_of_illness: '',
-      past_medical_history: '',
-      cvs_findings: '',
-      cns_findings: '',
-      rs_findings: '',
-      nurse_notes: '',
       provisional_diagnosis: '',
       differential_diagnosis: '',
       investigations_ordered: '',
       plan: '',
+      nurse_notes: '',
+      cvs_findings: '',
+      cns_findings: '',
+      rs_findings: '',
+      previous_history: '',
+      present_history: '',
+      examination: '',
+      previous_investigations: '',
+      investigations_to_be_advised: '',
+      treatment_notes: '',
+      medications: [{ drug_name: '', dose: '', frequency: '', instructions: '' }],
       follow_up: '1_week',
     },
+  });
+
+  const { fields: medFields, append: appendMed, remove: removeMed } = useFieldArray({
+    control,
+    name: 'medications'
   });
 
   // Auto-populate Triage Data into form fields whenever effectiveTriage updates
@@ -260,10 +271,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
       if (tmpl) {
         if (!watch('chief_complaints')) setValue('chief_complaints', tmpl.complaint);
-        if (!watch('history_of_illness')) setValue('history_of_illness', tmpl.hopi);
-        if (!watch('provisional_diagnosis')) setValue('provisional_diagnosis', tmpl.diagnosis);
-        if (!watch('investigations_ordered')) setValue('investigations_ordered', tmpl.investigations);
-        if (!watch('plan')) setValue('plan', tmpl.plan);
+        if (!watch('present_history')) setValue('present_history', tmpl.hopi);
+        if (!watch('examination')) setValue('examination', tmpl.diagnosis);
+        if (!watch('investigations_to_be_advised')) setValue('investigations_to_be_advised', tmpl.investigations);
+        if (!watch('treatment_notes')) setValue('treatment_notes', tmpl.plan);
       }
     }
   }, [currentAppointment]);
@@ -461,10 +472,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateId);
     if (!tmpl) return;
     setValue('chief_complaints', tmpl.complaint);
-    setValue('history_of_illness', tmpl.hopi);
-    setValue('provisional_diagnosis', tmpl.diagnosis);
-    setValue('investigations_ordered', tmpl.investigations);
-    setValue('plan', tmpl.plan);
+    setValue('present_history', tmpl.hopi);
+    setValue('examination', tmpl.diagnosis); // Place diagnosis in examination or notes
+    setValue('investigations_to_be_advised', tmpl.investigations);
+    setValue('treatment_notes', tmpl.plan);
   };
 
   // Populate from Ambient Scribe
@@ -492,13 +503,19 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     const medItems = Array.isArray(orderSet.medications) ? orderSet.medications : [];
 
     const newInv = `[${orderSet.name}]:\n- ${invItems.join('\n- ')}`;
-    const currentInv = watch('investigations_ordered');
-    setValue('investigations_ordered', currentInv && currentInv.trim() ? `${currentInv.trim()}\n\n${newInv}` : newInv);
+    const currentInv = watch('investigations_to_be_advised');
+    setValue('investigations_to_be_advised', currentInv && currentInv.trim() ? `${currentInv.trim()}\n\n${newInv}` : newInv);
 
     const instPart = orderSet.instructions ? `\nInstructions: ${orderSet.instructions}` : '';
-    const newPlan = `Prescribed Order Set [${orderSet.name}]:\n- ${medItems.join('\n- ')}${instPart}`;
-    const currentPlan = watch('plan');
-    setValue('plan', currentPlan && currentPlan.trim() ? `${currentPlan.trim()}\n\n${newPlan}` : newPlan);
+    if (instPart) {
+      const currentPlan = watch('treatment_notes');
+      setValue('treatment_notes', currentPlan && currentPlan.trim() ? `${currentPlan.trim()}\n\n[${orderSet.name}] ${instPart}` : `[${orderSet.name}] ${instPart}`);
+    }
+
+    // Append medications to the new structured table
+    medItems.forEach((medStr: string) => {
+      appendMed({ drug_name: medStr, dose: '', frequency: '', instructions: '' });
+    });
   };
 
   const handlePrintPrevious = (rec: any) => {
@@ -1024,19 +1041,9 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">CVS Findings</label>
-                        <Input {...register('cvs_findings')} placeholder="e.g. S1 S2 normal" className="h-8 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">CNS Findings</label>
-                        <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-8 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">RS Findings</label>
-                        <Input {...register('rs_findings')} placeholder="e.g. Bilateral clear" className="h-8 text-xs" />
-                      </div>
+                    <div className="pt-2">
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Examination Findings</label>
+                      <textarea {...register('examination')} placeholder="e.g. Vitals stable, P/A soft, CVS normal..." rows={3} className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800" />
                     </div>
                   </div>
                 )}
@@ -1071,24 +1078,34 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">History of Present Illness (HOPI)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Present History</label>
                         <textarea
-                          {...register('history_of_illness')}
+                          {...register('present_history')}
                           rows={3}
-                          placeholder="Detailed chronological history..."
+                          placeholder="Detailed chronological history of present illness..."
                           className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Past Medical / Surgical History</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Previous History</label>
                         <textarea
-                          {...register('past_medical_history')}
+                          {...register('previous_history')}
                           rows={3}
                           placeholder="Previous hospitalizations, surgeries, drug allergies..."
                           className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                         />
                       </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Previous Investigations</label>
+                      <textarea
+                        {...register('previous_investigations')}
+                        rows={2}
+                        placeholder="Past reports and imaging..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                      />
                     </div>
                   </CardContent>
                 )}
@@ -1124,35 +1141,17 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 </CardHeader>
                 {isPlanSectionExpanded && (
                   <CardContent className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Provisional Diagnosis</label>
-                        <Input
-                          {...register('provisional_diagnosis')}
-                          placeholder="e.g. PCOS Phenotype A / Unexplained Infertility"
-                          className="h-9 text-xs font-bold text-slate-900"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Differential Diagnosis</label>
-                        <Input
-                          {...register('differential_diagnosis')}
-                          placeholder="e.g. Hypothalamic amenorrhea, Hyperprolactinemia"
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                    </div>
+                    {/* Provisional & Differential Diagnosis removed as per new standard template */}
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <FlaskConical className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                          <span>Investigations &amp; Diagnostics Ordered</span>
+                          <span>Investigations To Be Advised</span>
                         </label>
                       </div>
                       <textarea
-                        {...register('investigations_ordered')}
+                        {...register('investigations_to_be_advised')}
                         rows={3}
                         placeholder="e.g. AMH, Pelvic TVS, Semen Analysis, Day 2 FSH/LH..."
                         className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] font-mono"
@@ -1163,15 +1162,91 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Pill className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                          <span>Prescriptions &amp; Management Plan</span>
+                          <span>Treatment (Medications)</span>
                         </label>
                       </div>
-                      <textarea
-                        {...register('plan')}
-                        rows={4}
-                        placeholder="Detailed Rx with dosages, frequencies, dietary and lifestyle instructions..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      />
+                      
+                      {/* Structured Medication Array */}
+                      <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        {medFields.map((field, index) => (
+                          <div key={field.id} className="flex gap-2 items-start relative">
+                            <div className="flex-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
+                              <Input
+                                {...register(`medications.${index}.drug_name`)}
+                                list="drugList"
+                                placeholder="e.g. Tab Paracetamol"
+                                className="h-8 text-xs mt-1 bg-white"
+                              />
+                            </div>
+                            <div className="w-24">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
+                              <Input
+                                {...register(`medications.${index}.dose`)}
+                                placeholder="500mg"
+                                className="h-8 text-xs mt-1 bg-white"
+                              />
+                            </div>
+                            <div className="w-32">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
+                              <select
+                                {...register(`medications.${index}.frequency`)}
+                                className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                              >
+                                <option value="">Select...</option>
+                                <option value="OD">OD (Once daily)</option>
+                                <option value="BD">BD (Twice daily)</option>
+                                <option value="TDS">TDS (Thrice daily)</option>
+                                <option value="QID">QID (Four times daily)</option>
+                                <option value="SOS">SOS (As needed)</option>
+                                <option value="Stat">Stat (Immediately)</option>
+                              </select>
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
+                              <Input
+                                {...register(`medications.${index}.instructions`)}
+                                placeholder="After food, for 5 days"
+                                className="h-8 text-xs mt-1 bg-white"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeMed(index)}
+                              className="mt-6 p-1.5 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        
+                        <datalist id="drugList">
+                          <option value="Tab Paracetamol 500mg" />
+                          <option value="Tab Metformin 500mg" />
+                          <option value="Tab Folic Acid 5mg" />
+                          <option value="Cap Doxycycline 100mg" />
+                          <option value="Inj Progesterone 100mg" />
+                        </datalist>
+
+                        <button
+                          type="button"
+                          onClick={() => appendMed({ drug_name: '', dose: '', frequency: '', instructions: '' })}
+                          className="text-xs font-bold text-[rgb(var(--clr-primary))] flex items-center gap-1 hover:underline pt-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Medicine
+                        </button>
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Treatment Notes (Non-Pharmacological / Dietary)</label>
+                        <textarea
+                          {...register('treatment_notes')}
+                          rows={3}
+                          placeholder="Dietary and lifestyle instructions, additional advice..."
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        />
+                      </div>
                     </div>
 
                     <div className="w-48">
@@ -1217,9 +1292,6 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
           )}
         </div>
       </div>
-
-      {/* Floating Collapsible Ambient AI Scribe Widget (Bottom Right - Pinned) */}
-      <AmbientScribeWidget patientId={selectedPatientId} onDataParsed={handleScribeParsed} />
 
       {/* Smart Order Set Palette (Cmd+K) */}
       <SmartOrderDialog

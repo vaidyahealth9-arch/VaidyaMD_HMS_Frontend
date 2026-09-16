@@ -612,6 +612,18 @@ export default function TreatmentCycleWizard({
                     <span>Donor Sperm</span>
                   </label>
                 </div>
+                {form.gametes_source.sperm === 'donor' && (
+                  <div className="mt-3">
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Donor ID (ART Bank Form 23)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DONOR-SPERM-1024"
+                      value={form.gametes_source.donor_sperm_id}
+                      onChange={(e) => setForm({ ...form, gametes_source: { ...form.gametes_source, donor_sperm_id: e.target.value } })}
+                      className="vmd-input text-xs"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

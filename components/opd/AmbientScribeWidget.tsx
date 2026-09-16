@@ -7,22 +7,12 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
-  Volume2,
   Edit3,
   X,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Minimize2,
-  Pin,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
-import { opdApi } from '@/lib/api';
-
-interface AmbientScribeWidgetProps {
-  patientId?: string;
-  onDataParsed: (parsedData: any) => void;
-}
 
 // Extend Window interface for SpeechRecognition
 declare global {
@@ -32,7 +22,7 @@ declare global {
   }
 }
 
-export default function AmbientScribeWidget({ patientId, onDataParsed }: AmbientScribeWidgetProps) {
+export default function AmbientScribeWidget() {
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,7 +31,6 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
   const [liveTranscript, setLiveTranscript] = useState('');
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualText, setManualText] = useState('');
-  // Grammarly-style pinned widget: collapsed into a sleek floating button at bottom-right corner
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const recognitionRef = useRef<any>(null);
@@ -76,7 +65,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
   const startSpeechRecognition = () => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
-      setErrorMessage('Speech recognition is not supported in this browser. Please use Chrome, Edge, or paste consultation notes.');
+      setErrorMessage('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
       return false;
     }
 
@@ -150,38 +139,68 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
     }
   };
 
-  const processTranscript = async (transcriptText: string) => {
+  const injectTextIntoActiveElement = (transcriptText: string) => {
     if (!transcriptText.trim()) {
-      setErrorMessage('No consultation notes or speech detected. Please speak or enter notes manually.');
+      setErrorMessage('No speech detected.');
       return;
     }
 
     setIsProcessing(true);
     setErrorMessage(null);
-    try {
-      const response = await opdApi.parseScribeAudio({
-        transcript_or_audio: transcriptText.trim(),
-        patient_id: patientId,
-      });
 
-      if (response?.extracted_data) {
-        onDataParsed(response.extracted_data);
-        setLastParsedStatus('Clinical notes auto-filled from Ambient Scribe!');
-        setLiveTranscript('');
-        finalTranscriptRef.current = '';
-        setShowManualModal(false);
-        setManualText('');
-        setTimeout(() => setLastParsedStatus(null), 5000);
+    try {
+      const activeElement = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
+      
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        const start = activeElement.selectionStart || 0;
+        const end = activeElement.selectionEnd || 0;
+        const currentText = activeElement.value;
+        const prefix = currentText.slice(0, start);
+        const suffix = currentText.slice(end);
+        
+        // Add a space before if we're appending to existing text
+        const textToInsert = (prefix && !prefix.endsWith(' ') ? ' ' : '') + transcriptText.trim();
+        const newText = prefix + textToInsert + suffix;
+
+        // Use native setter to trigger React's onChange
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+
+        if (activeElement.tagName === 'INPUT' && nativeInputValueSetter) {
+          nativeInputValueSetter.call(activeElement, newText);
+        } else if (activeElement.tagName === 'TEXTAREA' && nativeTextAreaValueSetter) {
+          nativeTextAreaValueSetter.call(activeElement, newText);
+        } else {
+          activeElement.value = newText;
+        }
+
+        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        // Move cursor to the end of the inserted text
+        const newCursorPos = start + textToInsert.length;
+        activeElement.setSelectionRange(newCursorPos, newCursorPos);
+
+        setLastParsedStatus('Text inserted into active field.');
+      } else {
+        // Fallback: Copy to clipboard if no input is focused
+        navigator.clipboard.writeText(transcriptText.trim());
+        setLastParsedStatus('Copied to clipboard! (Focus a text field first to auto-insert)');
       }
+
+      setLiveTranscript('');
+      finalTranscriptRef.current = '';
+      setShowManualModal(false);
+      setManualText('');
+      setTimeout(() => setLastParsedStatus(null), 5000);
     } catch (err: any) {
-      console.error('Scribe error:', err);
-      setErrorMessage(err.message || 'Failed to parse consultation with AI Scribe.');
+      console.error('Insertion error:', err);
+      setErrorMessage(err.message || 'Failed to insert text.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleToggleRecord = async () => {
+  const handleToggleRecord = () => {
     if (!isRecording) {
       setErrorMessage(null);
       setLastParsedStatus(null);
@@ -193,13 +212,13 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
       setIsRecording(false);
       stopSpeechRecognition();
       const captured = finalTranscriptRef.current || liveTranscript;
-      await processTranscript(captured);
+      injectTextIntoActiveElement(captured);
     }
   };
 
-  const handleManualSubmit = async () => {
+  const handleManualSubmit = () => {
     if (!manualText.trim()) return;
-    await processTranscript(manualText);
+    injectTextIntoActiveElement(manualText);
   };
 
   const formatTimer = (s: number) => {
@@ -209,7 +228,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 max-w-lg select-none pointer-events-none">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2 max-w-lg select-none pointer-events-none">
       {/* Error Alert Bubble */}
       {errorMessage && (
         <div className="pointer-events-auto flex items-center gap-2 bg-amber-600 text-white text-xs font-semibold px-4 py-2.5 rounded-md shadow-xl animate-in fade-in slide-in-from-bottom-2">
@@ -251,20 +270,20 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 font-bold text-slate-900">
               <Edit3 className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
-              <span>Consultation Dictation &amp; Notes</span>
+              <span>Manual Dictation &amp; Notes</span>
             </div>
             <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-600">
               <X className="w-4 h-4" />
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
-            Paste or type doctor consultation notes, patient complaints, or vitals. The AI Scribe will extract clinical entities into the EMR form.
+            Paste or type text here. It will be inserted directly into whichever field you have focused, or copied to your clipboard.
           </p>
           <textarea
             rows={4}
             value={manualText}
             onChange={(e) => setManualText(e.target.value)}
-            placeholder="E.g.: Patient BP 130/85, pulse 78. Complains of irregular cycles and pelvic pain. Suspect PCOS. Order AMH, Day 2 LH/FSH."
+            placeholder="E.g.: Patient BP 130/85, pulse 78."
             className="w-full p-2.5 rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:ring-2 focus:ring-[rgb(var(--clr-primary))] focus:outline-none"
           />
           <div className="flex justify-end gap-2">
@@ -283,7 +302,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
               className="text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-md h-8 gap-1"
             >
               {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>Extract to EMR</span>
+              <span>Insert Text</span>
             </Button>
           </div>
         </div>
@@ -294,13 +313,14 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
         <div className="pointer-events-auto relative flex items-center">
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setIsCollapsed(false)}
             className={`flex items-center gap-2 px-3.5 py-2.5 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-md border cursor-pointer ${
               isRecording
                 ? 'bg-rose-600 text-white ring-4 ring-rose-300/60 animate-pulse border-rose-400'
                 : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white ring-2 ring-indigo-300/40 border-indigo-400 hover:shadow-indigo-500/30'
             }`}
-            title="Ambient AI Scribe (Pinned to screen - click to open)"
+            title="Global Dictation (Pinned to screen - click to open)"
           >
             {isRecording ? (
               <>
@@ -312,7 +332,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
               <>
                 <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
                 <Mic className="w-4 h-4" />
-                <span className="text-xs font-bold tracking-wide">AI Scribe</span>
+                <span className="text-xs font-bold tracking-wide">Dictate</span>
               </>
             )}
           </button>
@@ -320,6 +340,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
           {/* Direct quick action: Start/Stop toggle button right on the pinned pin */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleToggleRecord}
             disabled={isProcessing}
             className={`w-7 h-7 rounded-full flex items-center justify-center -ml-2 z-10 transition-colors shadow-md border ${
@@ -327,7 +348,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
                 ? 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
                 : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
             }`}
-            title={isRecording ? 'Stop & Parse Scribe' : 'Quick Start Recording'}
+            title={isRecording ? 'Stop & Insert Text' : 'Quick Start Dictation'}
           >
             {isProcessing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
@@ -353,11 +374,11 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
                 <span className="text-xs font-bold text-slate-800">
-                  {isRecording ? 'Listening Ambient Scribe...' : isProcessing ? 'AI Structuring Notes...' : 'Ambient AI Scribe'}
+                  {isRecording ? 'Listening...' : isProcessing ? 'Inserting Text...' : 'Global Dictation'}
                 </span>
               </div>
               <span className="text-[10px] text-slate-500 font-medium">
-                {isRecording ? `Recording: ${formatTimer(seconds)}` : isProcessing ? 'Extracting clinical schema...' : 'Live browser mic listen'}
+                {isRecording ? `Recording: ${formatTimer(seconds)}` : isProcessing ? 'Pasting to active field...' : 'Live browser mic listen'}
               </span>
             </div>
           </div>
@@ -385,6 +406,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
                 type="button"
                 variant="outline"
                 size="sm"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowManualModal(!showManualModal)}
                 title="Type or paste consultation notes"
                 className="h-9 w-9 p-0 rounded-md border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-[rgb(var(--clr-primary))]"
@@ -394,6 +416,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
             )}
 
             <Button
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleToggleRecord}
               disabled={isProcessing}
               size="sm"
@@ -406,17 +429,17 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
               {isProcessing ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                  <span>Structuring...</span>
+                  <span>Inserting...</span>
                 </>
               ) : isRecording ? (
                 <>
                   <MicOff className="w-3.5 h-3.5 mr-1" />
-                  <span>Stop &amp; Parse</span>
+                  <span>Stop &amp; Insert</span>
                 </>
               ) : (
                 <>
                   <Mic className="w-3.5 h-3.5 mr-1" />
-                  <span>Start Scribe</span>
+                  <span>Start Dictating</span>
                 </>
               )}
             </Button>
@@ -424,6 +447,7 @@ export default function AmbientScribeWidget({ patientId, onDataParsed }: Ambient
             {/* Minimize to pinned button */}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setIsCollapsed(true)}
               className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 transition-colors ml-1"
               title="Pin to bottom-right corner"
