@@ -105,8 +105,23 @@ export default function HrtFetProtocolSheet({
   // UI States
   const [showSetupDrawer, setShowSetupDrawer] = useState(true);
   const [showNotesDrawer, setShowNotesDrawer] = useState(false);
+  const [showCalendarPrint, setShowCalendarPrint] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // Medication Modal State
+  const [medModal, setMedModal] = useState<{
+    open: boolean;
+    cycleDay: number;
+    medication: string;
+    dose: string;
+    unit: string;
+    route: string;
+    frequency: string;
+    timing: string;
+    applyFromDay: number;
+    applyToDay: number;
+  } | null>(null);
 
   // Main Protocol Table Rows (Sheet 1: HRT FET Protocol)
   const [rows, setRows] = useState<HrtFetRowData[]>([]);
@@ -291,6 +306,183 @@ export default function HrtFetProtocolSheet({
     );
   };
 
+  // Open medication modal for a row
+  const openMedModal = (row: HrtFetRowData) => {
+    if (readonly) return;
+    setMedModal({
+      open: true,
+      cycleDay: row.cycle_day,
+      medication: row.medication,
+      dose: row.dose,
+      unit: row.unit,
+      route: row.route,
+      frequency: row.frequency,
+      timing: row.timing,
+      applyFromDay: row.cycle_day,
+      applyToDay: row.cycle_day,
+    });
+  };
+
+  // Apply medication modal changes to selected day range
+  const applyMedModal = () => {
+    if (!medModal) return;
+    const { medication, dose, unit, route, frequency, timing, applyFromDay, applyToDay } = medModal;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.cycle_day >= applyFromDay && r.cycle_day <= applyToDay) {
+          return { ...r, medication, dose, unit, route, frequency, timing };
+        }
+        return r;
+      })
+    );
+    setMedModal(null);
+  };
+
+  // Open a clean print window with clinic header — used for both Table and Calendar prints
+  const openPrintWindow = (title: string, bodyHtml: string) => {
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Please allow popups for printing.'); return; }
+    win.document.write(`<!DOCTYPE html>
+<html><head>
+<title>${title}</title>
+<meta charset="utf-8"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #111827; background: white; padding: 12mm; }
+  @page { size: A4 landscape; margin: 10mm; }
+  .clinic-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0B4F6C; padding-bottom: 8px; margin-bottom: 12px; }
+  .clinic-name { font-size: 15pt; font-weight: 800; color: #0B4F6C; }
+  .clinic-sub { font-size: 8pt; color: #6b7280; margin-top: 2px; }
+  .doc-title { font-size: 11pt; font-weight: 700; color: #1a6e8e; text-align: right; }
+  .doc-sub { font-size: 8pt; color: #6b7280; text-align: right; }
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  th { background: #0B4F6C; color: white; padding: 4pt 5pt; text-align: left; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+  td { padding: 3pt 5pt; border-bottom: 0.5pt solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .phase-badge { display: inline-block; padding: 1pt 4pt; border-radius: 3pt; font-size: 7pt; font-weight: 700; }
+  .et-row td { background: #fff0f0 !important; font-weight: 700; }
+  .p0-row td { background: #fffbeb !important; }
+  .e-day { display: inline-block; background: #ccfbf1; color: #065f46; padding: 1pt 4pt; border-radius: 3pt; font-size: 7pt; font-weight: 700; }
+  .footer { margin-top: 16px; padding-top: 8px; border-top: 1pt solid #d1d5db; display: flex; justify-content: space-between; font-size: 7.5pt; color: #6b7280; }
+  /* Calendar grid */
+  .week-block { margin-bottom: 10px; page-break-inside: avoid; }
+  .week-label { background: #0B4F6C; color: white; padding: 3pt 6pt; font-size: 8pt; font-weight: 800; border-radius: 3pt 3pt 0 0; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 0.5pt solid #d1d5db; }
+  .cal-day-header { background: #1a6e8e; color: white; text-align: center; padding: 4pt; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; border-right: 0.5pt solid #d1d5db; }
+  .cal-day-header:last-child { border-right: none; }
+  .cal-cell { min-height: 90pt; padding: 4pt; border-right: 0.5pt solid #e2e8f0; border-top: 0.5pt solid #e2e8f0; vertical-align: top; }
+  .cal-cell:last-child { border-right: none; }
+  .cal-date { font-weight: 800; font-size: 8pt; margin-bottom: 2pt; }
+  .cal-phase { font-size: 6.5pt; color: #6b7280; font-style: italic; margin-bottom: 2pt; }
+  .cal-scan { background: #ecfeff; border: 0.5pt solid #a5f3fc; padding: 1.5pt 3pt; border-radius: 2pt; font-size: 6.5pt; font-weight: 700; color: #0e7490; margin-bottom: 2pt; }
+  .cal-med { background: #e0f2fe; border: 0.5pt solid #bae6fd; padding: 1.5pt 3pt; border-radius: 2pt; font-size: 6.5pt; font-weight: 600; color: #0369a1; margin-bottom: 1.5pt; }
+  .cal-et { font-size: 7pt; font-weight: 800; color: #be123c; margin-top: 2pt; }
+  .cal-empty { background: #f9fafb; }
+  .cal-p0 { background: #fffbeb; }
+  .cal-transfer { background: #fff0f0; }
+</style>
+</head><body>
+<div class="clinic-header">
+  <div>
+    <div class="clinic-name">VaidyaMD Fertility &amp; ART Hospital</div>
+    <div class="clinic-sub">Centre for Reproductive Medicine &amp; Advanced IVF · Reg No: TS/MED/2024/09812</div>
+  </div>
+  <div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-sub">Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+  </div>
+</div>
+${bodyHtml}
+<div class="footer">
+  <span>VaidyaMD HMS · Confidential Clinical Document</span>
+  <span>Printed: ${new Date().toLocaleString('en-IN')}</span>
+  <span>Doctor Signature: ____________________</span>
+</div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
+  const handlePrintTable = () => {
+    const tableRows = rows.map((row) => {
+      const isET = row.embryo_stage && row.embryo_stage !== '';
+      const isP0 = row.phase?.includes('P0');
+      return `<tr class="${isET ? 'et-row' : isP0 ? 'p0-row' : ''}">
+        <td style="font-weight:800">${row.cycle_day}</td>
+        <td>${row.display_date}<br/><span style="color:#9ca3af;font-size:7pt">${row.day_of_week}</span></td>
+        <td>${row.estrogen_day ? `<span class="e-day">E${row.estrogen_day}</span>` : '—'}</td>
+        <td style="font-size:7.5pt">${row.phase}</td>
+        <td style="font-weight:700">${row.medication || '—'}</td>
+        <td>${row.dose || '—'}</td>
+        <td>${row.route || '—'} ${row.frequency ? `· ${row.frequency}` : ''}</td>
+        <td>${row.monitoring_criteria || '—'}</td>
+        <td style="font-weight:700;color:#0369a1">${row.result_value || '—'}</td>
+        <td>${row.embryo_stage || '—'}</td>
+        <td style="color:#6b7280;font-size:7pt">${row.notes || ''}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `
+<table>
+  <thead>
+    <tr>
+      <th>Day</th><th>Date</th><th>E-Day</th><th>Phase</th><th>Medication</th>
+      <th>Dose</th><th>Route / Freq</th><th>Monitoring</th><th>Result</th><th>Embryo Stage</th><th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>${tableRows}</tbody>
+</table>
+<p style="margin-top:8px;font-size:7.5pt;color:#6b7280;">P0 = Progesterone Start Day. ET = Embryo Transfer Day. E# = Estrogen Day Number.</p>`;
+
+    openPrintWindow('HRT FET Protocol — Day-by-Day Schedule', html);
+  };
+
+  const handlePrintCalendar = () => {
+    const DAYS_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const groupedWeeks: (HrtFetRowData | null)[][] = [];
+    let weekBuf: (HrtFetRowData | null)[] = [];
+    let firstRow = true;
+    rows.forEach((r) => {
+      const dow = r.day_of_week?.slice(0, 3) || 'Mon';
+      const dowIdx = DAYS_ORDER.indexOf(dow);
+      if (firstRow) {
+        for (let i = 0; i < (dowIdx < 0 ? 0 : dowIdx); i++) weekBuf.push(null);
+        firstRow = false;
+      }
+      weekBuf.push(r);
+      if (weekBuf.length === 7) { groupedWeeks.push([...weekBuf]); weekBuf = []; }
+    });
+    if (weekBuf.length > 0) {
+      while (weekBuf.length < 7) weekBuf.push(null);
+      groupedWeeks.push(weekBuf);
+    }
+
+    const weeksHtml = groupedWeeks.map((week, wi) => {
+      const cellsHtml = week.map((row) => {
+        if (!row) return `<div class="cal-cell cal-empty"></div>`;
+        const isP0 = row.phase?.includes('P0');
+        const isET = row.embryo_stage && row.embryo_stage !== '';
+        return `<div class="cal-cell ${isET ? 'cal-transfer' : isP0 ? 'cal-p0' : ''}">
+          <div class="cal-date">${row.display_date}${row.estrogen_day ? ` <span style="background:#ccfbf1;color:#065f46;padding:0 3pt;border-radius:2pt;font-size:6pt;font-weight:800">E${row.estrogen_day}</span>` : ''}</div>
+          ${row.phase ? `<div class="cal-phase">${row.phase}</div>` : ''}
+          ${row.monitoring_criteria ? `<div class="cal-scan">${row.monitoring_criteria}</div>` : ''}
+          ${row.result_value ? `<div style="font-size:7pt;font-weight:700;color:#4338ca">${row.result_value}</div>` : ''}
+          ${row.medication ? `<div class="cal-med">${row.medication}${row.dose ? ` — ${row.dose}` : ''}${row.frequency ? ` × ${row.frequency}` : ''}</div>` : ''}
+          ${row.embryo_stage ? `<div class="cal-et">🌸 ${row.embryo_stage}</div>` : ''}
+        </div>`;
+      }).join('');
+
+      const headerCells = DAYS_ORDER.map(d => `<div class="cal-day-header">${d}</div>`).join('');
+      return `<div class="week-block">
+        <div class="week-label">Week ${wi + 1}</div>
+        <div class="cal-grid">${headerCells}${cellsHtml}</div>
+      </div>`;
+    }).join('');
+
+    openPrintWindow('HRT FET Protocol — Weekly Treatment Calendar', weeksHtml);
+  };
+
   // Re-apply Template with updated setup parameters
   const handleApplySetup = () => {
     const updated = buildScheduleFromTemplate(bleedDate, plannedEstrogenDays, embryoStage, p0Time);
@@ -418,6 +610,318 @@ export default function HrtFetProtocolSheet({
 
   return (
     <div className="space-y-4">
+
+      {/* ── Medication Popup Modal ─────────────────────────── */}
+      {medModal?.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 print:hidden" onClick={() => setMedModal(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <Pill className="w-4 h-4 text-[#2F6F8F]" />
+                Medication Entry — Day {medModal.cycleDay}
+              </h3>
+              <button type="button" onClick={() => setMedModal(null)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Medication / Drug Name</label>
+                <input
+                  type="text"
+                  value={medModal.medication}
+                  onChange={(e) => setMedModal({ ...medModal, medication: e.target.value })}
+                  className="vmd-input text-xs w-full"
+                  placeholder="e.g. Estradiol Valerate (Progynova)"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Dose</label>
+                  <input
+                    type="text"
+                    value={medModal.dose}
+                    onChange={(e) => setMedModal({ ...medModal, dose: e.target.value })}
+                    className="vmd-input text-xs w-full"
+                    placeholder="e.g. 2 mg"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Unit</label>
+                  <select
+                    value={medModal.unit}
+                    onChange={(e) => setMedModal({ ...medModal, unit: e.target.value })}
+                    className="vmd-input text-xs w-full"
+                  >
+                    {['mg', 'IU', 'mcg', 'tab', 'cap', 'ml', 'ampoule'].map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Route</label>
+                  <select
+                    value={medModal.route}
+                    onChange={(e) => setMedModal({ ...medModal, route: e.target.value })}
+                    className="vmd-input text-xs w-full"
+                  >
+                    {['Oral', 'Vaginal (PV)', 'IM', 'SC', 'Topical', 'Sublingual'].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Frequency</label>
+                  <select
+                    value={medModal.frequency}
+                    onChange={(e) => setMedModal({ ...medModal, frequency: e.target.value })}
+                    className="vmd-input text-xs w-full"
+                  >
+                    {['OD', 'BD', 'TDS', 'QID', 'SOS', 'Stat', 'On alternate days'].map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Timing</label>
+                <input
+                  type="text"
+                  value={medModal.timing}
+                  onChange={(e) => setMedModal({ ...medModal, timing: e.target.value })}
+                  className="vmd-input text-xs w-full"
+                  placeholder="e.g. Morning & Afternoon & Night"
+                />
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 space-y-2">
+                <label className="text-[11px] font-bold text-[#2F6F8F] block">Apply to day range (batch fill):</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Day</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={rows.length}
+                    value={medModal.applyFromDay}
+                    onChange={(e) => setMedModal({ ...medModal, applyFromDay: Number(e.target.value) })}
+                    className="vmd-input text-xs w-16"
+                  />
+                  <span className="text-xs text-slate-400">to</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={rows.length}
+                    value={medModal.applyToDay}
+                    onChange={(e) => setMedModal({ ...medModal, applyToDay: Number(e.target.value) })}
+                    className="vmd-input text-xs w-16"
+                  />
+                  <div className="flex gap-1 ml-auto">
+                    {[
+                      { label: 'E1-E6', from: 1, to: 7 },
+                      { label: 'E7-P0', from: 7, to: Math.min(rows.length, plannedEstrogenDays + 1) },
+                      { label: 'All', from: 1, to: rows.length },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setMedModal({ ...medModal, applyFromDay: preset.from, applyToDay: preset.to })}
+                        className="text-[10px] px-1.5 py-0.5 bg-[#2F6F8F]/10 text-[#2F6F8F] font-bold rounded hover:bg-[#2F6F8F]/20"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setMedModal(null)}
+                className="flex-1 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyMedModal}
+                className="flex-1 py-2 rounded-lg bg-[#2F6F8F] text-white text-xs font-bold hover:bg-[#245a75] shadow-xs"
+              >
+                Apply to Days {medModal.applyFromDay}–{medModal.applyToDay}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Weekly Calendar Print View ──────────────────────── */}
+      {showCalendarPrint && (
+        <div className="fixed inset-0 z-40 bg-white overflow-y-auto print:static print:overflow-visible print:z-auto printable-document">
+          <div className="p-6 print:p-0 min-h-screen">
+            <div className="max-w-[297mm] mx-auto">
+              {/* Print Toolbar */}
+              <div className="flex items-center justify-between mb-4 print:hidden">
+                <h2 className="text-base font-bold text-slate-800">Weekly Treatment Calendar — Print Preview</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-4 py-2 bg-[#2F6F8F] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-[#245a75]"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Print Calendar
+                  </button>
+                  <button
+                    onClick={() => setShowCalendarPrint(false)}
+                    className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+              </div>
+
+              {/* Calendar Layout — by week (Mon-Sun) */}
+              {(() => {
+                const DAYS_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const dayMap: Record<string, HrtFetRowData[]> = {};
+                rows.forEach((r) => {
+                  const key = r.day_of_week?.slice(0, 3);
+                  if (!dayMap[key]) dayMap[key] = [];
+                  dayMap[key].push(r);
+                });
+
+                // Group rows into weeks of 7 days each (Mon → Sun)
+                const weeks: HrtFetRowData[][] = [];
+                let currentWeek: HrtFetRowData[] = [];
+                rows.forEach((r) => {
+                  currentWeek.push(r);
+                  if (currentWeek.length === 7 || r === rows[rows.length - 1]) {
+                    weeks.push([...currentWeek]);
+                    currentWeek = [];
+                  }
+                });
+
+                // Group into actual Mon-Sun weeks starting from any day
+                const groupedWeeks: (HrtFetRowData | null)[][] = [];
+                let weekBuf: (HrtFetRowData | null)[] = [];
+                let firstRow = true;
+                rows.forEach((r) => {
+                  const dow = r.day_of_week?.slice(0, 3) || 'Mon';
+                  const dowIdx = DAYS_ORDER.indexOf(dow);
+                  if (firstRow) {
+                    // Pad start of first week
+                    for (let i = 0; i < (dowIdx < 0 ? 0 : dowIdx); i++) weekBuf.push(null);
+                    firstRow = false;
+                  }
+                  weekBuf.push(r);
+                  if (weekBuf.length === 7) {
+                    groupedWeeks.push([...weekBuf]);
+                    weekBuf = [];
+                  }
+                });
+                if (weekBuf.length > 0) {
+                  while (weekBuf.length < 7) weekBuf.push(null);
+                  groupedWeeks.push(weekBuf);
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {groupedWeeks.map((week, wi) => (
+                      <div key={wi} className="page-break-avoid">
+                        {/* Week label */}
+                        <div
+                          className="text-[10px] font-bold text-white px-3 py-1.5 rounded-t-lg"
+                          style={{ background: '#2F6F8F' }}
+                        >
+                          Week {wi + 1}
+                        </div>
+                        <div className="grid grid-cols-7 border border-t-0 border-slate-300 rounded-b-lg overflow-hidden">
+                          {/* Header Row */}
+                          {DAYS_ORDER.map((d) => (
+                            <div
+                              key={d}
+                              className="text-center text-[10px] font-extrabold uppercase tracking-wider py-1.5 border-r last:border-r-0 border-slate-300"
+                              style={{ background: '#2F6F8F', color: 'white' }}
+                            >
+                              {d}
+                            </div>
+                          ))}
+                          {/* Day Cells */}
+                          {week.map((row, di) => (
+                            <div
+                              key={di}
+                              className="border-r last:border-r-0 border-t border-slate-200 p-1.5 min-h-[100px] text-[10px]"
+                              style={{
+                                background: row?.embryo_stage && row.embryo_stage.includes('ET')
+                                  ? '#fff0f0'
+                                  : row?.phase?.includes('P0')
+                                  ? '#fffbeb'
+                                  : row ? 'white' : '#f9fafb',
+                              }}
+                            >
+                              {row ? (
+                                <>
+                                  {/* Date + Day badge */}
+                                  <div className="font-extrabold text-slate-800 mb-1 leading-none">
+                                    {row.display_date}
+                                    {row.estrogen_day && (
+                                      <span className="ml-1 text-[9px] bg-teal-100 text-teal-800 px-1 py-0.5 rounded font-bold">
+                                        E{row.estrogen_day}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Phase */}
+                                  {row.phase && (
+                                    <div className="text-[9px] text-slate-500 italic mb-1 truncate">{row.phase}</div>
+                                  )}
+                                  {/* Scan / Monitoring */}
+                                  {row.monitoring_criteria && (
+                                    <div className="text-[9px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 rounded px-1 py-0.5 mb-1">
+                                      {row.monitoring_criteria}
+                                    </div>
+                                  )}
+                                  {/* Result */}
+                                  {row.result_value && (
+                                    <div className="text-[9px] text-indigo-700 font-semibold mb-1">
+                                      {row.result_value}
+                                    </div>
+                                  )}
+                                  {/* Medication pill */}
+                                  {row.medication && (
+                                    <div
+                                      className="text-[9px] font-semibold rounded px-1 py-0.5 mb-0.5 truncate"
+                                      style={{ background: '#e0f2fe', color: '#0369a1', border: '0.5px solid #bae6fd' }}
+                                    >
+                                      {row.medication}{row.dose ? ` — ${row.dose}` : ''}{row.frequency ? ` ✕ ${row.frequency}` : ''}
+                                    </div>
+                                  )}
+                                  {/* Embryo Stage */}
+                                  {row.embryo_stage && (
+                                    <div className="text-[9px] font-extrabold text-rose-700 mt-0.5">
+                                      🌸 {row.embryo_stage}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-slate-200">—</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header & Actions Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-[#2F6F8F] text-white rounded-xl p-4 shadow-sm print:hidden">
         <div className="flex items-center gap-3">
@@ -469,12 +973,22 @@ export default function HrtFetProtocolSheet({
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrintTable}
             className="px-3 py-1.5 rounded-lg bg-white/15 text-white hover:bg-white/25 border border-white/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
-            title="Print Clinical Protocol"
+            title="Print Clinical Protocol Table in a clean print window"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print</span>
+            <span>Print Table</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintCalendar}
+            className="px-3 py-1.5 rounded-lg bg-amber-400/80 text-slate-900 hover:bg-amber-400 border border-amber-300/40 text-xs font-bold flex items-center gap-1.5 transition-all"
+            title="Open Weekly Calendar in a clean print window"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Calendar Print</span>
           </button>
 
           {!readonly && (
@@ -851,17 +1365,24 @@ export default function HrtFetProtocolSheet({
                       </span>
                     </td>
 
-                    {/* Medication / Intervention */}
+                    {/* Medication / Intervention — Click to open popup */}
                     <td className="py-1.5 px-2 border-r border-slate-200">
                       {readonly ? (
                         <span className="font-semibold text-slate-800">{row.medication}</span>
                       ) : (
-                        <input
-                          type="text"
-                          value={row.medication}
-                          onChange={(e) => handleCellChange(row.cycle_day, 'medication', e.target.value)}
-                          className="w-full text-xs font-semibold text-slate-800 bg-transparent border-0 focus:ring-1 focus:ring-[#2F6F8F] rounded px-1.5 py-1 hover:bg-white"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => openMedModal(row)}
+                          className="w-full text-left text-xs font-semibold text-slate-800 bg-transparent hover:bg-[#2F6F8F]/5 border border-transparent hover:border-[#2F6F8F]/20 rounded px-1.5 py-1 transition-all group"
+                          title="Click to set medication details"
+                        >
+                          <span className="truncate block">{row.medication || <span className="text-slate-300 italic font-normal">Click to set...</span>}</span>
+                          {(row.dose || row.route) && (
+                            <span className="text-[9px] text-slate-400 font-normal mt-0.5 block group-hover:text-[#2F6F8F]">
+                              {[row.dose, row.route, row.frequency].filter(Boolean).join(' • ')}
+                            </span>
+                          )}
+                        </button>
                       )}
                     </td>
 

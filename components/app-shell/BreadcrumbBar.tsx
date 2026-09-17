@@ -36,6 +36,7 @@ const MODULE_LABELS: Record<string, string> = {
   '/dashboard/analytics':   'Analytics & Performance',
   '/dashboard':             'Dashboard',
   '/opd':                   'OPD Workbench',
+  '/counseling':            'Counselor Desk',
   '/patients':              'Patients & EMR',
   '/appointments':          'Appointments',
   '/cosgyn':                'Cosmetic Gynae',

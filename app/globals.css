@@ -182,31 +182,83 @@
 ──────────────────────────────────────────── */
 @media print {
   * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  @page landscape {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  .print-landscape {
+    page: landscape;
+  }
+
+  html, body {
     background: white !important;
     color: #111827 !important;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 11pt;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
   }
 
-  header, nav, aside, [data-sidebar], .no-print {
+  /* Completely remove navigation, sidebar, header, toolbars, and no-print wrappers from print */
+  header, nav, aside, [data-sidebar], .no-print, .print\:hidden {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  .printable-document {
+  /* Strict print isolation: hide all background UI components */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Unconstrain parents containing printable documents */
+  body > *:has(.printable-document),
+  div:has(> .printable-document),
+  div:has(.printable-document) {
     position: static !important;
-    max-width: 100% !important;
-    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Make only the designated printable document visible in standard flow */
+  .printable-document,
+  .printable-document * {
+    visibility: visible !important;
+  }
+
+  .printable-document {
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    border: none !important;
+    box-shadow: none !important;
     background: white !important;
     border-radius: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    page-break-inside: auto !important;
   }
 
   /* Print-specific table borders */
@@ -219,4 +271,5 @@
   /* Page break control */
   .page-break-before { page-break-before: always; }
   .page-break-avoid  { page-break-inside: avoid; }
+  tr { page-break-inside: avoid; }
 }

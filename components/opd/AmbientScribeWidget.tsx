@@ -228,7 +228,7 @@ export default function AmbientScribeWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2 max-w-lg select-none pointer-events-none">
+    <div className="fixed bottom-20 right-6 z-[100] flex flex-col items-end gap-2 max-w-lg select-none pointer-events-none">
       {/* Error Alert Bubble */}
       {errorMessage && (
         <div className="pointer-events-auto flex items-center gap-2 bg-amber-600 text-white text-xs font-semibold px-4 py-2.5 rounded-md shadow-xl animate-in fade-in slide-in-from-bottom-2">

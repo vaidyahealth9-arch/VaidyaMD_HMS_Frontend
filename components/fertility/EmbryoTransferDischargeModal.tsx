@@ -58,24 +58,24 @@ export default function EmbryoTransferDischargeModal({
     existingSummary.blood_on_catheter || 'None (Clean Catheter)'
   );
   const [retainedEmbryoChecked, setRetainedEmbryoChecked] = useState(
-    existingSummary.retained_embryo_checked !== undefined ? existingSummary.retained_embryo_checked : true
+    existingSummary.retained_embryo_checked !== undefined ? existingSummary.retained_embryo_checked : false
   );
-  const [embryosTransferredCount, setEmbryosTransferredCount] = useState(
-    existingSummary.embryos_transferred_count || 1
+  const [embryosTransferredCount, setEmbryosTransferredCount] = useState<number | string>(
+    existingSummary.embryos_transferred_count !== undefined ? existingSummary.embryos_transferred_count : ''
   );
   const [embryoStage, setEmbryoStage] = useState(
-    existingSummary.embryo_stage || 'Day 5 Blastocyst'
+    existingSummary.embryo_stage || cycle?.sentinel_dates?.embryo_stage || 'Day 5 Blastocyst'
   );
   const [embryoGrades, setEmbryoGrades] = useState(
-    existingSummary.embryo_grades?.join(', ') || '4AA'
+    existingSummary.embryo_grades?.join(', ') || ''
   );
 
   // Attending Staff & Witness
   const [attendingDoctorName, setAttendingDoctorName] = useState(
-    existingSummary.attending_doctor_name || 'Dr. Sneha Verma, MS (OBG), DRM'
+    existingSummary.attending_doctor_name || cycle?.doctor_name || cycle?.treating_doctor_name || ''
   );
   const [witnessEmbryologistName, setWitnessEmbryologistName] = useState(
-    existingSummary.witness_embryologist_name || 'Senior Embryologist'
+    existingSummary.witness_embryologist_name || ''
   );
 
   // Luteal Phase Support Prescriptions
@@ -91,15 +91,12 @@ export default function EmbryoTransferDischargeModal({
   );
 
   // Follow-up Timer (Beta-hCG)
-  const defaultBetaDate = new Date(new Date(transferDate).getTime() + 14 * 86400000)
-    .toISOString()
-    .split('T')[0];
+  const defaultBetaDate = cycle?.sentinel_dates?.beta_hcg_date || (transferDate ? new Date(new Date(transferDate).getTime() + 14 * 86400000).toISOString().split('T')[0] : '');
   const [betaHcgDueDate, setBetaHcgDueDate] = useState(
     existingSummary.beta_hcg_due_date || defaultBetaDate
   );
   const [dischargeNotes, setDischargeNotes] = useState(
-    existingSummary.discharge_notes ||
-      'Embryo transfer performed under transabdominal ultrasound guidance. Embryo placed 1.5cm from fundus smoothly. No retained embryos found in catheter on stereomicroscopic flush. Patient rested for 30 minutes.'
+    existingSummary.discharge_notes || ''
   );
 
   const handleSave = async () => {

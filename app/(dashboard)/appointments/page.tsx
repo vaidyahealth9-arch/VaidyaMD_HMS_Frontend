@@ -185,6 +185,7 @@ export default function AppointmentsPage() {
       scheduled_at: defaultTime,
       visit_type: 'consultation',
       status: 'scheduled',
+      consultation_fee: 500,
       notes: '',
     };
   };
@@ -1137,6 +1138,26 @@ export default function AppointmentsPage() {
                     💡 <strong className="text-slate-700">Prep tip:</strong> {currentVisitType.prepTip}
                   </p>
                 )}
+              </div>
+
+              {/* Consultation Fee */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Consultation Fee (₹)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Auto-queues bill in finance</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={bookForm.consultation_fee ?? 500}
+                    onChange={(e) => setBookForm({ ...bookForm, consultation_fee: Number(e.target.value) })}
+                    placeholder="500"
+                    className="vmd-input text-xs py-2 pl-7 font-bold text-slate-800"
+                  />
+                </div>
               </div>
 
               {/* 5. Clinical Notes & SMS toggle */}

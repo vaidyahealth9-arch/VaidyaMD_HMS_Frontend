@@ -46,56 +46,50 @@ export default function MasterEmbryologyRecordModal({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Doctors & Clinical Staff
-  const [consultantDoctor, setConsultantDoctor] = useState('Dr. Sneha Verma, MS (OBG), DRM');
-  const [embryologist1, setEmbryologist1] = useState('Senior Embryologist');
-  const [embryologist2, setEmbryologist2] = useState('Second Witness Embryologist');
-  const [gynaecologist1, setGynaecologist1] = useState('Dr. Sneha Verma');
-  const [gynaecologist2, setGynaecologist2] = useState('Dr. Operating Registrar');
+  const [consultantDoctor, setConsultantDoctor] = useState(cycle?.doctor_name || cycle?.treating_doctor_name || '');
+  const [embryologist1, setEmbryologist1] = useState('');
+  const [embryologist2, setEmbryologist2] = useState('');
+  const [gynaecologist1, setGynaecologist1] = useState(cycle?.doctor_name || cycle?.treating_doctor_name || '');
+  const [gynaecologist2, setGynaecologist2] = useState('');
 
   // ART Factors
-  const [reasonForArt, setReasonForArt] = useState('Primary Infertility / Male + Ovarian Factor');
-  const [femaleFactor, setFemaleFactor] = useState('Diminished Ovarian Reserve (AMH 1.1 ng/mL)');
-  const [maleFactor, setMaleFactor] = useState('Oligoasthenozoospermia (Concentration 8 M/mL)');
-  const [stimulationProtocol, setStimulationProtocol] = useState(cycle?.protocol_type || 'Flexible Antagonist Protocol');
-  const [dateOfStimulation, setDateOfStimulation] = useState(cycle?.start_date || '2025-01-12');
-  const [e2OnHcg, setE2OnHcg] = useState('2450 pg/mL');
-  const [eggCollectionDate, setEggCollectionDate] = useState('2025-01-25');
-  const [eggCollectionTime, setEggCollectionTime] = useState('09:15');
+  const [reasonForArt, setReasonForArt] = useState(cycle?.indication || '');
+  const [femaleFactor, setFemaleFactor] = useState(cycle?.female_factors?.join(', ') || '');
+  const [maleFactor, setMaleFactor] = useState(cycle?.male_factors?.join(', ') || '');
+  const [stimulationProtocol, setStimulationProtocol] = useState(cycle?.protocol_name || cycle?.protocol_type || cycle?.treatment_type || '');
+  const [dateOfStimulation, setDateOfStimulation] = useState(cycle?.sentinel_dates?.stim_start || cycle?.start_date || '');
+  const [e2OnHcg, setE2OnHcg] = useState('');
+  const [eggCollectionDate, setEggCollectionDate] = useState(cycle?.sentinel_dates?.opu || '');
+  const [eggCollectionTime, setEggCollectionTime] = useState('');
 
   // Oocyte & Fertilization Metrics
-  const [noOfOocytes, setNoOfOocytes] = useState('12');
-  const [oocyteQuality, setOocyteQuality] = useState('10 MII mature oocytes, good cytoplasmic clarity, intact polar body');
-  const [spermParameters, setSpermParameters] = useState('Fresh ejaculate, DGC processed, post-wash conc 18M/mL, motility 85% PR');
-  const [oocytesInjected, setOocytesInjected] = useState('10');
-  const [oocytesFertilized, setOocytesFertilized] = useState('8');
+  const [noOfOocytes, setNoOfOocytes] = useState('');
+  const [oocyteQuality, setOocyteQuality] = useState('');
+  const [spermParameters, setSpermParameters] = useState('');
+  const [oocytesInjected, setOocytesInjected] = useState('');
+  const [oocytesFertilized, setOocytesFertilized] = useState('');
 
   // Embryo Transfer Details
-  const [dateDayTransfer, setDateDayTransfer] = useState('Day 5 Blastocyst Transfer (2025-01-30)');
-  const [embryosTransferred, setEmbryosTransferred] = useState('1');
-  const [qualityEmbryosTransferred, setQualityEmbryosTransferred] = useState('Grade 4AA Expanded Blastocyst');
-  const [transferComments, setTransferComments] = useState('Smooth ultrasound-guided transfer. Clean catheter tip, zero retained embryos.');
-  const [embryosFrozen, setEmbryosFrozen] = useState('4');
-  const [embryosDiscarded, setEmbryosDiscarded] = useState('3');
+  const [dateDayTransfer, setDateDayTransfer] = useState(cycle?.sentinel_dates?.et || '');
+  const [embryosTransferred, setEmbryosTransferred] = useState('');
+  const [qualityEmbryosTransferred, setQualityEmbryosTransferred] = useState('');
+  const [transferComments, setTransferComments] = useState('');
+  const [embryosFrozen, setEmbryosFrozen] = useState('');
+  const [embryosDiscarded, setEmbryosDiscarded] = useState('');
 
   // Vitrification & Cryo Leaf
-  const [freezingDoneOn, setFreezingDoneOn] = useState('2025-01-30');
-  const [noOfCryoleafs, setNoOfCryoleafs] = useState('2');
-  const [vitrificationExpiry, setVitrificationExpiry] = useState('2026-01-30');
-  const [laserHatching, setLaserHatching] = useState('Yes');
-  const [procedureDone, setProcedureDone] = useState('ICSI');
-  const [renewalBefore, setRenewalBefore] = useState('2026-01-15');
+  const [freezingDoneOn, setFreezingDoneOn] = useState('');
+  const [noOfCryoleafs, setNoOfCryoleafs] = useState('');
+  const [vitrificationExpiry, setVitrificationExpiry] = useState('');
+  const [laserHatching, setLaserHatching] = useState('No');
+  const [procedureDone, setProcedureDone] = useState(cycle?.treatment_type || 'ICSI');
+  const [renewalBefore, setRenewalBefore] = useState('');
   const [disclaimer, setDisclaimer] = useState(
     'If you fail to communicate regarding extension of freezing, your embryos will be managed as per the statutory guidelines of the ART (Regulation) Act 2021, and clinic disposal protocol.'
   );
 
   // Embryo Images
-  const [images, setImages] = useState<ImageUploadRow[]>([
-    {
-      id: '1',
-      previewUrl: '',
-      description: 'Day 5 Blastocyst Grade 4AA — Prominent ICM and cohesive trophectoderm',
-    },
-  ]);
+  const [images, setImages] = useState<ImageUploadRow[]>([]);
 
   const addImageRow = () => {
     setImages([

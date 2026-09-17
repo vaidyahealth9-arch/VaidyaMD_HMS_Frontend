@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { patientsApi, opdApi, appointmentsApi } from '@/lib/api';
+import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Stethoscope,
@@ -27,6 +27,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Trash2,
+  SlidersHorizontal,
+  HeartHandshake,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -34,10 +37,81 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
 import { Badge } from '@/shared/ui/badge';
 import SmartOrderDialog from './SmartOrderDialog';
+import TemplateManagementDialog, { ClinicalTemplateItem, RxTemplateItem } from './TemplateManagementDialog';
 import PrintablePrescription from '@/components/common/PrintablePrescription';
+import EditAlertsModal from '@/components/patients/EditAlertsModal';
+import { toast } from '@/contexts/ToastContext';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
 
 const CLINICAL_TEMPLATES = [
+  {
+    id: 'infertility_comprehensive_history',
+    name: '★ Infertility Couple Comprehensive History (Male & Female Proforma)',
+    complaint: 'Duration of Infertility: ___ yrs (Primary / Secondary). Marriage duration: ___ yrs. Coital frequency: ___/week.',
+    hopi: `[FEMALE PARTNER HISTORY]
+- Menstrual: Menarche at ___ yrs, Cycle: ___ days (Regular/Irregular), Duration: ___ days, Flow: (Normal/Scanty/Heavy), Dysmenorrhea: (None/Mild/Moderate/Severe), LMP: ___, PMP: ___
+- Obstetric: Gravida ___, Para ___, Living ___, Abortions ___, Ectopic ___
+- Sexual: Dyspareunia: (None/Superficial/Deep), Coital difficulty: ___
+- Medical: PID / STIs: (No/Yes), Genital TB: (No/Yes), Thyroid: ___, Diabetes: ___, PCOS/Hirsutism: ___
+- Surgical: Pelvic/Abdominal: ___, Tubal surgery: ___, Cystectomy: ___, Myomectomy: ___
+- Family: Infertility: ___, Early Menopause: ___, Consanguinity: ___
+- Lifestyle: Smoking: ___, Alcohol: ___, Stress level: ___, Weight changes: ___
+- Previous Workup & Treatment: Prior OI: ___, IUI: ___, IVF/ICSI: ___, Outcomes: ___
+
+[MALE PARTNER HISTORY]
+- Sexual: Libido: (Normal/Reduced), Erectile function: ___, Ejaculatory function: (Normal/PE/Delayed/Retrograde)
+- Medical: Mumps/Orchitis: ___, Cryptorchidism: ___, Testicular trauma: ___, Recent high fever (last 3 mos): ___
+- Surgical: Orchidopexy: ___, Hernia: ___, Varicocele surgery: ___, Vasectomy: ___
+- Occupational/Lifestyle: Heat exposure: ___, Sitting > 6hrs: ___, Smoking: ___, Alcohol: ___, Steroids: ___
+- Previous Semen Analysis: Volume: ___ ml, Count: ___ M/ml, Motility: ___ %, Morphology: ___ %
+
+[CLINICAL EXAMINATION]
+- Female: General/BMI: ___, Thyroid: ___, Breast: ___. P/A: Soft, non-tender, no mass. P/S: Cervix (Healthy/Erosion/Discharge), Os closed. P/V: Uterus (AV/RV, Normal size/Bulky, Mobile, Non-tender), Adnexa: Free bilaterally.
+- Male: General/BMI: ___, Secondary sexual characteristics: Normal. Local Genital: Both testes descended, volume R: ___ ml, L: ___ ml, consistency: Normal, Vas deferens palpable bilaterally, Varicocele: (None / Grade I-III).`,
+    diagnosis: 'Primary / Secondary Subfertility - Combined Couple Factor Evaluation',
+    investigations: `1. Transvaginal Ultrasound (Baseline Pelvic TVS - AFC, Endometrial Pattern)
+2. Female Hormonal Profile: Serum AMH, Day 2/3 FSH, LH, Estradiol (E2), TSH, Serum Prolactin
+3. Male Partner: Semen Analysis (WHO 6th Edition) + CASA Semen Analysis + Sperm DFI
+4. Couple Viral Screening: HIV I & II, HBsAg, HCV, VDRL
+5. Tubal Patency: HSG / HyCoSy / Diagnostic Hysterolaparoscopy`,
+    plan: `1. Tab Folic Acid + L-Methylfolate 5mg OD
+2. Male partner antioxidant supplementation: CoQ10 100mg BD + Zinc/L-Carnitine OD
+3. Schedule Day 2 Pelvic TVS for AFC evaluation
+4. Male partner semen analysis after 3 days of abstinence
+5. Review with all reports for individualized treatment protocol (OI / IUI / IVF-ICSI)`,
+  },
+  {
+    id: 'general_gynaecology_history',
+    name: '★ General Gynaecology Clinical History & Examination',
+    complaint: 'Chief Complaint: ____________ (Duration: ____). Associated Symptoms: ________________',
+    hopi: `[MENSTRUAL HISTORY]
+- Menarche: ___ yrs | Cycle length & regularity: ___ days (Regular/Irregular) | Duration: ___ days | Amount: ___ pads/day (clots: +/-)
+- Dysmenorrhea: (None / Mild / Moderate / Severe) | LMP: _________ | PMP: _________
+- Abnormal Bleeding: Intermenstrual / Postcoital / Postmenopausal bleeding: (None / Present)
+
+[OBSTETRIC & CONTRACEPTION]
+- Obstetric: G__ P__ L__ A__ | Mode of deliveries: Normal / LSCS | Complications: None
+- Contraception: Current method: _________ (Duration: ____) | Past methods: _________
+
+[PAST MEDICAL & SURGICAL]
+- Medical: Diabetes / Hypertension / Thyroid / Asthma / Cardiac disease: None
+- Surgical: Previous pelvic or abdominal surgeries: None | Drug Allergies: NKDA
+
+[CLINICAL EXAMINATION]
+- General: Vitals stable, Pallor (-), Edema (-), Thyroid: Normal, Breast exam: Normal
+- Abdomen: Soft, non-tender, no palpable organomegaly or mass
+- Per Speculum (P/S): Vulva/vagina healthy, Cervix: (Healthy / Erosion / Hypertrophied / Discharge), Pap smear taken: (Yes/No)
+- Per Vaginal (P/V): Uterus (AV/RV, Normal size / Enlarged, Mobile, Non-tender), Fornices: Free & non-tender, Adnexa: Clear bilaterally`,
+    diagnosis: 'Gynaecological Clinical Review under evaluation',
+    investigations: `1. Pelvic Ultrasound (USG Abdomen & Pelvis / TVS)
+2. Complete Blood Picture (CBP) + Hemoglobin
+3. Pap Smear / Cervical Cytology
+4. Urine Routine & Microscopy
+5. Thyroid Stimulating Hormone (TSH)`,
+    plan: `1. Symptomatic medical management
+2. Lifestyle, diet, and menstrual hygiene counseling
+3. Review in OPD with ultrasound and lab reports`,
+  },
   {
     id: 'infertility_workup',
     name: 'Fertility Evaluation & Workup',
@@ -85,14 +159,182 @@ const CLINICAL_TEMPLATES = [
   },
 ];
 
+interface RxTemplate {
+  id: string;
+  name: string;
+  category: string;
+  medications: Array<{
+    drug_name: string;
+    dose: string;
+    frequency: string;
+    duration?: string;
+    instructions: string;
+  }>;
+  advice?: string;
+}
+
+const COMMON_INVESTIGATION_OPTIONS = [
+  'Pelvic TVS Scan',
+  'Serum AMH',
+  'Day 2/3 FSH & LH',
+  'Serum Estradiol (E2)',
+  'Serum Progesterone (P4)',
+  'Serum Prolactin',
+  'Thyroid (TSH)',
+  'Semen Analysis (WHO 6th)',
+  'CASA Semen Analysis',
+  'Sperm DFI',
+  'Viral Markers (HIV, HBsAg, HCV)',
+  'Complete Blood Picture (CBP)',
+  'Blood Group & Rh',
+  'HbA1c',
+  'Tubal Patency (HSG)',
+  'Diagnostic Hysteroscopy',
+  'Karyotyping (Couple)',
+];
+
+const RX_TEMPLATES: RxTemplate[] = [
+  {
+    id: 'antagonist_stimulation_rx',
+    name: 'Antagonist Protocol Daily Stimulation Rx',
+    category: 'IVF Stimulation',
+    medications: [
+      { drug_name: 'Inj Recombinant FSH (Follisurge / Gonal-F) 225 IU', dose: '225 IU', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous injection daily at 8:00 PM (Days 2 to 6)' },
+      { drug_name: 'Inj HMG (Menopur) 75 IU', dose: '75 IU', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous / IM injection daily at 8:00 PM (From Day 6 onward)' },
+      { drug_name: 'Inj GnRH Antagonist (Cetrotide / Orgalutran) 0.25mg', dose: '0.25mg', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous injection daily at 8:00 AM (From Day 6 until trigger)' },
+      { drug_name: 'Tab Folic Acid + L-Methylfolate 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
+    ],
+    advice: 'Report on Day 6 for TVS follicular tracking scan and Serum E2/P4 levels. Maintain adequate hydration (>2.5 L/day).',
+  },
+  {
+    id: 'ppos_protocol_rx',
+    name: 'PPOS Protocol (Progestin-Primed Ovarian Stimulation)',
+    category: 'IVF Stimulation',
+    medications: [
+      { drug_name: 'Inj Recombinant FSH (Follisurge) 225 IU', dose: '225 IU', frequency: 'OD', duration: '9-10 days', instructions: 'SC daily at 8:00 PM from Day 2 until trigger' },
+      { drug_name: 'Tab Medroxyprogesterone Acetate (MPA) 10mg', dose: '10mg', frequency: 'OD', duration: '9-10 days', instructions: 'Oral once daily with meals starting Day 2 until trigger day' },
+      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
+    ],
+    advice: 'Serial follicular scans starting Day 6. Freeze-all cycle planned; embryo transfer in subsequent HRT cycle.',
+  },
+  {
+    id: 'agonist_downreg_rx',
+    name: 'Agonist Downregulation Protocol (Long / Flare)',
+    category: 'IVF Stimulation',
+    medications: [
+      { drug_name: 'Inj Leuprolide Acetate (Lupride) 0.5mg', dose: '0.5mg', frequency: 'OD', duration: '14 days', instructions: 'SC daily from Day 21 of previous cycle until menses' },
+      { drug_name: 'Inj Recombinant FSH (Follisurge) 225 IU', dose: '225 IU', frequency: 'OD', duration: '10 days', instructions: 'SC daily after pituitary downregulation confirmed (Lupride reduced to 0.25mg)' },
+      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
+    ],
+    advice: 'Baseline scan on Day 2 to confirm endometrial thinning (< 4mm) and absence of ovarian cysts before starting gonadotropins.',
+  },
+  {
+    id: 'post_fet_luteal_support',
+    name: 'Post-FET Comprehensive Luteal Phase Support',
+    category: 'FET Luteal Support',
+    medications: [
+      { drug_name: 'Cap Micronized Progesterone (Susten) 400mg', dose: '400mg', frequency: 'BD', duration: '15 days', instructions: 'Vaginal insertion twice daily (morning & bedtime)' },
+      { drug_name: 'Tab Dydrogesterone (Duphaston) 10mg', dose: '1 tab', frequency: 'BD', duration: '15 days', instructions: 'Oral twice daily after meals' },
+      { drug_name: 'Tab Estradiol Valerate (Progynova) 2mg', dose: '2mg', frequency: 'BD', duration: '15 days', instructions: 'Oral twice daily after meals' },
+      { drug_name: 'Inj Enoxaparin (Clexane) 40mg', dose: '40mg', frequency: 'OD', duration: '15 days', instructions: 'Subcutaneous injection once daily post-dinner' },
+      { drug_name: 'Tab Aspirin (Ecosprin) 75mg', dose: '1 tab', frequency: 'OD', duration: '15 days', instructions: 'Oral once daily after lunch' },
+      { drug_name: 'Tab Methylfolate + B-Complex', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Oral once daily morning' },
+    ],
+    advice: 'Strict adherence to medications. Serum Beta-hCG blood test on Day 14 post-embryo transfer. Contact clinic immediately if vaginal bleeding occurs.',
+  },
+  {
+    id: 'ovulation_induction',
+    name: 'Ovulation Induction (Letrozole + Folic Acid)',
+    category: 'Stimulation / OI',
+    medications: [
+      { drug_name: 'Tab Letrozole 2.5mg', dose: '1 tab', frequency: 'OD', duration: '5 days', instructions: 'Day 2 to Day 6 of cycle at bedtime (5 days)' },
+      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast for 30 days' },
+      { drug_name: 'Inj HMG / Menopur 75 IU', dose: '75 IU', frequency: 'OD', duration: '3 doses', instructions: 'IM/SC on Day 6, Day 8, and Day 10 (as advised)' },
+    ],
+    advice: 'Report on Day 9/10 of cycle for TVS follicular monitoring scan. Maintain adequate hydration.',
+  },
+  {
+    id: 'pcos_metabolic',
+    name: 'PCOS Metabolic & Insulin Sensitization',
+    category: 'PCOS Protocol',
+    medications: [
+      { drug_name: 'Tab Myo-Inositol + D-Chiro-Inositol 2000mg', dose: '1 tab', frequency: 'BD', duration: '60 days', instructions: 'Twice daily with water for 60 days' },
+      { drug_name: 'Tab Metformin 500mg SR', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Post-dinner at night for 30 days' },
+      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning post-breakfast for 30 days' },
+      { drug_name: 'Cap Vitamin D3 60,000 IU', dose: '1 cap', frequency: 'OD', duration: '8 weeks', instructions: 'Once weekly on Sundays for 8 weeks' },
+    ],
+    advice: 'Low carbohydrate, low-GI diet with 45 minutes of brisk walking daily. Avoid refined sugars and dairy excess.',
+  },
+  {
+    id: 'luteal_support',
+    name: 'Luteal Phase Support (IUI / Natural)',
+    category: 'Luteal Support',
+    medications: [
+      { drug_name: 'Tab Dydrogesterone 10mg', dose: '1 tab', frequency: 'BD', duration: '14 days', instructions: 'Twice daily after meals for 14 days' },
+      { drug_name: 'Cap Micronized Progesterone 400mg', dose: '400mg', frequency: 'OD', duration: '14 days', instructions: 'Vaginal insertion at bedtime for 14 days' },
+      { drug_name: 'Tab Aspirin (Ecosprin) 75mg', dose: '1 tab', frequency: 'OD', duration: '14 days', instructions: 'Once daily after lunch for 14 days' },
+    ],
+    advice: 'Avoid strenuous physical activity. Take Serum Beta-hCG blood test on Day 14 post-IUI/ovulation.',
+  },
+  {
+    id: 'opu_recovery',
+    name: 'OPU Post-Egg Retrieval Recovery',
+    category: 'Post-OPU / Daycare',
+    medications: [
+      { drug_name: 'Tab Cabergoline 0.5mg', dose: '1 tab', frequency: 'OD', duration: '8 days', instructions: 'At bedtime for 8 days to prevent OHSS' },
+      { drug_name: 'Tab Cefuroxime 500mg', dose: '1 tab', frequency: 'BD', duration: '5 days', instructions: 'Twice daily after food for 5 days' },
+      { drug_name: 'Tab Paracetamol 650mg', dose: '1 tab', frequency: 'SOS', duration: '3 days', instructions: 'As needed for lower abdominal cramping (max 3/day)' },
+      { drug_name: 'Syp Lactulose 15ml', dose: '15 ml', frequency: 'OD', duration: '3 days', instructions: 'At bedtime for bowel regulation (3 days)' },
+    ],
+    advice: 'High-protein diet (egg whites, paneer, protein shake) and electrolyte-rich fluids (coconut water, ORS) > 3L/day.',
+  },
+  {
+    id: 'fet_prep',
+    name: 'FET Endometrial Preparation (HRT Protocol)',
+    category: 'FET Protocol',
+    medications: [
+      { drug_name: 'Tab Estradiol Valerate 2mg (Progynova)', dose: '2mg', frequency: 'BD', duration: '14 days', instructions: 'Day 2 to Day 7: 2mg BD; Day 8 onward: 2mg TDS' },
+      { drug_name: 'Tab Aspirin 75mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Once daily post-lunch for 30 days' },
+      { drug_name: 'Tab Folic Acid + L-Methylfolate', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast for 30 days' },
+      { drug_name: 'Inj Enoxaparin / Clexane 40mg', dose: '40mg', frequency: 'OD', duration: '14 days', instructions: 'Subcutaneous injection as advised by physician' },
+    ],
+    advice: 'TVS scan on Day 10 to evaluate endometrial thickness (> 8mm trilaminar pattern required before progesterone start).',
+  },
+  {
+    id: 'male_factor',
+    name: 'Male Subfertility & Antioxidant Booster',
+    category: 'Andrology / Male',
+    medications: [
+      { drug_name: 'Tab Coenzyme Q10 + L-Carnitine 100mg', dose: '1 tab', frequency: 'BD', duration: '90 days', instructions: 'Twice daily after meals for 90 days' },
+      { drug_name: 'Tab Zinc + Vitamin C + Selenium + Lycopene', dose: '1 tab', frequency: 'OD', duration: '90 days', instructions: 'Once daily post-lunch for 90 days' },
+      { drug_name: 'Tab Clomiphene Citrate 25mg', dose: '25mg', frequency: 'OD', duration: '60 days', instructions: 'Alternate days on Mon/Wed/Fri for 60 days' },
+    ],
+    advice: 'Avoid tight clothing, hot tubs, and laptop on lap. Repeat Semen Analysis (WHO 6th Ed) with CASA after 90 days.',
+  },
+];
+
 export default function OPDWorkbench({ patientId, triageData, appointment, onBack }: { patientId?: string; triageData?: any; appointment?: any; onBack?: () => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const selectedPatientId = patientId || '';
   const [smartOrderOpen, setSmartOrderOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateDialogTab, setTemplateDialogTab] = useState<'clinical' | 'rx'>('clinical');
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any>(null);
   const [printablePrescription, setPrintablePrescription] = useState<any>(null);
+  const [activeConsultationRecordId, setActiveConsultationRecordId] = useState<string | null>(null);
+  const [showEditAlertsModal, setShowEditAlertsModal] = useState(false);
+  const [localAlerts, setLocalAlerts] = useState<string[] | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'consultations' | 'counseling'>('consultations');
+  const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
+
+  // Fetch Counselor Notes for selected patient
+  const { data: counselingNotes = [] } = useQuery<CounselingNote[]>({
+    queryKey: ['counseling-notes', selectedPatientId],
+    queryFn: () => counselingApi.listNotes({ patient_id: selectedPatientId }),
+    enabled: !!selectedPatientId,
+  });
 
   // Workbench Mode: Doctor Consultation vs Nurse Triage View
   const [workbenchMode, setWorkbenchMode] = useState<'doctor' | 'nurse'>(user?.role === 'nurse' ? 'nurse' : 'doctor');
@@ -103,12 +345,74 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   const [isHistorySectionExpanded, setIsHistorySectionExpanded] = useState(true);
   const [isPlanSectionExpanded, setIsPlanSectionExpanded] = useState(true);
 
+  // Reset local alerts when patient changes
+  useEffect(() => {
+    setLocalAlerts(null);
+  }, [selectedPatientId]);
+
   // Fetch Selected Patient Details
   const { data: patient } = useQuery({
     queryKey: ['patient', selectedPatientId],
     queryFn: () => patientsApi.get(selectedPatientId),
     enabled: !!selectedPatientId,
   });
+
+  const activeAlerts = localAlerts !== null ? localAlerts : (patient?.alert_notes || []);
+
+  // Fetch custom templates from backend
+  const { data: customClinicalData = [], refetch: refetchClinicalTemplates } = useQuery({
+    queryKey: ['custom-clinical-templates'],
+    queryFn: async () => {
+      try {
+        const res = await opdApi.getTemplates('clinical_template');
+        if (Array.isArray(res)) {
+          return res.map((t: any) => ({
+            id: t.id,
+            name: t.title,
+            isCustom: true,
+            complaint: t.schema_json?.complaint || '',
+            hopi: t.schema_json?.hopi || '',
+            diagnosis: t.schema_json?.diagnosis || '',
+            investigations: t.schema_json?.investigations || '',
+            plan: t.schema_json?.plan || '',
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load custom clinical templates', err);
+      }
+      return [];
+    },
+  });
+
+  const { data: customRxData = [], refetch: refetchRxTemplates } = useQuery({
+    queryKey: ['custom-rx-templates'],
+    queryFn: async () => {
+      try {
+        const res = await opdApi.getTemplates('rx_template');
+        if (Array.isArray(res)) {
+          return res.map((t: any) => ({
+            id: t.id,
+            name: t.title,
+            isCustom: true,
+            category: t.schema_json?.category || 'General',
+            medications: t.schema_json?.medications || [],
+            advice: t.schema_json?.advice || '',
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load custom rx templates', err);
+      }
+      return [];
+    },
+  });
+
+  const allClinicalTemplates: ClinicalTemplateItem[] = useMemo(() => {
+    return [...CLINICAL_TEMPLATES, ...customClinicalData];
+  }, [customClinicalData]);
+
+  const allRxTemplates: RxTemplateItem[] = useMemo(() => {
+    return [...RX_TEMPLATES, ...customRxData];
+  }, [customRxData]);
 
   // Fetch Patient OPD History
   const { data: consultationHistory } = useQuery({
@@ -217,7 +521,8 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       previous_investigations: '',
       investigations_to_be_advised: '',
       treatment_notes: '',
-      medications: [{ drug_name: '', dose: '', frequency: '', instructions: '' }],
+      future_consultation_notes: '',
+      medications: [{ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' }],
       follow_up: '1_week',
     },
   });
@@ -302,6 +607,102 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Helper to extract structured prescription medications with fallback
+  const resolvePrescriptionMeds = (rawMeds: any[], fallbackPlan?: string) => {
+    if (Array.isArray(rawMeds) && rawMeds.length > 0) {
+      const valid = rawMeds
+        .filter((m: any) => (m.drug_name || m.drug) && (m.drug_name || m.drug).trim())
+        .map((m: any) => ({
+          drug: m.drug_name || m.drug,
+          dose: m.dose || '1 tab',
+          freq: m.frequency || m.freq || 'OD',
+          duration: m.duration || '—',
+          instructions: m.instructions || 'After food',
+        }));
+      if (valid.length > 0) return valid;
+    }
+
+    if (fallbackPlan) {
+      return fallbackPlan
+        .split('\n')
+        .filter((l: string) => l.trim().length > 0)
+        .map((line: string) => ({
+          drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
+          dose: 'As advised',
+          freq: 'OD',
+          duration: '—',
+          instructions: 'As directed by physician',
+        }));
+    }
+    return [];
+  };
+
+  // Apply Rx Template to structured medications array
+  const handleApplyRxTemplate = (templateId: string) => {
+    const tmpl = allRxTemplates.find((t) => t.id === templateId);
+    if (!tmpl) return;
+
+    // Filter out completely blank rows
+    const currentMeds = watch('medications') || [];
+    const existing = currentMeds.filter((f: any) => f.drug_name && f.drug_name.trim());
+    
+    // Set medications with template rows
+    setValue('medications', [
+      ...existing,
+      ...tmpl.medications.map((m) => ({
+        drug_name: m.drug_name,
+        dose: m.dose,
+        frequency: m.frequency,
+        duration: m.duration || '',
+        instructions: m.instructions,
+      })),
+    ]);
+
+    if (tmpl.advice) {
+      const currentAdvice = watch('treatment_notes');
+      setValue('treatment_notes', currentAdvice && currentAdvice.trim() ? `${currentAdvice.trim()}\n\n${tmpl.advice}` : tmpl.advice);
+    }
+
+    toast.success('Rx Template Applied', `Loaded "${tmpl.name}" with ${tmpl.medications.length} medications`);
+  };
+
+  // Load an existing past consultation into Workbench in in-place update mode
+  const handleLoadConsultationForEdit = (rec: any) => {
+    setActiveConsultationRecordId(rec.id);
+    const d = rec.data || {};
+
+    if (d.vitals) {
+      if (d.vitals.weight) setValue('weight', String(d.vitals.weight));
+      if (d.vitals.height) setValue('height', String(d.vitals.height));
+      if (d.vitals.bmi) setValue('bmi', String(d.vitals.bmi));
+      if (d.vitals.bp) {
+        const parts = String(d.vitals.bp).split('/');
+        if (parts[0]) setValue('blood_pressure_systolic', parts[0]);
+        if (parts[1]) setValue('blood_pressure_diastolic', parts[1]);
+      }
+      if (d.vitals.hr) setValue('heart_rate', String(d.vitals.hr));
+      if (d.vitals.rr) setValue('respiratory_rate', String(d.vitals.rr));
+      if (d.vitals.temp) setValue('temperature', String(d.vitals.temp));
+      if (d.vitals.spo2) setValue('spo2', String(d.vitals.spo2));
+    }
+    if (d.chief_complaints) setValue('chief_complaints', d.chief_complaints);
+    if (d.history_of_illness) setValue('history_of_illness', d.history_of_illness);
+    if (d.previous_history) setValue('previous_history', d.previous_history);
+    if (d.present_history) setValue('present_history', d.present_history);
+    if (d.examination) setValue('examination', d.examination);
+    if (d.provisional_diagnosis) setValue('provisional_diagnosis', d.provisional_diagnosis);
+    if (d.investigations_to_be_advised) setValue('investigations_to_be_advised', d.investigations_to_be_advised);
+    if (d.treatment_notes) setValue('treatment_notes', d.treatment_notes);
+    if (d.plan) setValue('plan', d.plan);
+    if (d.future_consultation_notes) setValue('future_consultation_notes', d.future_consultation_notes);
+    if (d.follow_up) setValue('follow_up', d.follow_up);
+    if (Array.isArray(d.medications) && d.medications.length > 0) {
+      setValue('medications', d.medications);
+    }
+
+    toast.info('Consultation Loaded', `Loaded consultation (${rec.created_at?.split('T')[0] || 'history'}) in in-place update mode`);
+  };
+
   // Save Consultation Mutation (Doctor)
   const saveMutation = useMutation({
     mutationFn: (formData: any) => {
@@ -319,85 +720,107 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         bmi: formData.bmi,
       };
 
-      const consultationPayload = {
-        ...formData,
-        record_type: 'opd_consultation',
-        vitals: vitalsPayload,
-        nurse_triage_merged: !!effectiveTriage,
-        triage_source: effectiveTriage?.source,
-        linked_triage_record_id: effectiveTriage?.record_id,
-        status: 'completed',
-      };
+      const targetRecordId = activeConsultationRecordId; // In-place update if already saved in current consultation!
+ 
+       const consultationPayload = {
+         ...formData,
+         record_type: 'opd_consultation',
+         vitals: vitalsPayload,
+         nurse_triage_merged: !!effectiveTriage,
+         triage_source: effectiveTriage?.source,
+         linked_triage_record_id: effectiveTriage?.record_id,
+         future_consultation_notes: formData.future_consultation_notes,
+         status: 'completed',
+       };
 
-      return opdApi.saveConsultation({
-        patient_id: selectedPatientId,
-        created_by: user?.id,
-        record_id: effectiveTriage?.record_id, // Updates triage into unified doctor consultation!
-        data: consultationPayload,
-      });
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
-      queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
+       return opdApi.saveConsultation({
+         patient_id: selectedPatientId,
+         created_by: user?.id,
+         record_id: targetRecordId || undefined,
+         record_type: 'opd_consultation',
+         plugin_id: 'opd',
+         data: consultationPayload,
+       });
+     },
+     onError: (err: any) => {
+       console.error('Failed to save consultation', err);
+       toast.error('Failed to Save Consultation', err?.message || 'Server error saving clinical record');
+     },
+     onSuccess: async (savedRecord: any) => {
+       if (savedRecord?.id) {
+         setActiveConsultationRecordId(savedRecord.id);
+       }
+       queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
+       queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
+       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+       queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
 
-      // Automatically mark linked appointment as completed
-      const linkedApptId = currentAppointment?.id || appointment?.id;
-      if (linkedApptId) {
-        try {
-          await appointmentsApi.update(linkedApptId, { status: 'completed' });
-          queryClient.invalidateQueries({ queryKey: ['appointment', linkedApptId] });
-          queryClient.invalidateQueries({ queryKey: ['appointments'] });
-        } catch (err) {
-          console.error('Failed to complete linked appointment:', err);
-        }
-      }
+       // Automatically mark linked appointment as completed
+       const linkedApptId = currentAppointment?.id || appointment?.id;
+       if (linkedApptId) {
+         try {
+           await appointmentsApi.update(linkedApptId, { status: 'completed' });
+           queryClient.invalidateQueries({ queryKey: ['appointment', linkedApptId] });
+           queryClient.invalidateQueries({ queryKey: ['appointments'] });
+         } catch (err) {
+           console.error('Failed to complete linked appointment:', err);
+         }
+       }
 
-      setSaveSuccessMessage('OPD Consultation record (with triage vitals & prescription) successfully saved and added to EMR!');
-      setTimeout(() => setSaveSuccessMessage(null), 5000);
-    },
-  });
+       setSaveSuccessMessage(
+         activeConsultationRecordId
+           ? 'OPD Consultation updated in-place successfully!'
+           : 'OPD Consultation record successfully saved and added to EMR!'
+       );
+       setTimeout(() => setSaveSuccessMessage(null), 5000);
+     },
+   });
 
-  // Save Triage Mutation (Nurse)
-  const saveNurseTriageMutation = useMutation({
-    mutationFn: async (formData: any) => {
-      const vitalsPayload = {
-        bp:
-          formData.blood_pressure_systolic && formData.blood_pressure_diastolic
-            ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
-            : undefined,
-        hr: formData.heart_rate,
-        rr: formData.respiratory_rate,
-        temp: formData.temperature,
-        spo2: formData.spo2,
-        weight: formData.weight,
-        height: formData.height,
-        bmi: formData.bmi,
-      };
+   // Save Triage Mutation (Nurse)
+   const saveNurseTriageMutation = useMutation({
+     mutationFn: async (formData: any) => {
+       const vitalsPayload = {
+         bp:
+           formData.blood_pressure_systolic && formData.blood_pressure_diastolic
+             ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
+             : undefined,
+         hr: formData.heart_rate,
+         rr: formData.respiratory_rate,
+         temp: formData.temperature,
+         spo2: formData.spo2,
+         weight: formData.weight,
+         height: formData.height,
+         bmi: formData.bmi,
+       };
 
-      const linkedApptId = currentAppointment?.id || appointment?.id;
-      if (linkedApptId) {
-        await appointmentsApi.triage(linkedApptId, {
-          vitals: vitalsPayload,
-          chief_complaint: formData.chief_complaints,
-          nurse_notes: formData.nurse_notes,
-        });
-      }
+       const linkedApptId = currentAppointment?.id || appointment?.id;
+       if (linkedApptId) {
+         await appointmentsApi.triage(linkedApptId, {
+           vitals: vitalsPayload,
+           chief_complaint: formData.chief_complaints,
+           nurse_notes: formData.nurse_notes,
+         });
+       }
 
-      return opdApi.saveConsultation({
-        patient_id: selectedPatientId,
-        created_by: user?.id,
-        record_id: effectiveTriage?.record_id,
-        data: {
-          ...formData,
-          record_type: 'nurse_triage',
-          vitals: vitalsPayload,
-          status: 'triage_completed',
-        },
-      });
-    },
-    onSuccess: () => {
+       return opdApi.saveConsultation({
+         patient_id: selectedPatientId,
+         created_by: user?.id,
+         record_id: effectiveTriage?.record_id,
+         record_type: 'nurse_triage',
+         plugin_id: 'opd',
+         data: {
+           ...formData,
+           record_type: 'nurse_triage',
+           vitals: vitalsPayload,
+           status: 'triage_completed',
+         },
+       });
+     },
+     onError: (err: any) => {
+       console.error('Failed to save nurse triage', err);
+       toast.error('Failed to Save Triage', err?.message || 'Server error saving nurse triage');
+     },
+     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
@@ -415,18 +838,11 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     saveMutation.mutate(data, {
       onSuccess: () => {
         if (andPrint) {
-          const meds = data.plan
-            ? data.plan
-                .split('\n')
-                .filter((l: string) => l.trim().length > 0)
-                .map((line: string) => ({
-                  drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
-                  instructions: 'As directed by physician',
-                }))
-            : [];
+          const meds = resolvePrescriptionMeds(data.medications, data.treatment_notes || data.plan);
           setPrintablePrescription({
             patient: {
               name: patient?.name,
+              vid: patient?.vid,
               mrn: patient?.mrn,
               age: patient?.age,
               gender: patient?.gender,
@@ -439,8 +855,8 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             },
             visitDate: new Date().toISOString().split('T')[0],
             chiefComplaint: data.chief_complaints,
-            hopi: data.history_of_illness,
-            pastHistory: data.past_medical_history,
+            hopi: data.present_history || data.history_of_illness,
+            pastHistory: data.previous_history || data.past_medical_history,
             vitals: {
               bp:
                 data.blood_pressure_systolic && data.blood_pressure_diastolic
@@ -451,9 +867,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
               weight: data.weight ? `${data.weight} kg` : undefined,
               spo2: data.spo2 ? `${data.spo2}%` : undefined,
             },
-            diagnosis: data.provisional_diagnosis,
+            diagnosis: data.examination || data.provisional_diagnosis || 'Fertility Review',
+            investigations: data.investigations_to_be_advised || data.investigations_ordered || data.previous_investigations,
             medications: meds,
-            advice: data.plan,
+            advice: data.treatment_notes || data.plan,
             nextFollowUp:
               data.follow_up === '1_week'
                 ? 'Review in 1 week'
@@ -469,13 +886,14 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   };
 
   const handleApplyTemplate = (templateId: string) => {
-    const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateId);
+    const tmpl = allClinicalTemplates.find((t) => t.id === templateId);
     if (!tmpl) return;
     setValue('chief_complaints', tmpl.complaint);
     setValue('present_history', tmpl.hopi);
-    setValue('examination', tmpl.diagnosis); // Place diagnosis in examination or notes
+    setValue('examination', tmpl.diagnosis);
     setValue('investigations_to_be_advised', tmpl.investigations);
     setValue('treatment_notes', tmpl.plan);
+    toast.success('Clinical Template Applied', `Loaded "${tmpl.name}"`);
   };
 
   // Populate from Ambient Scribe
@@ -514,23 +932,16 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
     // Append medications to the new structured table
     medItems.forEach((medStr: string) => {
-      appendMed({ drug_name: medStr, dose: '', frequency: '', instructions: '' });
+      appendMed({ drug_name: medStr, dose: '', frequency: '', duration: '', instructions: '' });
     });
   };
 
   const handlePrintPrevious = (rec: any) => {
-    const meds = rec.data?.plan
-      ? rec.data.plan
-          .split('\n')
-          .filter((l: string) => l.trim().length > 0)
-          .map((line: string) => ({
-            drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
-            instructions: 'As directed by physician',
-          }))
-      : [];
+    const meds = resolvePrescriptionMeds(rec.data?.medications, rec.data?.treatment_notes || rec.data?.plan);
     setPrintablePrescription({
       patient: {
         name: patient?.name,
+        vid: patient?.vid,
         mrn: patient?.mrn,
         age: patient?.age,
         gender: patient?.gender,
@@ -543,8 +954,8 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       },
       visitDate: rec.created_at ? rec.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
       chiefComplaint: rec.data?.chief_complaints,
-      hopi: rec.data?.history_of_illness,
-      pastHistory: rec.data?.past_medical_history,
+      hopi: rec.data?.present_history || rec.data?.history_of_illness,
+      pastHistory: rec.data?.previous_history || rec.data?.past_medical_history,
       vitals: {
         bp:
           rec.data?.blood_pressure_systolic && rec.data?.blood_pressure_diastolic
@@ -555,9 +966,10 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         weight: rec.data?.weight ? `${rec.data.weight} kg` : undefined,
         spo2: rec.data?.spo2 ? `${rec.data.spo2}%` : undefined,
       },
-      diagnosis: rec.data?.provisional_diagnosis,
+      diagnosis: rec.data?.examination || rec.data?.provisional_diagnosis || 'Fertility Review',
+      investigations: rec.data?.investigations_to_be_advised || rec.data?.investigations_ordered || rec.data?.previous_investigations,
       medications: meds,
-      advice: rec.data?.plan,
+      advice: rec.data?.treatment_notes || rec.data?.plan,
       nextFollowUp:
         rec.data?.follow_up === '1_week'
           ? 'Review in 1 week'
@@ -626,25 +1038,53 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
           {workbenchMode === 'doctor' && (
             <>
               {/* Quick Template Selector */}
-              <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+              <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
                 <FileText className="w-3.5 h-3.5 text-slate-500" />
                 <select
                   onChange={(e) => {
-                    if (e.target.value) handleApplyTemplate(e.target.value);
+                    if (e.target.value) {
+                      handleApplyTemplate(e.target.value);
+                      e.target.value = '';
+                    }
                   }}
                   defaultValue=""
-                  className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[180px] truncate"
                 >
                   <option value="" disabled>
                     — Clinical Template —
                   </option>
-                  {CLINICAL_TEMPLATES.map((tmpl) => (
+                  {allClinicalTemplates.map((tmpl) => (
                     <option key={tmpl.id} value={tmpl.id}>
-                      {tmpl.name}
+                      {tmpl.isCustom ? `★ ${tmpl.name}` : tmpl.name}
                     </option>
                   ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTemplateDialogTab('clinical');
+                    setTemplateDialogOpen(true);
+                  }}
+                  className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors"
+                  title="Manage & Edit Clinical Templates"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </button>
               </div>
+
+              {/* Templates Studio Dialog Trigger */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setTemplateDialogTab('clinical');
+                  setTemplateDialogOpen(true);
+                }}
+                className="gap-1.5 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50 rounded-md h-8"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">Templates Studio</span>
+              </Button>
 
               <Button
                 variant="outline"
@@ -668,26 +1108,52 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             isSidebarOpen ? 'w-72 sm:w-80' : 'w-12'
           }`}
         >
-          {/* Sidebar Header with Collapse Toggle */}
-          <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          {/* Sidebar Header with Collapse Toggle & Mode Switch */}
+          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
             {isSidebarOpen ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-slate-600" />
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Past Consultations</h3>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
-                    {consultationHistory?.length || 0}
-                  </Badge>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Clinical Records</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-200/60 transition-colors"
+                    title="Collapse History Sidebar"
+                  >
+                    <PanelLeftClose className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-200/60 transition-colors"
-                  title="Collapse History Sidebar"
-                >
-                  <PanelLeftClose className="w-4 h-4" />
-                </button>
-              </>
+                {/* 2-Tab Switcher: Consultations vs Counselor Notes */}
+                <div className="grid grid-cols-2 p-0.5 bg-slate-200/70 rounded-md text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab('consultations')}
+                    className={`py-1 px-1.5 rounded text-[11px] flex items-center justify-center gap-1 transition-all ${
+                      sidebarTab === 'consultations'
+                        ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <History className="w-3 h-3 text-slate-500" />
+                    <span>Consults ({consultationHistory?.length || 0})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab('counseling')}
+                    className={`py-1 px-1.5 rounded text-[11px] flex items-center justify-center gap-1 transition-all relative ${
+                      sidebarTab === 'counseling'
+                        ? 'bg-white text-violet-900 shadow-2xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <HeartHandshake className="w-3 h-3 text-violet-600" />
+                    <span>Counseling ({counselingNotes?.length || 0})</span>
+                    {counselingNotes && counselingNotes.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-pulse" />
+                    )}
+                  </button>
+                </div>
+              </div>
             ) : (
               <button
                 type="button"
@@ -700,82 +1166,149 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             )}
           </div>
 
-          {/* Previous Consultations List */}
+          {/* Previous Records List */}
           {isSidebarOpen && (
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-              {/* Active Clinical Alerts in Sidebar (Compact if any) */}
-              {patient?.alert_notes && patient.alert_notes.length > 0 && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start gap-2">
+              {/* Active Clinical Alerts in Sidebar */}
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-bold block text-[10px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
-                    <span className="text-[11px]">{patient.alert_notes.join(', ')}</span>
+                    <span className="text-[11px] truncate block">
+                      {activeAlerts && activeAlerts.length > 0 ? activeAlerts.join(', ') : 'No active alerts'}
+                    </span>
                   </div>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setShowEditAlertsModal(true)}
+                  className="text-[10px] font-bold text-amber-900 hover:underline flex-shrink-0 px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
 
-              {consultationHistory && consultationHistory.length > 0 ? (
-                consultationHistory.map((rec: any) => (
-                  <div
-                    key={rec.id}
-                    className="p-2.5 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors group relative shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
-                      <span
-                        onClick={() => setViewingRecord(rec)}
-                        className="flex items-center gap-1 group-hover:text-[rgb(var(--clr-primary))] transition-colors cursor-pointer"
-                      >
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        {formatDateTime(rec.created_at)}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handlePrintPrevious(rec)}
-                          className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] border border-[rgb(var(--clr-primary)/0.2)] rounded flex items-center gap-1 shadow-2xs"
-                          title="Print Prescription (Rx)"
-                        >
-                          <Printer className="w-2.5 h-2.5" />
-                          <span>Rx</span>
-                        </button>
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] px-1.5 py-0 font-medium ${
-                            rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                              : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
-                              ? 'bg-rose-50 text-rose-700 border-rose-300'
-                              : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          }`}
-                        >
-                          {rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
-                            ? 'OPD (Vitals+Rx)'
-                            : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
-                            ? 'Triage'
-                            : 'OPD'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <p
-                      onClick={() => setViewingRecord(rec)}
-                      className="text-xs font-bold text-slate-800 line-clamp-1 cursor-pointer"
+              {sidebarTab === 'consultations' ? (
+                /* Doctor Consultations List */
+                consultationHistory && consultationHistory.length > 0 ? (
+                  consultationHistory.map((rec: any) => (
+                    <div
+                      key={rec.id}
+                      className={`p-2.5 border rounded-md transition-colors group relative shadow-2xs ${
+                        activeConsultationRecordId === rec.id
+                          ? 'bg-amber-50/70 border-amber-400 ring-1 ring-amber-400'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                      }`}
                     >
-                      Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'Clinical Review'}
-                    </p>
-                    {rec.data?.plan && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
+                        <span
+                          onClick={() => setViewingRecord(rec)}
+                          className="flex items-center gap-1 group-hover:text-[rgb(var(--clr-primary))] transition-colors cursor-pointer"
+                        >
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {formatDateTime(rec.created_at)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadConsultationForEdit(rec)}
+                            className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded flex items-center gap-0.5 shadow-2xs"
+                            title="Load into Workbench to edit / update this record"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintPrevious(rec)}
+                            className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] border border-[rgb(var(--clr-primary)/0.2)] rounded flex items-center gap-1 shadow-2xs"
+                            title="Print Prescription (Rx)"
+                          >
+                            <Printer className="w-2.5 h-2.5" />
+                            <span>Rx</span>
+                          </button>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] px-1.5 py-0 font-medium ${
+                              rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
+                                ? 'bg-rose-50 text-rose-700 border-rose-300'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}
+                          >
+                            {rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
+                              ? 'OPD (Vitals+Rx)'
+                              : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
+                              ? 'Triage'
+                              : 'OPD'}
+                          </Badge>
+                        </div>
+                      </div>
                       <p
                         onClick={() => setViewingRecord(rec)}
-                        className="text-[10px] text-slate-600 line-clamp-2 mt-1 bg-white p-1 rounded border border-slate-100 cursor-pointer"
+                        className="text-xs font-bold text-slate-800 line-clamp-1 cursor-pointer"
                       >
-                        {rec.data.plan}
+                        Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'Clinical Review'}
                       </p>
-                    )}
+                      {rec.data?.plan && (
+                        <p
+                          onClick={() => setViewingRecord(rec)}
+                          className="text-[10px] text-slate-600 line-clamp-2 mt-1 bg-white p-1 rounded border border-slate-100 cursor-pointer"
+                        >
+                          {rec.data.plan}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-400 text-xs">
+                    No previous consultations recorded for this patient.
                   </div>
-                ))
+                )
               ) : (
-                <div className="text-center py-8 text-slate-400 text-xs">
-                  No previous consultations recorded for this patient.
-                </div>
+                /* Pre-ART Counselor Sessions List */
+                counselingNotes && counselingNotes.length > 0 ? (
+                  counselingNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      onClick={() => setViewingCounselingNote(note)}
+                      className="p-2.5 bg-violet-50/50 hover:bg-violet-50 border border-violet-200 rounded-md transition-all group cursor-pointer shadow-2xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1 text-slate-500 font-medium">
+                          <Clock className="w-3 h-3 text-violet-500" />
+                          {formatDateTime(note.created_at)}
+                        </span>
+                        <Badge className="bg-violet-100 text-violet-800 border-violet-300 text-[10px] px-1.5 py-0 font-bold">
+                          {note.procedure || 'Pre-ART'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-900">
+                          Source: <span className="text-violet-700">{note.source || 'Direct'}</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-violet-600 bg-white px-1.5 py-0.5 rounded border border-violet-200 shadow-2xs group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                          View 8-Pt Sheet →
+                        </span>
+                      </div>
+                      {note.discussion && (
+                        <p className="text-[10px] text-slate-600 line-clamp-2 bg-white/80 p-1 rounded border border-violet-100">
+                          <strong>Discussion:</strong> {note.discussion}
+                        </p>
+                      )}
+                      <div className="pt-0.5 flex items-center justify-between text-[10px] text-slate-500 border-t border-violet-100/60">
+                        <span>By: <strong>{note.counselor_name || 'Counselor'}</strong></span>
+                        <span className="italic text-slate-400">Sig: {note.signature || 'Signed'}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-400 text-xs">
+                    <HeartHandshake className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                    No pre-ART counseling sessions recorded for this patient.
+                  </div>
+                )
               )}
             </div>
           )}
@@ -935,6 +1468,69 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             /* DOCTOR CONSULTATION VIEW: COLLAPSED SUMMARY ON TOP        */
             /* ========================================================= */
             <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-5 max-w-5xl pb-24">
+              {/* Active Consultation In-Place Update Alert */}
+              {activeConsultationRecordId && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between shadow-2xs animate-in fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-950">Editing Existing Consultation (In-Place Update Mode)</p>
+                      <p className="text-[10px] text-amber-700">Any changes saved will directly update this consultation in EMR without creating duplicates.</p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActiveConsultationRecordId(null);
+                      reset();
+                      toast.info('New Consultation', 'Reset form to start a brand new consultation record');
+                    }}
+                    className="h-7 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                  >
+                    + Start New Consult
+                  </Button>
+                </div>
+              )}
+
+              {/* Pre-ART Counselor Session Quick Review Banner (Doctor Consultation) */}
+              {counselingNotes && counselingNotes.length > 0 && (
+                <div className="p-3 bg-violet-50/90 border border-violet-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-md bg-violet-100 text-violet-700 flex items-center justify-center flex-shrink-0">
+                      <HeartHandshake className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-violet-950">Pre-ART Counselor Notes on File ({counselingNotes.length})</p>
+                        <Badge className="bg-violet-600 text-white text-[10px] px-1.5 py-0">
+                          {counselingNotes[0].procedure || 'Pre-ART Consultation'}
+                        </Badge>
+                        <span className="text-[10px] text-violet-700 font-semibold hidden sm:inline">
+                          Source: {counselingNotes[0].source || 'Direct'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-violet-800 line-clamp-1">
+                        Counselor: <strong>{counselingNotes[0].counselor_name || 'Counselor'}</strong> · {formatDateTime(counselingNotes[0].created_at)}
+                        {counselingNotes[0].discussion ? ` · Discussion: ${counselingNotes[0].discussion.slice(0, 80)}...` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setViewingCounselingNote(counselingNotes[0])}
+                      className="h-7 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-2xs gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Review 8-Point Case Sheet</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Top Collapsible Vitals & Triage Summary Banner (Doctor View) */}
               <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs transition-all">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1144,33 +1740,101 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     {/* Provisional & Differential Diagnosis removed as per new standard template */}
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <FlaskConical className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                          <span>Investigations To Be Advised</span>
+                          <span>Investigations</span>
                         </label>
+                        <span className="text-[10px] text-slate-400 font-medium">Click options below to quickly add/remove</span>
                       </div>
+
+                      {/* Quick Selectable Investigation Options */}
+                      <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-slate-50/80 rounded-md border border-slate-200">
+                        {COMMON_INVESTIGATION_OPTIONS.map((opt) => {
+                          const currentVal = watch('investigations_to_be_advised') || '';
+                          const isSelected = currentVal.toLowerCase().includes(opt.toLowerCase());
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                const lines = currentVal.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                                const matchIdx = lines.findIndex((l: string) => l.toLowerCase() === opt.toLowerCase() || l.toLowerCase().includes(opt.toLowerCase()));
+                                if (matchIdx >= 0) {
+                                  lines.splice(matchIdx, 1);
+                                  setValue('investigations_to_be_advised', lines.join('\n'));
+                                } else {
+                                  lines.push(opt);
+                                  setValue('investigations_to_be_advised', lines.join('\n'));
+                                }
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[rgb(var(--clr-primary))]/10 border-[rgb(var(--clr-primary))] text-[rgb(var(--clr-primary))] font-bold shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                              }`}
+                            >
+                              {isSelected ? `✓ ${opt}` : `+ ${opt}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <textarea
                         {...register('investigations_to_be_advised')}
                         rows={3}
-                        placeholder="e.g. AMH, Pelvic TVS, Semen Analysis, Day 2 FSH/LH..."
+                        placeholder="Selected investigations will appear here, or type additional investigations..."
                         className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] font-mono"
                       />
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-2">
                         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Pill className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
                           <span>Treatment (Medications)</span>
                         </label>
+                        {/* Rx Template Selector */}
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleApplyRxTemplate(e.target.value);
+                                e.target.value = '';
+                              }
+                            }}
+                            defaultValue=""
+                            className="h-7 px-2 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs max-w-[220px] truncate"
+                          >
+                            <option value="" disabled>⚡ Apply Rx Template...</option>
+                            {allRxTemplates.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.isCustom ? `★ ${t.category}: ${t.name}` : `${t.category}: ${t.name}`}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setTemplateDialogTab('rx');
+                              setTemplateDialogOpen(true);
+                            }}
+                            className="h-7 px-2 text-[11px] font-bold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1 shadow-2xs"
+                            title="Manage & Edit Prescription Templates"
+                          >
+                            <SlidersHorizontal className="w-3 h-3 text-indigo-600" />
+                            <span>Manage</span>
+                          </Button>
+                        </div>
                       </div>
                       
                       {/* Structured Medication Array */}
                       <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
                         {medFields.map((field, index) => (
-                          <div key={field.id} className="flex gap-2 items-start relative">
-                            <div className="flex-1">
+                          <div key={field.id} className="flex gap-2 items-start relative flex-wrap sm:flex-nowrap">
+                            <div className="flex-1 min-w-[130px]">
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
                               <Input
                                 {...register(`medications.${index}.drug_name`)}
@@ -1179,7 +1843,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                                 className="h-8 text-xs mt-1 bg-white"
                               />
                             </div>
-                            <div className="w-24">
+                            <div className="w-20">
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
                               <Input
                                 {...register(`medications.${index}.dose`)}
@@ -1187,7 +1851,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                                 className="h-8 text-xs mt-1 bg-white"
                               />
                             </div>
-                            <div className="w-32">
+                            <div className="w-28">
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
                               <select
                                 {...register(`medications.${index}.frequency`)}
@@ -1202,11 +1866,19 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                                 <option value="Stat">Stat (Immediately)</option>
                               </select>
                             </div>
-                            <div className="flex-1">
+                            <div className="w-24">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
+                              <Input
+                                {...register(`medications.${index}.duration`)}
+                                placeholder="e.g. 5 days"
+                                className="h-8 text-xs mt-1 bg-white"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-[130px]">
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
                               <Input
                                 {...register(`medications.${index}.instructions`)}
-                                placeholder="After food, for 5 days"
+                                placeholder="After food"
                                 className="h-8 text-xs mt-1 bg-white"
                               />
                             </div>
@@ -1230,7 +1902,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
                         <button
                           type="button"
-                          onClick={() => appendMed({ drug_name: '', dose: '', frequency: '', instructions: '' })}
+                          onClick={() => appendMed({ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' })}
                           className="text-xs font-bold text-[rgb(var(--clr-primary))] flex items-center gap-1 hover:underline pt-1"
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -1245,6 +1917,23 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                           rows={3}
                           placeholder="Dietary and lifestyle instructions, additional advice..."
                           className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        />
+                      </div>
+
+                      {/* Notes for Future Consultation Reference (Requirement 5) */}
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Notes for Future Consultation Reference</span>
+                          </label>
+                          <span className="text-[10px] text-slate-400 font-medium">Internal clinical reference for upcoming visits</span>
+                        </div>
+                        <textarea
+                          {...register('future_consultation_notes')}
+                          rows={3}
+                          placeholder="e.g. Next visit: Assess Day 10 endometrial pattern and consider adding vaginal sildenafil if < 7mm. Check partner seminal culture..."
+                          className="w-full bg-amber-50/40 border border-amber-200 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                         />
                       </div>
                     </div>
@@ -1303,11 +1992,24 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       {/* History Full View Modal */}
       {viewingRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
-                <h3 className="font-bold text-slate-900 text-lg">Consultation Record</h3>
-                <p className="text-xs text-slate-500">{formatDateTime(viewingRecord.created_at)}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-900 text-lg">Consultation Record</h3>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200"
+                  >
+                    {viewingRecord.record_type || 'OPD Consultation'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    {formatDateTime(viewingRecord.created_at || viewingRecord.updated_at || viewingRecord.data?.created_at)}
+                  </span>
+                </p>
               </div>
               <button
                 onClick={() => setViewingRecord(null)}
@@ -1316,65 +2018,251 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-6">
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Subjective &amp; History</h4>
-                <div className="bg-slate-50 p-4 rounded-md border border-slate-100 space-y-3">
+            
+            <div className="p-6 overflow-y-auto space-y-5 divide-y divide-slate-100">
+              {/* Section 1: Subjective & History */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Subjective &amp; History</span>
+                </h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/70 space-y-3">
                   <div>
-                    <span className="font-semibold text-slate-700 text-sm">Chief Complaints:</span>
-                    <p className="text-sm text-slate-600 mt-1">{viewingRecord.data?.chief_complaints || 'None recorded'}</p>
+                    <span className="font-semibold text-slate-700 text-xs">Chief Complaints:</span>
+                    <p className="text-xs font-medium text-slate-900 mt-1 whitespace-pre-line">
+                      {viewingRecord.data?.chief_complaints || 'None recorded'}
+                    </p>
                   </div>
-                  {(viewingRecord.data?.history_of_illness || viewingRecord.data?.past_medical_history) && (
-                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200/60 mt-3">
-                      <div>
-                        <span className="font-semibold text-slate-700 text-xs">HPI:</span>
-                        <p className="text-xs text-slate-600 mt-1">{viewingRecord.data?.history_of_illness || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-700 text-xs">Past Medical Hx:</span>
-                        <p className="text-xs text-slate-600 mt-1">{viewingRecord.data?.past_medical_history || '-'}</p>
-                      </div>
+                  {(viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history || viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/60">
+                      {(viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history) && (
+                        <div>
+                          <span className="font-semibold text-slate-600 text-xs">History of Present Illness (HPI):</span>
+                          <p className="text-xs text-slate-800 mt-0.5 whitespace-pre-line">
+                            {viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history}
+                          </p>
+                        </div>
+                      )}
+                      {(viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history) && (
+                        <div>
+                          <span className="font-semibold text-slate-600 text-xs">Past Medical / Surgical Hx:</span>
+                          <p className="text-xs text-slate-800 mt-0.5 whitespace-pre-line">
+                            {viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assessment &amp; Plan</h4>
-                <div className="bg-slate-50 p-4 rounded-md border border-slate-200 space-y-3">
+              {/* Section 2: Vitals & Physical Examination */}
+              {(viewingRecord.data?.vitals || viewingRecord.data?.examination || viewingRecord.data?.cvs_findings || viewingRecord.data?.rs_findings || viewingRecord.data?.cns_findings) && (
+                <div className="pt-4 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <HeartPulse className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Objective &amp; Examination</span>
+                  </h4>
+                  
+                  {/* Vitals Grid */}
+                  {viewingRecord.data?.vitals && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-rose-50/30 p-3 rounded-lg border border-rose-100">
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">BP</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.bp || '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Heart Rate</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.hr ? `${viewingRecord.data.vitals.hr} bpm` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Resp Rate</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.rr ? `${viewingRecord.data.vitals.rr} /m` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Temp</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.temp ? `${viewingRecord.data.vitals.temp} °F` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">SpO2</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.spo2 ? `${viewingRecord.data.vitals.spo2}%` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Weight</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.weight ? `${viewingRecord.data.vitals.weight} kg` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Height</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.height ? `${viewingRecord.data.vitals.height} cm` : '—'}</span>
+                      </div>
+                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">BMI</span>
+                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.bmi || '—'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Physical Examination */}
+                  {viewingRecord.data?.examination && (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+                      <span className="font-semibold text-slate-700 text-xs">Physical Examination:</span>
+                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data.examination}</p>
+                    </div>
+                  )}
+
+                  {/* Systemic Examination findings */}
+                  {(viewingRecord.data?.cvs_findings || viewingRecord.data?.rs_findings || viewingRecord.data?.cns_findings) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+                      {viewingRecord.data?.cvs_findings && (
+                        <div>
+                          <span className="font-bold text-slate-500 text-[10px] uppercase">CVS</span>
+                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.cvs_findings}</p>
+                        </div>
+                      )}
+                      {viewingRecord.data?.rs_findings && (
+                        <div>
+                          <span className="font-bold text-slate-500 text-[10px] uppercase">RS</span>
+                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.rs_findings}</p>
+                        </div>
+                      )}
+                      {viewingRecord.data?.cns_findings && (
+                        <div>
+                          <span className="font-bold text-slate-500 text-[10px] uppercase">CNS</span>
+                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.cns_findings}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section 3: Assessment & Diagnostics */}
+              <div className="pt-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Assessment &amp; Diagnosis</span>
+                </h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/70 space-y-3">
                   <div>
-                    <span className="font-semibold text-slate-900 text-sm">Diagnosis:</span>
-                    <p className="text-sm text-slate-800 font-bold mt-1">{viewingRecord.data?.provisional_diagnosis || 'None recorded'}</p>
+                    <span className="font-semibold text-slate-700 text-xs">Provisional / Final Diagnosis:</span>
+                    <p className="text-sm font-bold text-indigo-950 mt-0.5">
+                      {viewingRecord.data?.provisional_diagnosis || viewingRecord.data?.diagnosis || 'Clinical Review'}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 mt-3">
-                    <div>
-                      <span className="font-semibold text-slate-900 text-xs flex items-center gap-1">
-                        <FlaskConical className="w-3 h-3" /> Investigations:
+                  {(viewingRecord.data?.investigations_to_be_advised || viewingRecord.data?.investigations_ordered || viewingRecord.data?.previous_investigations) && (
+                    <div className="pt-2 border-t border-slate-200/60">
+                      <span className="font-semibold text-slate-700 text-xs flex items-center gap-1">
+                        <FlaskConical className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Investigations:</span>
                       </span>
-                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data?.investigations_ordered || '-'}</p>
+                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">
+                        {viewingRecord.data?.investigations_to_be_advised || viewingRecord.data?.investigations_ordered || viewingRecord.data?.previous_investigations}
+                      </p>
                     </div>
-                    <div>
-                      <span className="font-semibold text-slate-900 text-xs flex items-center gap-1">
-                        <Pill className="w-3 h-3" /> Prescriptions &amp; Plan:
-                      </span>
-                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data?.plan || '-'}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
+
+              {/* Section 4: Treatment & Medications */}
+              <div className="pt-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Pill className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Treatment Plan &amp; Regimen</span>
+                </h4>
+
+                {/* Structured Medications Table */}
+                {Array.isArray(viewingRecord.data?.medications) && viewingRecord.data.medications.length > 0 ? (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Drug / Medicine Name</th>
+                          <th className="p-2.5">Dose</th>
+                          <th className="p-2.5">Frequency</th>
+                          <th className="p-2.5">Duration</th>
+                          <th className="p-2.5">Instructions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {viewingRecord.data.medications.map((m: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/60">
+                            <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
+                            <td className="p-2.5 font-semibold text-slate-700">{m.dose || '—'}</td>
+                            <td className="p-2.5">
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 text-[11px] font-bold">
+                                {m.frequency || m.freq || 'OD'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
+                            <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+
+                {/* Treatment Notes / Plan */}
+                {(viewingRecord.data?.treatment_notes || viewingRecord.data?.plan) && (
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+                    <span className="font-semibold text-slate-700 text-xs">Treatment &amp; Dietary Advice:</span>
+                    <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">
+                      {viewingRecord.data?.treatment_notes || viewingRecord.data?.plan}
+                    </p>
+                  </div>
+                )}
+
+                {/* Notes for Future Consultation Reference */}
+                {viewingRecord.data?.future_consultation_notes && (
+                  <div className="bg-amber-50 p-4 rounded-md border border-amber-200">
+                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Notes for Future Consultation Reference</span>
+                    </h4>
+                    <p className="text-xs text-amber-950 whitespace-pre-line font-medium">
+                      {viewingRecord.data.future_consultation_notes}
+                    </p>
+                  </div>
+                )}
+
+                {/* Follow-up */}
+                {viewingRecord.data?.follow_up && (
+                  <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
+                    <span className="font-bold text-slate-500">Next Follow-Up:</span>
+                    <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                      {viewingRecord.data.follow_up.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  handlePrintPrevious(viewingRecord);
-                }}
-                className="text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] rounded-md font-semibold px-4 flex items-center gap-1.5"
-              >
-                <Printer className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
-                <span>Print Prescription (Rx)</span>
-              </Button>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    handleLoadConsultationForEdit(viewingRecord);
+                    setViewingRecord(null);
+                  }}
+                  className="text-amber-800 border-amber-300 hover:bg-amber-50 rounded-md font-bold px-4 flex items-center gap-1.5"
+                >
+                  <span>Load into Workbench (Edit)</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    handlePrintPrevious(viewingRecord);
+                  }}
+                  className="text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] rounded-md font-semibold px-4 flex items-center gap-1.5"
+                >
+                  <Printer className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
+                  <span>Print Prescription (Rx)</span>
+                </Button>
+              </div>
               <Button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white rounded-md font-bold px-6">
                 Close
               </Button>
@@ -1389,6 +2277,156 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
           {...printablePrescription}
           onClose={() => setPrintablePrescription(null)}
         />
+      )}
+
+      {/* Edit Clinical Alerts Modal */}
+      <EditAlertsModal
+        open={showEditAlertsModal}
+        onClose={() => setShowEditAlertsModal(false)}
+        patientId={selectedPatientId}
+        patientName={patient?.name || 'Patient'}
+        initialAlerts={activeAlerts}
+        onSuccess={(updatedAlerts: string[]) => {
+          setLocalAlerts(updatedAlerts);
+          queryClient.setQueryData(['patient', selectedPatientId], (old: any) =>
+            old ? { ...old, alert_notes: updatedAlerts } : old
+          );
+          queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
+        }}
+      />
+
+      {/* Template Management Dialog (Clinical & Rx) */}
+      <TemplateManagementDialog
+        open={templateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        defaultTab={templateDialogTab}
+        initialClinicalTemplates={CLINICAL_TEMPLATES}
+        initialRxTemplates={RX_TEMPLATES}
+        onApplyClinicalTemplate={(tmpl) => handleApplyTemplate(tmpl.id)}
+        onApplyRxTemplate={(tmpl) => handleApplyRxTemplate(tmpl.id)}
+        onTemplatesUpdated={() => {
+          refetchClinicalTemplates();
+          refetchRxTemplates();
+        }}
+      />
+
+      {/* 8-Point Counselor Notes Case Sheet Modal */}
+      {viewingCounselingNote && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-md bg-violet-600 text-white flex items-center justify-center">
+                  <HeartHandshake className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm sm:text-base">Pre-ART Clinical Counseling Case Sheet</h3>
+                    <Badge className="bg-violet-600 text-white text-[10px] px-1.5 py-0">
+                      {viewingCounselingNote.procedure || 'Procedure Note'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Patient: <strong className="text-slate-800">{patient?.name || viewingCounselingNote.patient_name || 'Patient'}</strong> ({patient?.vid || viewingCounselingNote.patient_vid || '—'}) · Session: {formatDateTime(viewingCounselingNote.created_at)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingCounselingNote(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: The 8 Clinical Columns */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source</span>
+                  <p className="font-bold text-slate-800 text-sm">{viewingCounselingNote.source || '—'}</p>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">2. Procedure</span>
+                  <p className="font-bold text-violet-800 text-sm">{viewingCounselingNote.procedure || '—'}</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">3. Egg Pick Up</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.egg_pick_up || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">4. Discussion</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.discussion || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">5. Laparoscopy / Hysteroscopy / Etc</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.laparoscopy_hysteroscopy || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">6. Egg Transfer</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.egg_transfer || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">7. Remarks</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.remarks || '—'}
+                </p>
+              </div>
+
+              {/* Signature & Counselor Sign-off Card */}
+              <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-lg flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-violet-700 block">8. Counselor Signature &amp; Attestation</span>
+                  <p className="text-sm font-bold font-serif italic text-slate-900 mt-0.5">
+                    {viewingCounselingNote.signature || 'Digital Sign-off'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-800">{viewingCounselingNote.counselor_name || 'Counselor Specialist'}</p>
+                  <p className="text-[10px] text-slate-500">Reproductive Counselor · VaidyaMD</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="gap-1.5 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Case Sheet</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setViewingCounselingNote(null)}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

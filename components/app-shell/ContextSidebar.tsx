@@ -33,6 +33,7 @@ import {
   Activity,
   Pill,
   BookOpen,
+  HeartHandshake,
 } from 'lucide-react';
 import { useSidebar } from '@/contexts/SidebarContext';
 
@@ -118,6 +119,14 @@ const sidebarConfig: Record<string, { label?: string; items: { id: string; href:
       items: [
         { id: 'inventory',  href: '/pharmacy?tab=inventory', icon: Package,      label: 'Stock Registry' },
         { id: 'dispensary', href: '/pharmacy?tab=pos',       icon: ShoppingCart, label: 'Point of Sale (POS)' },
+      ],
+    },
+  ],
+  '/counseling': [
+    {
+      label: 'Pre-ART Counseling',
+      items: [
+        { id: 'counseling-sessions', href: '/counseling', icon: HeartHandshake, label: 'Sessions & Notes' },
       ],
     },
   ],

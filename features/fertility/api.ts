@@ -91,13 +91,13 @@ export const cryoApi = {
 };
 
 export const protocolsApi = {
-  list: (params?: { search?: string }) =>
-    request<any[]>(`/plugins/fertility/protocol-library/templates${toQueryString(params)}`),
-  get: (id: string) => request<any>(`/plugins/fertility/protocol-library/templates/${id}`),
+  list: (params?: { search?: string; category?: string }) =>
+    request<any[]>(`/plugins/fertility/protocols/${toQueryString(params)}`),
+  get: (id: string) => request<any>(`/plugins/fertility/protocols/${id}`),
   create: (data: Record<string, unknown>) =>
-    request<any>('/plugins/fertility/protocol-library/templates', { method: 'POST', body: JSON.stringify(data) }),
+    request<any>('/plugins/fertility/protocols/', { method: 'POST', body: JSON.stringify(data) }),
   previewCalendar: (data: Record<string, unknown>) =>
-    request<any>('/plugins/fertility/protocol-library/preview-calendar', { method: 'POST', body: JSON.stringify(data) }),
+    request<any>('/plugins/fertility/protocols/preview-calendar', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export const qcApi = {

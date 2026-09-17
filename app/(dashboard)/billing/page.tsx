@@ -6,7 +6,7 @@ import { billingApi, patientsApi, walletApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
-import { Printer, X, Building2, FileText, Package, Receipt, Zap } from 'lucide-react';
+import { Printer, X, Building2, FileText, Package, Receipt, Zap, Search, Plus } from 'lucide-react';
 import PrintableInvoice from '@/components/common/PrintableInvoice';
 
 const statusColors: Record<string, string> = {
@@ -69,6 +69,7 @@ export default function BillingPage() {
   );
 
   // Filters
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState(statusParam || '');
   const [genderFilter, setGenderFilter] = useState('');
@@ -85,6 +86,8 @@ export default function BillingPage() {
   // New invoice form state
   const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState('');
+  const [invoicePatientSearch, setInvoicePatientSearch] = useState('');
+  const [isInvoicePatientDropdownOpen, setIsInvoicePatientDropdownOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState('OP');
   const [reasonForAttendance, setReasonForAttendance] = useState('');
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0, total: 0 }]);
@@ -98,7 +101,13 @@ export default function BillingPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Service catalog autocomplete
-  const [serviceCatalog, setServiceCatalog] = useState<any[]>([]);
+  const DEFAULT_SERVICES = TARIFF_CATALOG.map((t) => ({
+    name: t.description,
+    type: t.category,
+    cost: t.price,
+    code: t.code,
+  }));
+  const [serviceCatalog, setServiceCatalog] = useState<any[]>(DEFAULT_SERVICES);
   const [itemSearches, setItemSearches] = useState<string[]>(['']);
   const [itemDropdowns, setItemDropdowns] = useState<boolean[]>([false]);
 
@@ -119,7 +128,7 @@ export default function BillingPage() {
       patientsApi.list({ per_page: 500 }),
       fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/core'}/billing/service-catalog`, {
         headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}` },
-      }).then((r) => r.json()),
+      }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]).then(([invResult, pkgResult, patResult, catalogResult]) => {
       if (invResult.status === 'fulfilled') setInvoices((invResult.value as any) || []);
       if (pkgResult.status === 'fulfilled') setPackages((pkgResult.value as any) || []);
@@ -127,7 +136,9 @@ export default function BillingPage() {
         const v = patResult.value as any;
         setPatients(v.patients || v.items || []);
       }
-      if (catalogResult.status === 'fulfilled') setServiceCatalog((catalogResult.value as any) || []);
+      if (catalogResult.status === 'fulfilled' && Array.isArray(catalogResult.value) && catalogResult.value.length > 0) {
+        setServiceCatalog(catalogResult.value);
+      }
     }).catch(() => {}).finally(() => setIsLoading(false));
   };
 
@@ -136,10 +147,22 @@ export default function BillingPage() {
   }, [sourceFilter, statusFilter]);
 
   const filteredInvoices = invoices.filter((inv: any) => {
-    if (!genderFilter) return true;
-    const p = patients.find((pat: any) => pat.id === inv.patient_id);
-    const pGender = (p?.gender || '').toLowerCase();
-    return pGender === genderFilter.toLowerCase();
+    if (genderFilter) {
+      const p = patients.find((pat: any) => pat.id === inv.patient_id);
+      const pGender = (p?.gender || '').toLowerCase();
+      if (pGender !== genderFilter.toLowerCase()) return false;
+    }
+    if (patientSearchQuery.trim()) {
+      const q = patientSearchQuery.toLowerCase().trim();
+      const p = patients.find((pat: any) => pat.id === inv.patient_id);
+      const patName = (p?.name || inv.patient_name || '').toLowerCase();
+      const patVid = (p?.vid || p?.mrn || inv.patient_vid || '').toLowerCase();
+      const patPhone = (p?.phone || '').toLowerCase();
+      const invNum = (inv.invoice_number || '').toLowerCase();
+      const matches = patName.includes(q) || patVid.includes(q) || patPhone.includes(q) || invNum.includes(q);
+      if (!matches) return false;
+    }
+    return true;
   });
 
   // When selected patient changes in new invoice modal, fetch wallet balance
@@ -187,6 +210,16 @@ export default function BillingPage() {
       };
       return updated;
     });
+    setItemSearches((prev) => {
+      const s = [...prev];
+      s[idx] = tariff.description;
+      return s;
+    });
+    setItemDropdowns((prev) => {
+      const d = [...prev];
+      d[idx] = false;
+      return d;
+    });
   };
 
   const addItemRow = () => {
@@ -221,14 +254,26 @@ export default function BillingPage() {
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !user) return;
+    if (!selectedPatient) {
+      toast.error('Patient Required', 'Please select a patient before generating an invoice.');
+      return;
+    }
+    if (!user) {
+      toast.error('Authentication Required', 'You must be logged in to create an invoice.');
+      return;
+    }
+    const validItems = items.filter((i) => i.description && i.description.trim().length > 0);
+    if (validItems.length === 0) {
+      toast.error('Services Required', 'Please enter or select at least one billable service with a description.');
+      return;
+    }
     setIsSaving(true);
     try {
       const inv: any = await billingApi.createInvoice({
         patient_id: selectedPatient,
         appointment_source: selectedSource,
         reason_for_attendance: reasonForAttendance,
-        items: items.map((i) => ({ ...i, total: i.unit_price * i.quantity })),
+        items: validItems.map((i) => ({ ...i, total: (Number(i.unit_price) || 0) * (Number(i.quantity) || 1) })),
         discount: calculatedDiscount,
         tax: 0,
         paid_amount: immediatePaid,
@@ -331,9 +376,32 @@ export default function BillingPage() {
       {activeTab === 'invoices' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter by Department / Source</label>
+          <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Search Patient or Invoice #</label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={patientSearchQuery}
+                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                  placeholder="Search by Patient Name, VID, MRN, Phone, or Invoice #..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 py-1.5 text-xs text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                />
+                {patientSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPatientSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Clear Search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="w-full md:w-52">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Department / Source</label>
               <select
                 value={sourceFilter}
                 onChange={(e) => setSourceFilter(e.target.value)}
@@ -345,8 +413,8 @@ export default function BillingPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter by Status</label>
+            <div className="w-full md:w-36">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -358,8 +426,8 @@ export default function BillingPage() {
                 <option value="pending">Pending</option>
               </select>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter by Gender</label>
+            <div className="w-full md:w-32">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gender</label>
               <select
                 value={genderFilter}
                 onChange={(e) => setGenderFilter(e.target.value)}
@@ -522,23 +590,108 @@ export default function BillingPage() {
 
             <form onSubmit={handleCreateInvoice} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <label className="block text-xs font-bold text-slate-500 mb-1">Select Patient <span className="text-red-500">*</span></label>
-                  <select
-                    value={selectedPatient}
-                    onChange={(e) => setSelectedPatient(e.target.value)}
-                    required
-                    className="vmd-input text-xs"
-                  >
-                    <option value="">— Select Patient —</option>
-                    {patients.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.vid})</option>
-                    ))}
-                  </select>
-                  {selectedPatientWallet && (
-                    <p className="text-[11px] text-emerald-700 font-bold mt-1">
-                      Advance Wallet Balance: ₹{selectedPatientWallet.balance.toLocaleString()}
-                    </p>
+                  {selectedPatient ? (
+                    (() => {
+                      const p = patients.find((pat: any) => pat.id === selectedPatient);
+                      return (
+                        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg flex items-center justify-between">
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900 truncate">{p?.name || 'Selected Patient'}</span>
+                              <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-200">
+                                {p?.vid || p?.mrn || 'VID'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {p?.phone || 'No phone'} · {p?.gender || ''} {p?.age ? `(${p.age}y)` : ''}
+                            </div>
+                            {selectedPatientWallet && (
+                              <p className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                                Advance Wallet Balance: ₹{selectedPatientWallet.balance?.toLocaleString() ?? 0}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPatient('');
+                              setInvoicePatientSearch('');
+                              setIsInvoicePatientDropdownOpen(true);
+                            }}
+                            className="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline px-2.5 py-1 bg-white border border-slate-200 rounded shadow-xs"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="relative">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={invoicePatientSearch}
+                          onChange={(e) => {
+                            setInvoicePatientSearch(e.target.value);
+                            setIsInvoicePatientDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsInvoicePatientDropdownOpen(true)}
+                          placeholder="Search patient by name, VID, phone..."
+                          className="vmd-input text-xs pl-8 pr-4 w-full"
+                          autoFocus
+                          required={!selectedPatient}
+                        />
+                      </div>
+                      {isInvoicePatientDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100">
+                          {(() => {
+                            const filtered = patients.filter((p: any) => {
+                              if (!invoicePatientSearch.trim()) return true;
+                              const q = invoicePatientSearch.toLowerCase().trim();
+                              return (
+                                (p.name || '').toLowerCase().includes(q) ||
+                                (p.vid || p.mrn || '').toLowerCase().includes(q) ||
+                                (p.phone || '').toLowerCase().includes(q)
+                              );
+                            }).slice(0, 15);
+
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="p-3 text-xs text-slate-400 text-center">
+                                  No matching patients found ({patients.length} loaded)
+                                </div>
+                              );
+                            }
+
+                            return filtered.map((p: any) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPatient(p.id);
+                                  setInvoicePatientSearch('');
+                                  setIsInvoicePatientDropdownOpen(false);
+                                }}
+                                className="w-full p-2.5 text-left hover:bg-blue-50/60 transition-colors flex items-center justify-between"
+                              >
+                                <div>
+                                  <p className="text-xs font-bold text-slate-800">{p.name}</p>
+                                  <p className="text-[11px] text-slate-400">
+                                    {p.phone || 'No phone'} · {p.gender || ''}
+                                  </p>
+                                </div>
+                                <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                                  {p.vid || p.mrn || 'VID'}
+                                </span>
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -570,34 +723,101 @@ export default function BillingPage() {
               {/* Line Items */}
               <div className="space-y-3 pt-2 border-t">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">Billable Services &amp; Procedures</label>
-                  <span className="text-[11px] text-slate-400">Type to search real clinic catalog · price auto-fills</span>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800">Billable Services &amp; Procedures</label>
+                    <p className="text-[11px] text-slate-500">Pick from clinic tariff catalog or type custom service names</p>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">Standard tariffs auto-fill rates</span>
                 </div>
+
                 {items.map((item, idx) => {
-                  const search = itemSearches[idx] || '';
-                  const filtered = search.length >= 1
-                    ? serviceCatalog.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10)
+                  const search = itemSearches[idx] !== undefined ? itemSearches[idx] : item.description;
+                  const filtered = search && search.length >= 1
+                    ? serviceCatalog.filter((s) =>
+                        s.name.toLowerCase().includes(search.toLowerCase()) ||
+                        (s.code && s.code.toLowerCase().includes(search.toLowerCase())) ||
+                        (s.type && s.type.toLowerCase().includes(search.toLowerCase()))
+                      ).slice(0, 10)
                     : [];
                   const isOpen = itemDropdowns[idx] && filtered.length > 0;
 
                   return (
-                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="grid grid-cols-12 gap-2 items-start">
-                        {/* Service search autocomplete */}
-                        <div className="col-span-12 sm:col-span-5 relative">
+                    <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/80">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                          Service Item #{idx + 1}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleSelectTariff(idx, e.target.value);
+                              }
+                            }}
+                            defaultValue=""
+                            className="text-[11px] font-medium bg-white border border-slate-300 rounded px-2.5 py-1 text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                          >
+                            <option value="">⚡ Quick Pick from Standard Tariffs...</option>
+                            <optgroup label="Consultation &amp; OPD">
+                              {TARIFF_CATALOG.filter((t) => t.category === 'Consultation').map((t) => (
+                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Diagnostics &amp; Scans">
+                              {TARIFF_CATALOG.filter((t) => t.category === 'Scans').map((t) => (
+                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Laboratory &amp; Andrology">
+                              {TARIFF_CATALOG.filter((t) => t.category === 'Lab').map((t) => (
+                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Daycare &amp; Procedures">
+                              {TARIFF_CATALOG.filter((t) => t.category === 'Procedure' || t.category === 'Daycare').map((t) => (
+                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Pharmacy &amp; Nursing">
+                              {TARIFF_CATALOG.filter((t) => t.category === 'Pharmacy').map((t) => (
+                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
+                              ))}
+                            </optgroup>
+                          </select>
+
+                          {items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItemRow(idx)}
+                              className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors"
+                              title="Remove Line Item"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-12 gap-2.5 items-center">
+                        {/* Service name input + Autocomplete */}
+                        <div className="col-span-12 sm:col-span-6 relative">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Service Description / Name</label>
                           <input
                             type="text"
-                            placeholder="Search service… (e.g. ICSI, OPU, Scan)"
-                            value={search}
+                            placeholder="Type service name or search tariff catalog..."
+                            value={item.description}
                             onChange={(e) => {
                               const v = e.target.value;
+                              updateItem(idx, 'description', v);
                               setItemSearches((prev) => { const s = [...prev]; s[idx] = v; return s; });
                               setItemDropdowns((prev) => { const d = [...prev]; d[idx] = true; return d; });
-                              if (!v) updateItem(idx, 'description', '');
                             }}
-                            onFocus={() => setItemDropdowns((prev) => { const d = [...prev]; d[idx] = true; return d; })}
-                            onBlur={() => setTimeout(() => setItemDropdowns((prev) => { const d = [...prev]; d[idx] = false; return d; }), 150)}
-                            className="vmd-input text-xs w-full"
+                            onFocus={() => {
+                              setItemSearches((prev) => { const s = [...prev]; s[idx] = item.description || ''; return s; });
+                              setItemDropdowns((prev) => { const d = [...prev]; d[idx] = true; return d; });
+                            }}
+                            onBlur={() => setTimeout(() => setItemDropdowns((prev) => { const d = [...prev]; d[idx] = false; return d; }), 250)}
+                            className="vmd-input text-xs w-full bg-white shadow-sm"
                           />
                           {isOpen && (
                             <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
@@ -606,11 +826,12 @@ export default function BillingPage() {
                                   key={si}
                                   type="button"
                                   onMouseDown={() => handleSelectService(idx, svc)}
-                                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+                                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-indigo-50/50 border-b border-slate-100 last:border-0 transition-colors"
                                 >
                                   <div>
                                     <span className="text-xs font-semibold text-slate-800">{svc.name}</span>
-                                    <span className="text-[10px] text-slate-400 ml-2 uppercase">{svc.type}</span>
+                                    {svc.code && <span className="text-[10px] text-indigo-600 font-mono ml-2">[{svc.code}]</span>}
+                                    <span className="text-[10px] text-slate-400 ml-2 uppercase">({svc.type})</span>
                                   </div>
                                   <span className="text-xs font-bold text-emerald-700 ml-2 flex-shrink-0">₹{(svc.cost || 0).toLocaleString()}</span>
                                 </button>
@@ -618,61 +839,49 @@ export default function BillingPage() {
                             </div>
                           )}
                         </div>
-                        {/* Description (editable after selection) */}
-                        <div className="col-span-12 sm:col-span-3">
-                          <input
-                            type="text"
-                            placeholder="Description / Notes"
-                            value={item.description}
-                            onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                            className="vmd-input text-xs bg-white"
-                          />
-                        </div>
-                        <div className="col-span-4 sm:col-span-1">
+
+                        {/* Qty */}
+                        <div className="col-span-3 sm:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Qty</label>
                           <input
                             type="number"
-                            placeholder="Qty"
                             value={item.quantity}
-                            onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                            onChange={(e) => updateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
                             min={1}
-                            className="vmd-input text-xs bg-white text-center"
+                            className="vmd-input text-xs bg-white text-center font-bold shadow-sm"
                           />
                         </div>
-                        <div className="col-span-6 sm:col-span-2">
+
+                        {/* Rate */}
+                        <div className="col-span-4 sm:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Rate (₹)</label>
                           <input
                             type="number"
-                            placeholder="Rate ₹"
                             value={item.unit_price}
-                            onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                            className="vmd-input text-xs bg-white font-mono"
+                            onChange={(e) => updateItem(idx, 'unit_price', Math.max(0, parseFloat(e.target.value) || 0))}
+                            min={0}
+                            className="vmd-input text-xs bg-white font-mono font-medium shadow-sm"
                           />
                         </div>
-                        <div className="col-span-2 sm:col-span-1 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removeItemRow(idx)}
-                            className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors mt-0.5"
-                            title="Remove Item"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+
+                        {/* Line Total */}
+                        <div className="col-span-5 sm:col-span-2 text-right">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Line Total</label>
+                          <div className="text-xs font-bold text-slate-900 font-mono py-1.5 px-2 bg-white rounded border border-slate-200 shadow-sm">
+                            ₹{((item.quantity || 1) * (item.unit_price || 0)).toLocaleString()}
+                          </div>
                         </div>
                       </div>
-                      {item.description && (
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pl-1">
-                          <span>{item.description}</span>
-                          <span className="font-bold text-slate-700">Total: ₹{(item.total || 0).toLocaleString()}</span>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
+
                 <button
                   type="button"
                   onClick={addItemRow}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
                 >
-                  + Add Another Service
+                  <Plus className="w-3.5 h-3.5" /> Add Another Service
                 </button>
               </div>
 

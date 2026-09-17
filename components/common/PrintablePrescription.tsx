@@ -17,6 +17,7 @@ interface PrescriptionProps {
   pastHistory?: string;
   vitals?: { bp?: string; pulse?: string; temp?: string; weight?: string; spo2?: string; };
   diagnosis?: string;
+  investigations?: string;
   medications: MedRow[];
   partnerMedications?: MedRow[];
   partnerName?: string;
@@ -72,6 +73,7 @@ export default function PrintablePrescription({
   pastHistory,
   vitals,
   diagnosis,
+  investigations,
   medications = [],
   partnerMedications = [],
   partnerName,
@@ -79,6 +81,8 @@ export default function PrintablePrescription({
   nextFollowUp,
   onClose,
 }: PrescriptionProps) {
+  const [includeHeader, setIncludeHeader] = React.useState(true);
+
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,28 +97,55 @@ export default function PrintablePrescription({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-20 sm:pt-24 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-white"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-20 sm:pt-24 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible"
       style={{ background: 'rgba(0,0,0,0.65)' }}
     >
-      <div className="bg-white max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-lg print:shadow-none print:rounded-none print:m-0 print:max-w-full border border-slate-200">
+      <div className="bg-white max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-lg print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent">
 
         {/* Preview toolbar — hidden in print */}
-        <div className="flex items-center justify-between px-5 py-3 print:hidden"
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-5 py-3 gap-2 print:hidden"
           style={{ background: 'rgb(var(--clr-rail-bg))', color: 'white' }}>
           <div>
-            <p className="text-sm font-semibold">Prescription Preview</p>
-            <p className="text-xs opacity-50 mt-0.5">Review before printing or sending</p>
+            <p className="text-sm font-semibold">Prescription Print Preview</p>
+            <p className="text-xs opacity-60 mt-0.5">Toggle header if printing on pre-printed clinic letterhead</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 self-end sm:self-center flex-wrap">
+            {/* Header / Letterhead Toggle */}
+            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-md border border-slate-600 text-xs">
+              <button
+                type="button"
+                onClick={() => setIncludeHeader(true)}
+                className={`px-2.5 py-1 rounded transition-colors font-medium ${
+                  includeHeader
+                    ? 'bg-[rgb(var(--clr-primary))] text-white font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                With Header
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeHeader(false)}
+                className={`px-2.5 py-1 rounded transition-colors font-medium ${
+                  !includeHeader
+                    ? 'bg-amber-600 text-white font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="Use this for pre-printed letterhead pads"
+              >
+                Pre-printed Pad (No Header)
+              </button>
+            </div>
+
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-opacity hover:opacity-80"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-opacity hover:opacity-90 shadow-sm"
               style={{ background: 'rgb(var(--clr-primary))', color: 'white' }}
             >
               <Printer className="w-3.5 h-3.5" />
               Print (A4)
             </button>
-            <button onClick={onClose} className="p-1 opacity-50 hover:opacity-100 transition-opacity">
+            <button onClick={onClose} className="p-1 opacity-60 hover:opacity-100 transition-opacity">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -123,41 +154,53 @@ export default function PrintablePrescription({
         {/* ── Printable Document Sheet ── */}
         <div className="p-8 space-y-5 printable-document print:p-6" style={{ fontFamily: 'Inter, Arial, sans-serif', fontSize: '11px', color: '#111827' }}>
 
-          {/* Hospital Header */}
-          <div className="flex items-start justify-between pb-3" style={{ borderBottom: '1.5px solid #0B4F6C' }}>
-            <div className="flex items-center gap-3">
-              {/* Logo box — square, tight */}
-              <div className="w-10 h-10 flex items-center justify-center rounded-md flex-shrink-0"
-                style={{ background: '#0B4F6C' }}>
-                <img src="/logo.svg" alt="VM" className="w-8 h-8" />
+          {/* Hospital Header & Doctor Demographics (Conditional on includeHeader) */}
+          {includeHeader ? (
+            <>
+              {/* Hospital Header */}
+              <div className="flex items-start justify-between pb-3" style={{ borderBottom: '1.5px solid #0B4F6C' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 flex items-center justify-center rounded-md flex-shrink-0"
+                    style={{ background: '#0B4F6C' }}>
+                    <img src="/logo.svg" alt="VM" className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h1 className="font-bold text-base leading-tight" style={{ color: '#0B4F6C', fontFamily: 'Inter, Arial, sans-serif' }}>
+                      {hospitalName}
+                    </h1>
+                    <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>{hospitalSubtext}</p>
+                    <p className="text-[9px] mt-0.5" style={{ color: '#9ca3af' }}>
+                      Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · +91 40 4888 9999 · care@vaidyamd.com
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '2rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: '#9ca3af' }}>Outpatient Rx</p>
+                </div>
               </div>
-              <div>
-                <h1 className="font-bold text-base leading-tight" style={{ color: '#0B4F6C', fontFamily: 'Inter, Arial, sans-serif' }}>
-                  {hospitalName}
-                </h1>
-                <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>{hospitalSubtext}</p>
-                <p className="text-[9px] mt-0.5" style={{ color: '#9ca3af' }}>
-                  Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · +91 40 4888 9999 · care@vaidyamd.com
-                </p>
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '2rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
-              <p className="text-[9px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: '#9ca3af' }}>Outpatient Rx</p>
-            </div>
-          </div>
 
-          {/* Doctor Demographics */}
-          <div className="flex justify-between items-center py-2" style={{ borderBottom: '0.5px solid #e5e7eb' }}>
-            <div>
-              <p className="font-semibold text-sm" style={{ color: '#111827' }}>{doctor.name || 'Treating Consultant'}</p>
-              <p className="text-[10px]" style={{ color: '#1A6E8E' }}>{doctor.qualification || 'MBBS, MS (OBG), DRM (Germany) · Senior Fertility Specialist'}</p>
+              {/* Doctor Demographics */}
+              <div className="flex justify-between items-center py-2" style={{ borderBottom: '0.5px solid #e5e7eb' }}>
+                <div>
+                  <p className="font-semibold text-sm" style={{ color: '#111827' }}>{doctor.name || 'Treating Consultant'}</p>
+                  <p className="text-[10px]" style={{ color: '#1A6E8E' }}>{doctor.qualification || 'MBBS, MS (OBG), DRM (Germany) · Senior Fertility Specialist'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>Reg. No: {doctor.reg_number || 'TSMC/2016/54210'}</p>
+                  <p className="text-[10px]" style={{ color: '#374151' }}>{doctor.department || 'Reproductive Medicine & ART'}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Spacer for Pre-printed Letterhead Pads (Leaves approx 2.8 - 3 inches margin at top) */
+            <div className="h-28 sm:h-32 print:h-36 flex items-end justify-between border-b border-dashed border-slate-200 pb-1.5 print:border-none">
+              <span className="text-[9px] font-bold text-amber-600 print:hidden italic">
+                [Pre-printed Letterhead Pad Mode: Header Hidden — Content starts 3 inches from top]
+              </span>
+              <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '1.8rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
             </div>
-            <div className="text-right">
-              <p className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>Reg. No: {doctor.reg_number || 'TSMC/2016/54210'}</p>
-              <p className="text-[10px]" style={{ color: '#374151' }}>{doctor.department || 'Reproductive Medicine & ART'}</p>
-            </div>
-          </div>
+          )}
 
           {/* Patient Strip */}
           <div className="grid grid-cols-4 gap-3 p-3 rounded-md" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
@@ -204,6 +247,18 @@ export default function PrintablePrescription({
           {partnerMedications.length > 0 && (
             <div className="pt-3" style={{ borderTop: '0.5px solid #e5e7eb' }}>
               <MedTable medications={partnerMedications} label={`Medications for Partner (${partnerName || 'Spouse'})`} />
+            </div>
+          )}
+
+          {/* Advised Investigations */}
+          {investigations && (
+            <div className="space-y-1.5 pt-3 page-break-avoid" style={{ borderTop: '0.5px solid #e5e7eb' }}>
+              <div className="flex items-center gap-2 pb-0.5">
+                <h4 className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: '#0B4F6C' }}>Investigations</h4>
+              </div>
+              <p className="text-[10px] leading-relaxed whitespace-pre-line p-2.5 rounded-md font-mono" style={{ background: '#F8FAFC', border: '0.5px solid #E2E8F0', color: '#1E293B' }}>
+                {investigations}
+              </p>
             </div>
           )}
 

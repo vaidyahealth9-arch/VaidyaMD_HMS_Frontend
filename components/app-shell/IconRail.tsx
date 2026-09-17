@@ -22,20 +22,22 @@ import {
   Activity,
   PanelLeftClose,
   PanelLeftOpen,
+  HeartHandshake,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 
 const navItems = [
-  { id: 'dashboard',        href: '/dashboard',                 icon: LayoutDashboard, label: 'Dashboard',          roles: ['admin','doctor','nurse','receptionist','embryologist','andrologist','pharma'] },
-  { id: 'patients',         href: '/patients',                  icon: Users,           label: 'Patients & EMR',     roles: ['admin','doctor','nurse','receptionist'] },
-  { id: 'appointments',     href: '/appointments',              icon: Calendar,        label: 'Appointments',       roles: ['admin','doctor','nurse','receptionist'] },
-  { id: 'cosgyn',           href: '/cosgyn',                    icon: Sparkles,        label: 'Cosmetic Gynae',     roles: ['admin','doctor','nurse','receptionist'] },
-  { id: 'treatment-board',  href: '/fertility/treatment-board', icon: Activity,        label: 'Treatment Board',    roles: ['admin','doctor','nurse','embryologist','receptionist'], badge: 'Live' },
-  { id: 'ivf-lab',          href: '/ivf-lab',                   icon: Microscope,      label: 'IVF Lab',     roles: ['admin','doctor','embryologist','andrologist'], badge: 'ART' },
-  { id: 'ipd',              href: '/ipd',                       icon: BedDouble,       label: 'IPD Bedboard',       roles: ['admin','doctor','nurse','receptionist'] },
-  { id: 'pharmacy',         href: '/pharmacy',                  icon: Pill,            label: 'Pharmacy & Stock',   roles: ['admin','pharma','doctor'] },
+  { id: 'dashboard',        href: '/dashboard',                 icon: LayoutDashboard, label: 'Dashboard',          roles: ['admin','doctor','nurse','receptionist','accounts','embryologist','andrologist','pharma','pharmacist','counsellor'] },
+  { id: 'counseling',       href: '/counseling',                icon: HeartHandshake,  label: 'Counselor Desk',     roles: ['admin','counsellor','doctor','nurse'] },
+  { id: 'patients',         href: '/patients',                  icon: Users,           label: 'Patients & EMR',     roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
+  { id: 'appointments',     href: '/appointments',              icon: Calendar,        label: 'Appointments',       roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
+  { id: 'cosgyn',           href: '/cosgyn',                    icon: Sparkles,        label: 'Cosmetic Gynae',     roles: ['admin','doctor','nurse','receptionist','accounts'] },
+  { id: 'treatment-board',  href: '/fertility/treatment-board', icon: Activity,        label: 'Treatment Board',    roles: ['admin','doctor','nurse','embryologist','receptionist','accounts'], badge: 'Live' },
+  { id: 'ivf-lab',          href: '/ivf-lab',                   icon: Microscope,      label: 'IVF Lab',            roles: ['admin','doctor','embryologist','andrologist'], badge: 'ART' },
+  { id: 'ipd',              href: '/ipd',                       icon: BedDouble,       label: 'IPD Bedboard',       roles: ['admin','doctor','nurse','receptionist','accounts'] },
+  { id: 'pharmacy',         href: '/pharmacy',                  icon: Pill,            label: 'Pharmacy & Stock',   roles: ['admin','pharma','pharmacist','doctor'] },
   { id: 'lims',             href: '/lims',                      icon: FlaskConical,    label: 'LIMS & HL7 Lab',     roles: ['admin','doctor','andrologist','embryologist'] },
-  { id: 'billing',          href: '/billing',                   icon: ReceiptText,     label: 'Billing & Cashier',  roles: ['admin','receptionist','doctor'] },
+  { id: 'billing',          href: '/billing',                   icon: ReceiptText,     label: 'Billing & Cashier',  roles: ['admin','receptionist','accounts','pharma','pharmacist','doctor'] },
 ];
 
 export default function IconRail() {
@@ -43,7 +45,10 @@ export default function IconRail() {
   const { user, activeRole, currentBranch } = useAuth();
   const { isExpanded, toggleSidebar } = useSidebar();
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(activeRole || 'admin'));
+  const currentRole = (activeRole || user?.role || 'admin').toLowerCase();
+  const visibleItems = navItems.filter((item) =>
+    currentRole === 'admin' || item.roles.map((r) => r.toLowerCase()).includes(currentRole)
+  );
   const activeItem   = visibleItems.find((item) => pathname.startsWith(item.href));
 
   return (

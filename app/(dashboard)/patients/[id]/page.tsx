@@ -14,6 +14,8 @@ import {
   opdApi,
   appointmentsApi,
   documentsApi,
+  counselingApi,
+  CounselingNote,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -30,6 +32,8 @@ import SpermFreezingModal from '@/components/fertility/SpermFreezingModal';
 import OPDWorkbench from '@/components/opd/OPDWorkbench';
 import AndrologyDataEntry from '@/components/fertility/AndrologyDataEntry';
 import MultiDocumentUploader from '@/components/common/MultiDocumentUploader';
+import AddToOPDModal from '@/components/opd/AddToOPDModal';
+import EditAlertsModal from '@/components/patients/EditAlertsModal';
 import {
   Users,
   Clock,
@@ -61,12 +65,15 @@ import {
   Mail,
   MapPin,
   Phone,
+  HeartHandshake,
+  Eye,
 } from 'lucide-react';
 
 const tabs = [
   { id: 'overview', label: 'Couple 360', icon: Users },
   { id: 'timeline', label: 'Timeline', icon: Clock },
   { id: 'workbench', label: 'OPD & Rx', icon: Stethoscope },
+  { id: 'counseling', label: 'Counselor Notes', icon: HeartHandshake },
   { id: 'investigations', label: 'Investigations & USG', icon: ScanLine },
   { id: 'treatment', label: 'Treatment Cycles', icon: Activity },
   { id: 'andrology', label: 'Andrology Lab', icon: FlaskConical },
@@ -98,6 +105,8 @@ export default function PatientProfilePage() {
 
   // Link Partner Modal State
   const [showLinkPartnerModal, setShowLinkPartnerModal] = useState(false);
+  const [showAddToOPDModal, setShowAddToOPDModal] = useState(false);
+  const [showEditAlertsModal, setShowEditAlertsModal] = useState(false);
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
   const [partnerSearchResults, setPartnerSearchResults] = useState<any[]>([]);
   const [isSearchingPartner, setIsSearchingPartner] = useState(false);
@@ -131,6 +140,8 @@ export default function PatientProfilePage() {
   const [showEtDischargeModal, setShowEtDischargeModal] = useState(false);
   const [showSpermPrepModal, setShowSpermPrepModal] = useState(false);
   const [showSpermFreezingModal, setShowSpermFreezingModal] = useState(false);
+  const [counselingNotes, setCounselingNotes] = useState<CounselingNote[]>([]);
+  const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
 
   // Collapsible States & Photo Upload
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
@@ -309,6 +320,11 @@ export default function PatientProfilePage() {
       .then((docs: any) => setPatientDocs(docs || []))
       .catch((err) => console.error("Failed to load documents", err));
 
+    // Fetch counseling notes
+    counselingApi.listNotes({ patient_id: patientId })
+      .then((notes: any) => setCounselingNotes(notes || []))
+      .catch((err) => console.error("Failed to load counseling notes", err));
+
     // Fetch patient appointments for active appointment & triage resolution
     appointmentsApi.list({ patient_id: patientId })
       .then((res: any) => {
@@ -422,21 +438,8 @@ export default function PatientProfilePage() {
 
 
 
-  const handleSendToOPD = async () => {
-    if (!user || !patient) return;
-    try {
-      await appointmentsApi.create({
-        patient_id: patientId,
-        doctor_id: patient.treating_doctor_id || user.id,
-        department: 'OPD',
-        scheduled_at: new Date().toISOString(),
-        visit_type: 'consultation',
-        status: 'waiting',
-      });
-      alert('Patient successfully added to OPD Queue for today!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to add to OPD Queue');
-    }
+  const handleSendToOPD = () => {
+    setShowAddToOPDModal(true);
   };
 
   if (isLoading) {
@@ -544,12 +547,19 @@ export default function PatientProfilePage() {
                   </span>
                 )}
 
-                {patient.alert_notes?.length > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded">
-                    <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
-                    {patient.alert_notes.length} {patient.alert_notes.length === 1 ? 'Alert' : 'Alerts'}
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowEditAlertsModal(true)}
+                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                    patient.alert_notes?.length > 0
+                      ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                  }`}
+                  title="Click to edit clinical alerts & allergies"
+                >
+                  <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
+                  {patient.alert_notes?.length > 0 ? `${patient.alert_notes.length} Alerts (Edit)` : '+ Alert'}
+                </button>
               </div>
             </div>
           </div>
@@ -726,9 +736,18 @@ export default function PatientProfilePage() {
                 <div><span className="text-slate-400 font-medium">Referring Doctor:</span> <strong className="text-slate-800">{patient.referring_doctor || 'Direct / Walk-in'}</strong></div>
                 <div><span className="text-slate-400 font-medium">Marketing Person:</span> <strong className="text-slate-800">{patient.marketing_person_name || 'None'}</strong></div>
                 <div><span className="text-slate-400 font-medium">Registered:</span> <span className="text-slate-600">{formatDate(patient.created_at)}</span></div>
-                {patient.alert_notes?.length > 0 && (
-                  <div className="pt-1">
-                    <span className="text-slate-400 font-medium block">Allergies &amp; Alerts:</span>
+                <div className="pt-1">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-slate-400 font-medium">Allergies &amp; Alerts:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditAlertsModal(true)}
+                      className="text-[10px] font-bold text-amber-800 hover:underline"
+                    >
+                      Edit Alerts
+                    </button>
+                  </div>
+                  {patient.alert_notes?.length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {patient.alert_notes.map((a: string, i: number) => (
                         <span key={i} className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded">
@@ -736,8 +755,10 @@ export default function PatientProfilePage() {
                         </span>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">No alerts recorded</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1436,6 +1457,145 @@ export default function PatientProfilePage() {
             </div>
           </div>
         )}
+
+        {/* === TAB: COUNSELOR NOTES === */}
+        {activeTab === 'counseling' && (
+          <div className="space-y-6 w-full animate-in fade-in slide-in-from-bottom-2">
+            {/* Header / Summary Card */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-violet-50 border border-violet-200 text-violet-600 flex items-center justify-center">
+                    <HeartHandshake className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-bold text-slate-900">Pre-ART Clinical Counseling Sessions</h2>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200 font-mono">
+                        {counselingNotes.length} Record{counselingNotes.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Standard 8-point fertility counseling record: Source, Procedure, Egg pick up, Discussion, Laparoscopy/hysteroscopy, Egg transfer, Remarks &amp; Signature.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/counseling"
+                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Open Counselor Portal</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Sessions Case Sheet List */}
+            {counselingNotes.length > 0 ? (
+              <div className="space-y-4">
+                {counselingNotes.map((note, idx) => (
+                  <div
+                    key={note.id}
+                    className="bg-white border border-slate-200 hover:border-violet-300 rounded-xl p-5 shadow-sm transition-all space-y-4"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center font-mono">
+                          #{counselingNotes.length - idx}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-sm">{note.procedure || 'Pre-ART Consultation'}</span>
+                            <span className="text-xs px-2 py-0.5 rounded font-bold bg-violet-50 text-violet-700 border border-violet-200">
+                              Source: {note.source || 'Direct'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            Session Date: <strong className="text-slate-700">{formatDate(note.created_at)}</strong> · Counselor: <strong className="text-slate-700">{note.counselor_name || 'Counselor'}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewingCounselingNote(note)}
+                          className="px-3 py-1.5 text-xs font-bold bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-md transition-colors flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Full Case Sheet</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 8 Columns Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">1. Source</span>
+                        <p className="font-semibold text-slate-800">{note.source || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">2. Procedure</span>
+                        <p className="font-semibold text-violet-900">{note.procedure || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">3. Egg Pick Up</span>
+                        <p className="text-slate-700 whitespace-pre-line line-clamp-3">{note.egg_pick_up || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 md:col-span-2 lg:col-span-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">4. Discussion</span>
+                        <p className="text-slate-800 whitespace-pre-line leading-relaxed">{note.discussion || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">5. Laparoscopy / Hysteroscopy / Etc</span>
+                        <p className="text-slate-700 whitespace-pre-line line-clamp-3">{note.laparoscopy_hysteroscopy || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">6. Egg Transfer</span>
+                        <p className="text-slate-700 whitespace-pre-line line-clamp-3">{note.egg_transfer || '—'}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">7. Remarks</span>
+                        <p className="text-slate-700 whitespace-pre-line line-clamp-3">{note.remarks || '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* Signature Footer */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-500">8. Counselor Attestation &amp; Signature:</span>
+                        <span className="font-serif italic font-bold text-slate-900 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
+                          {note.signature || 'Digital Sign-off'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Recorded by {note.counselor_name || 'Counselor'} · {formatDate(note.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-xl p-12 text-center space-y-3">
+                <HeartHandshake className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="font-bold text-slate-700 text-sm">No Counseling Sessions Recorded</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Pre-ART counseling notes recorded by the counselor desk will automatically appear here for the medical team and treating doctor.
+                </p>
+                <Link
+                  href="/counseling"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-md text-xs font-bold transition-colors shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Go to Counselor Desk</span>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
 
@@ -1594,6 +1754,141 @@ export default function PatientProfilePage() {
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add To OPD Queue Modal */}
+      <AddToOPDModal
+        open={showAddToOPDModal}
+        onClose={() => setShowAddToOPDModal(false)}
+        patient={patient}
+      />
+
+      {/* Edit Clinical Alerts Modal */}
+      <EditAlertsModal
+        open={showEditAlertsModal}
+        onClose={() => setShowEditAlertsModal(false)}
+        patientId={patientId}
+        patientName={patient?.name || 'Patient'}
+        initialAlerts={patient?.alert_notes || []}
+        onSuccess={(updatedAlerts) => {
+          setPatient((prev: any) => ({ ...prev, alert_notes: updatedAlerts }));
+        }}
+      />
+
+      {/* 8-Point Counselor Notes Case Sheet Modal */}
+      {viewingCounselingNote && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-md bg-violet-600 text-white flex items-center justify-center">
+                  <HeartHandshake className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm sm:text-base">Pre-ART Clinical Counseling Case Sheet</h3>
+                    <span className="bg-violet-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                      {viewingCounselingNote.procedure || 'Procedure Note'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Patient: <strong className="text-slate-800">{patient?.name || viewingCounselingNote.patient_name || 'Patient'}</strong> ({patient?.vid || viewingCounselingNote.patient_vid || '—'}) · Session: {formatDate(viewingCounselingNote.created_at)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingCounselingNote(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: The 8 Clinical Columns */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source</span>
+                  <p className="font-bold text-slate-800 text-sm">{viewingCounselingNote.source || '—'}</p>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">2. Procedure</span>
+                  <p className="font-bold text-violet-800 text-sm">{viewingCounselingNote.procedure || '—'}</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">3. Egg Pick Up</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.egg_pick_up || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">4. Discussion</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.discussion || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">5. Laparoscopy / Hysteroscopy / Etc</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.laparoscopy_hysteroscopy || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">6. Egg Transfer</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.egg_transfer || '—'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">7. Remarks</span>
+                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
+                  {viewingCounselingNote.remarks || '—'}
+                </p>
+              </div>
+
+              {/* Signature & Counselor Sign-off Card */}
+              <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-lg flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-violet-700 block">8. Counselor Signature &amp; Attestation</span>
+                  <p className="text-sm font-bold font-serif italic text-slate-900 mt-0.5">
+                    {viewingCounselingNote.signature || 'Digital Sign-off'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-800">{viewingCounselingNote.counselor_name || 'Counselor Specialist'}</p>
+                  <p className="text-[10px] text-slate-500">Reproductive Counselor · VaidyaMD</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 rounded-md transition-colors flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Case Sheet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingCounselingNote(null)}
+                className="px-5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-md transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

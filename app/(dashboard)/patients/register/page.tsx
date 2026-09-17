@@ -28,11 +28,11 @@ export default function RegisterPatientPage() {
 
   const [form, setForm] = useState({
     registration_type: 'patient',
-    title: '',
+    title: 'Mrs.',
     name: '',
     surname: '',
     surname_at_birth: '',
-    gender: '',
+    gender: 'female',
     age: '',
     dob: '',
     marital_status: 'married',
@@ -92,12 +92,12 @@ export default function RegisterPatientPage() {
   };
 
   const [partnerForm, setPartnerForm] = useState({
-    title: '',
+    title: 'Mr.',
     name: '',
     surname: '',
     age: '',
     dob: '',
-    gender: '',
+    gender: 'male',
     marital_status: 'married',
     phone: '',
     email: '',
@@ -128,7 +128,7 @@ export default function RegisterPatientPage() {
     const payload: Record<string, any> = {
       name: data.name?.trim(),
       registration_type: form.registration_type,
-      gender: data.gender,
+      gender: data.gender || (isPartner ? 'male' : 'female'),
       phone: data.phone?.trim() || '+91-9999900000',
     };
 
@@ -697,7 +697,15 @@ export default function RegisterPatientPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Gender</label>
+                <select value={partnerForm.gender} onChange={(e) => updatePartner('gender', e.target.value)} className="vmd-input text-xs">
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Age (Years)</label>
                 <input

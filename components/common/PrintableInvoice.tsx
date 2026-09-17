@@ -38,10 +38,10 @@ export default function PrintableInvoice({ invoice, onClose }: PrintableInvoiceP
   const paid = n(invoice.paid_amount);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:static print:bg-white"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible"
       style={{ background: 'rgba(0,0,0,0.55)' }}>
 
-      <div className="bg-white max-w-2xl w-full shadow-xl rounded-lg overflow-hidden flex flex-col my-6 print:shadow-none print:rounded-none print:m-0 print:max-w-full">
+      <div className="bg-white max-w-2xl w-full shadow-xl rounded-lg overflow-hidden flex flex-col my-6 print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent">
 
         {/* Preview toolbar */}
         <div className="flex items-center justify-between px-5 py-3 print:hidden"

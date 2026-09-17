@@ -43,74 +43,76 @@ export default function OPUAspirationReportModal({
 
   // SUMMARY
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
-  const [reasonForART, setReasonForART] = useState('Primary Infertility (Tubal Factor + Diminished Ovarian Reserve)');
-  const [femaleFactor, setFemaleFactor] = useState('Bilateral Tubal Block / AFC 6');
-  const [maleFactor, setMaleFactor] = useState('Mild Asthenozoospermia (Normozoospermic for ICSI)');
-  const [addOnDrugs, setAddOnDrugs] = useState('DHEA 25mg TDS, CoQ10 300mg OD, L-Arginine sachet OD');
+  const [reasonForART, setReasonForART] = useState(resolvedCycle?.indication || '');
+  const [femaleFactor, setFemaleFactor] = useState(resolvedCycle?.female_factors?.join(', ') || '');
+  const [maleFactor, setMaleFactor] = useState(resolvedCycle?.male_factors?.join(', ') || '');
+  const [addOnDrugs, setAddOnDrugs] = useState('');
 
   // PRE-TREATMENTS
-  const [preTreatments, setPreTreatments] = useState('Oral Contraceptive Pill (OCP) Priming');
-  const [preTreatmentComments, setPreTreatmentComments] = useState('21-day priming to schedule suppression and synchronized recruitment.');
-  const [daysPreTreatment, setDaysPreTreatment] = useState('21');
-  const [lmp, setLmp] = useState(resolvedCycle?.sentinel_dates?.lmp_day1 || resolvedCycle?.lmp_date || '2025-01-10');
+  const [preTreatments, setPreTreatments] = useState('');
+  const [preTreatmentComments, setPreTreatmentComments] = useState('');
+  const [daysPreTreatment, setDaysPreTreatment] = useState('');
+  const [lmp, setLmp] = useState(resolvedCycle?.sentinel_dates?.lmp_day1 || resolvedCycle?.lmp_date || '');
 
   // STIMULATION
-  const [stimulationProtocol, setStimulationProtocol] = useState(resolvedCycle?.protocol_plan || resolvedCycle?.treatment_type || 'Antagonist Protocol (Flexible)');
-  const [daysStimulation, setDaysStimulation] = useState('11');
-  const [stimulationDate, setStimulationDate] = useState(resolvedCycle?.sentinel_dates?.stim_start || resolvedCycle?.start_date || '2025-01-12');
-  const [oralStimulatingAgents, setOralStimulatingAgents] = useState('None');
-  const [downRegulation, setDownRegulation] = useState('GnRH Antagonist (Cetrotide 0.25mg) from Day 6');
-  const [downRegulationDays, setDownRegulationDays] = useState('6');
-  const [downRegulationDate, setDownRegulationDate] = useState('2025-01-17');
-  const [downRegulationE2, setDownRegulationE2] = useState('32.4 pg/mL');
-  const [day2EndometrialThickness, setDay2EndometrialThickness] = useState('3.8 mm (Type C Basal)');
+  const [stimulationProtocol, setStimulationProtocol] = useState(resolvedCycle?.protocol_name || resolvedCycle?.protocol_plan || resolvedCycle?.treatment_type || '');
+  const [daysStimulation, setDaysStimulation] = useState('');
+  const [stimulationDate, setStimulationDate] = useState(resolvedCycle?.sentinel_dates?.stim_start || resolvedCycle?.start_date || '');
+  const [oralStimulatingAgents, setOralStimulatingAgents] = useState('');
+  const [downRegulation, setDownRegulation] = useState('');
+  const [downRegulationDays, setDownRegulationDays] = useState('');
+  const [downRegulationDate, setDownRegulationDate] = useState('');
+  const [downRegulationE2, setDownRegulationE2] = useState('');
+  const [day2EndometrialThickness, setDay2EndometrialThickness] = useState('');
 
   // HORMONES
-  const [rfshDosage, setRfshDosage] = useState('Gonal-F 225 IU OD');
-  const [rlhDosage, setRlhDosage] = useState('Luveris 75 IU OD');
-  const [hphmgDosage, setHphmgDosage] = useState('Menopur 75 IU OD');
-  const [hpfshDosage, setHpfshDosage] = useState('—');
-  const [totalGonadotrophinDose, setTotalGonadotrophinDose] = useState('3300 IU Total');
-  const [deviationDuringCycle, setDeviationDuringCycle] = useState('None. Steady follicle development without premature LH surge.');
-  const [endometrialThickness, setEndometrialThickness] = useState('10.2 mm (Trilaminar Type A)');
-  const [fluidInCavity, setFluidInCavity] = useState('Absent (Clear cavity)');
-  const [interventionsDuringCycle, setInterventionsDuringCycle] = useState('Dose stepped down from 300 IU to 225 IU on Day 8.');
-  const [growthHormoneDosage, setGrowthHormoneDosage] = useState('Optional: 4 IU SC alternate days');
+  const [rfshDosage, setRfshDosage] = useState('');
+  const [rlhDosage, setRlhDosage] = useState('');
+  const [hphmgDosage, setHphmgDosage] = useState('');
+  const [hpfshDosage, setHpfshDosage] = useState('');
+  const [totalGonadotrophinDose, setTotalGonadotrophinDose] = useState('');
+  const [deviationDuringCycle, setDeviationDuringCycle] = useState('');
+  const [endometrialThickness, setEndometrialThickness] = useState('');
+  const [fluidInCavity, setFluidInCavity] = useState('');
+  const [interventionsDuringCycle, setInterventionsDuringCycle] = useState('');
+  const [growthHormoneDosage, setGrowthHormoneDosage] = useState('');
 
   // TRIGGER
-  const [trigger, setTrigger] = useState('Dual Trigger (r-hCG 250mcg + Decapeptyl 0.2mg)');
-  const [triggerComments, setTriggerComments] = useState('Administered at exact time to prevent OHSS and maximize MII oocyte maturity.');
-  const [triggerDateTime, setTriggerDateTime] = useState('2025-01-23T21:30');
-  const [repeat12hTrigger, setRepeat12hTrigger] = useState('Not required');
-  const [preTriggerE2, setPreTriggerE2] = useState('2840 pg/mL');
-  const [preTriggerLH, setPreTriggerLH] = useState('1.8 mIU/mL');
-  const [preTriggerProgesterone, setPreTriggerProgesterone] = useState('0.85 ng/mL');
-  const [postTriggerLH, setPostTriggerLH] = useState('54.2 mIU/mL');
-  const [postTriggerProgesterone, setPostTriggerProgesterone] = useState('9.4 ng/mL');
-  const [postTriggerBHCG, setPostTriggerBHCG] = useState('186 mIU/mL');
-  const [triggerDayE2, setTriggerDayE2] = useState('2840 pg/mL');
-  const [triggerDayEndometrialThickness, setTriggerDayEndometrialThickness] = useState('10.2 mm');
+  const [trigger, setTrigger] = useState('');
+  const [triggerComments, setTriggerComments] = useState('');
+  const [triggerDateTime, setTriggerDateTime] = useState(
+    resolvedCycle?.sentinel_dates?.trigger ? `${resolvedCycle.sentinel_dates.trigger}T21:30` : ''
+  );
+  const [repeat12hTrigger, setRepeat12hTrigger] = useState('');
+  const [preTriggerE2, setPreTriggerE2] = useState('');
+  const [preTriggerLH, setPreTriggerLH] = useState('');
+  const [preTriggerProgesterone, setPreTriggerProgesterone] = useState('');
+  const [postTriggerLH, setPostTriggerLH] = useState('');
+  const [postTriggerProgesterone, setPostTriggerProgesterone] = useState('');
+  const [postTriggerBHCG, setPostTriggerBHCG] = useState('');
+  const [triggerDayE2, setTriggerDayE2] = useState('');
+  const [triggerDayEndometrialThickness, setTriggerDayEndometrialThickness] = useState('');
 
   // OPU PROCEDURAL
-  const [opuDateTime, setOpuDateTime] = useState('2025-01-25T09:00');
-  const [surgeon, setSurgeon] = useState('Dr. Sneha Verma, MS (OBG), DRM');
-  const [anaesthetist, setAnaesthetist] = useState('Dr. K. R. Nair, MD (Anaesth)');
-  const [otherSurgeons, setOtherSurgeons] = useState('Dr. Fellow Registrar');
-  const [opuTotalDose, setOpuTotalDose] = useState('Propofol 120mg + Fentanyl 50mcg');
-  const [selfDonor, setSelfDonor] = useState('Self');
-  const [triggerOpuDifference, setTriggerOpuDifference] = useState('35.5 Hours');
-  const [folliclesOver14, setFolliclesOver14] = useState('14');
-  const [oocytesRetrieved, setOocytesRetrieved] = useState('12');
-  const [matureOocytes, setMatureOocytes] = useState('10');
-  const [immatureOocytes, setImmatureOocytes] = useState('2');
-  const [oocyteQuality, setOocyteQuality] = useState('Good. Clear homogeneous ooplasm with intact first polar body.');
-  const [oocyteAbnormalities, setOocyteAbnormalities] = useState('1 oocyte with central cytoplasmic granularity; 1 GV arrested.');
-  const [freezing, setFreezing] = useState('Freeze-all strategy planned due to E2 > 2500 pg/mL');
-  const [spermDetails, setSpermDetails] = useState('Husband fresh sample prepared by DGC. Post-wash TMSI 18M with 85% progressive motility.');
-  const [advancedSpermTechnique, setAdvancedSpermTechnique] = useState('Microfluidic Sperm Sorting (Zymōt) + ICSI');
-  const [adviceOnDischarge, setAdviceOnDischarge] = useState(
-    'Tab. Cabergoline 0.5mg OD for 4 days (OHSS prophylaxis). Tab. Cefixime 200mg BD for 3 days. High protein diet and adequate oral hydration (2.5 - 3 L/day). Report in case of severe abdominal distension or breathlessness.'
+  const [opuDateTime, setOpuDateTime] = useState(
+    resolvedCycle?.sentinel_dates?.opu ? `${resolvedCycle.sentinel_dates.opu}T09:00` : ''
   );
+  const [surgeon, setSurgeon] = useState(resolvedCycle?.doctor_name || resolvedCycle?.treating_doctor_name || '');
+  const [anaesthetist, setAnaesthetist] = useState('');
+  const [otherSurgeons, setOtherSurgeons] = useState('');
+  const [opuTotalDose, setOpuTotalDose] = useState('');
+  const [selfDonor, setSelfDonor] = useState(resolvedCycle?.gametes_source?.oocyte === 'donor' ? 'Donor' : 'Self');
+  const [triggerOpuDifference, setTriggerOpuDifference] = useState('');
+  const [folliclesOver14, setFolliclesOver14] = useState('');
+  const [oocytesRetrieved, setOocytesRetrieved] = useState('');
+  const [matureOocytes, setMatureOocytes] = useState('');
+  const [immatureOocytes, setImmatureOocytes] = useState('');
+  const [oocyteQuality, setOocyteQuality] = useState('');
+  const [oocyteAbnormalities, setOocyteAbnormalities] = useState('');
+  const [freezing, setFreezing] = useState('');
+  const [spermDetails, setSpermDetails] = useState('');
+  const [advancedSpermTechnique, setAdvancedSpermTechnique] = useState('');
+  const [adviceOnDischarge, setAdviceOnDischarge] = useState('');
 
   const handleSave = async () => {
     if (!patient?.id) return;

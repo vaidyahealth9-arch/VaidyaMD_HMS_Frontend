@@ -7,6 +7,7 @@ import { patientsApi, appointmentsApi } from '@/lib/api';
 import Link from 'next/link';
 import { Download, Plus, Search, Building2, User } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import AddToOPDModal from '@/components/opd/AddToOPDModal';
 
 export default function PatientsPage() {
   const { currentBranch, user } = useAuth();
@@ -23,6 +24,7 @@ export default function PatientsPage() {
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [opdModalPatient, setOpdModalPatient] = useState<any>(null);
 
   const fetchPatients = () => {
     setIsLoading(true);
@@ -58,33 +60,8 @@ export default function PatientsPage() {
     return () => clearTimeout(timer);
   }, [search, referredByType, area, gender, startDate, endDate, page, currentBranch?.id, filterParam]);
 
-  const handleSendToOPD = async (p: any) => {
-    if (!user) return;
-    try {
-      // Check if patient is already in queue today to prevent duplicates
-      const todayStr = new Date().toISOString().split('T')[0];
-      const existing: any = await appointmentsApi.list({ date_filter: todayStr }).catch(() => ({ appointments: [] }));
-      const isAlreadyInQueue = (existing?.appointments || []).some(
-        (a: any) => a.patient_id === p.id && (a.status === 'waiting' || a.status === 'in_progress')
-      );
-
-      if (isAlreadyInQueue) {
-        alert(`Notice: Patient ${p.name} is ALREADY in today's OPD Queue (Waiting/In Consultation). Duplicate entry was prevented.`);
-        return;
-      }
-
-      await appointmentsApi.create({
-        patient_id: p.id,
-        doctor_id: p.treating_doctor_id || user.id,
-        department: 'OPD',
-        scheduled_at: new Date().toISOString(),
-        visit_type: 'consultation',
-        status: 'waiting',
-      });
-      alert(`Patient ${p.name} successfully added to OPD Queue for today!`);
-    } catch (err: any) {
-      alert(err.message || 'Failed to add to OPD Queue');
-    }
+  const handleSendToOPD = (p: any) => {
+    setOpdModalPatient(p);
   };
 
   const handleExportCSV = () => {
@@ -323,6 +300,12 @@ export default function PatientsPage() {
           </div>
         )}
       </div>
+
+      <AddToOPDModal
+        open={!!opdModalPatient}
+        onClose={() => setOpdModalPatient(null)}
+        patient={opdModalPatient}
+      />
     </div>
   );
 }

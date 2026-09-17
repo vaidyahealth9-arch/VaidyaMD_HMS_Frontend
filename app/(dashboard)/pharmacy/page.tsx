@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { pharmacyApi, patientsApi } from '@/lib/api';
+import { pharmacyApi, patientsApi, billingApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Pill,
@@ -23,7 +23,12 @@ import {
   DollarSign,
   Loader2,
   Trash2,
+  User,
+  X,
+  Printer,
+  Receipt,
 } from 'lucide-react';
+import PrintableInvoice from '@/components/common/PrintableInvoice';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
@@ -37,21 +42,23 @@ export default function PharmacyPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'indents' | 'pos_orders'>(
-    tabParam && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders'].includes(tabParam)
+  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'indents' | 'pos_orders' | 'bills'>(
+    tabParam && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders', 'bills'].includes(tabParam)
       ? (tabParam as any)
       : 'inventory'
   );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders'].includes(tab)) {
+    if (tab && ['inventory', 'ocr_grn', 'pos', 'indents', 'pos_orders', 'bills'].includes(tab)) {
       setActiveTab(tab as any);
     }
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [posSearch, setPosSearch] = useState('');
+  const [billSearchQuery, setBillSearchQuery] = useState('');
+  const [receiptModalInv, setReceiptModalInv] = useState<any | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResult, setOcrResult] = useState<any>(null);
@@ -59,7 +66,21 @@ export default function PharmacyPage() {
 
   // POS State
   const [posPatientId, setPosPatientId] = useState<string>('');
+  const [posPatientSearch, setPosPatientSearch] = useState<string>('');
+  const [isPosPatientDropdownOpen, setIsPosPatientDropdownOpen] = useState<boolean>(false);
+  const posPatientDropdownRef = useRef<HTMLDivElement>(null);
   const [posCart, setPosCart] = useState<Array<{ item_code: string; item_name: string; quantity: number; unit_price: number; batch_number: string }>>([]);
+  const [dispensedInvoice, setDispensedInvoice] = useState<any | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (posPatientDropdownRef.current && !posPatientDropdownRef.current.contains(event.target as Node)) {
+        setIsPosPatientDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch Inventory Batches
   const { data: batches = [], isLoading: batchesLoading } = useQuery({
@@ -95,6 +116,75 @@ export default function PharmacyPage() {
     queryFn: () => patientsApi.list({ per_page: 500 }),
   });
   const patients = patientsData?.patients || patientsData?.items || [];
+
+  // Fetch Pharmacy Invoices for Bills & Receipts Tab
+  const { data: allInvoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ['pharmacy-invoices'],
+    queryFn: () => billingApi.listInvoices(),
+    refetchInterval: 15000,
+  });
+
+  const pharmacyInvoices = (allInvoices as any[]).filter((inv: any) => {
+    const isPharmaSource = (inv.appointment_source || '').toLowerCase() === 'pharmacy';
+    const isPharmaInvNum = (inv.invoice_number || '').toUpperCase().startsWith('INV-PHARMA');
+    const hasPharmaReason = (inv.reason_for_attendance || '').toLowerCase().includes('pharmacy');
+    return isPharmaSource || isPharmaInvNum || hasPharmaReason;
+  });
+
+  const filteredPharmacyInvoices = pharmacyInvoices.filter((inv: any) => {
+    if (!billSearchQuery.trim()) return true;
+    const q = billSearchQuery.toLowerCase().trim();
+    const num = (inv.invoice_number || '').toLowerCase();
+    const patName = (inv.patient_name || '').toLowerCase();
+    const patVid = (inv.patient_vid || inv.patient_mrn || '').toLowerCase();
+    return num.includes(q) || patName.includes(q) || patVid.includes(q);
+  });
+
+  const openPrintFromPOS = (invData: any) => {
+    setReceiptModalInv({
+      invoice_number: invData.invoice_number,
+      patient_name: invData.patient_name || 'Walk-in / Counter Patient',
+      patient_vid: invData.patient_mrn || invData.patient_vid || '—',
+      created_at: invData.created_at || new Date().toISOString(),
+      appointment_source: 'Pharmacy',
+      reason_for_attendance: 'Point of Sale Pharmacy Dispense',
+      items: (invData.dispensed_batches || []).map((b: any) => ({
+        description: `${b.item_name} (Batch: ${b.batch_number || 'N/A'}${b.expiry_date ? `, Exp: ${formatDate(b.expiry_date)}` : ''})`,
+        quantity: b.quantity_dispensed || b.quantity || 1,
+        unit_price: b.unit_price || 0,
+        total: b.total_price || (b.quantity_dispensed || b.quantity || 1) * (b.unit_price || 0),
+      })),
+      subtotal: invData.total_amount || 0,
+      total_amount: invData.total_amount || 0,
+      paid_amount: invData.total_amount || 0,
+      pending_due: 0,
+    });
+  };
+
+  const openPrintFromInvoice = (inv: any) => {
+    setReceiptModalInv({
+      invoice_number: inv.invoice_number,
+      patient_name: inv.patient_name || 'Patient',
+      patient_vid: inv.patient_vid || inv.patient_mrn || '—',
+      created_at: inv.created_at || new Date().toISOString(),
+      appointment_source: inv.appointment_source || 'Pharmacy',
+      reason_for_attendance: inv.reason_for_attendance || 'Point of Sale Pharmacy Dispense',
+      items: (Array.isArray(inv.items) ? inv.items : []).map((it: any) => ({
+        description: it.item_name
+          ? `${it.item_name}${it.batch_number ? ` (Batch: ${it.batch_number})` : ''}`
+          : (it.description || 'Medication Dispensed'),
+        quantity: it.quantity_dispensed || it.quantity || 1,
+        unit_price: it.unit_price || 0,
+        total: it.total_price || it.total || ((it.quantity_dispensed || it.quantity || 1) * (it.unit_price || 0)),
+      })),
+      subtotal: inv.subtotal || inv.total_amount,
+      total_amount: inv.total_amount,
+      paid_amount: inv.paid_amount || inv.total_amount,
+      pending_due: inv.pending_due || 0,
+      discount: inv.discount || 0,
+      wallet_amount_used: inv.wallet_amount_used || 0,
+    });
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -232,9 +322,12 @@ export default function PharmacyPage() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+      queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
       setPosCart([]);
+      setDispensedInvoice(data);
       setActionSuccess(`Prescription successfully dispensed! Invoice #${data.invoice_number} created.`);
-      setTimeout(() => setActionSuccess(null), 5000);
+      setTimeout(() => setActionSuccess(null), 8000);
     },
     onError: (err: any) => {
       import('@/contexts/ToastContext').then(({ toast }) => toast.error('Dispensing failed', err.message));
@@ -306,6 +399,10 @@ export default function PharmacyPage() {
           <TabsTrigger value="pos" className="rounded-lg text-xs font-bold gap-1.5">
             <ShoppingCart className="w-3.5 h-3.5" />
             <span>Dispensing POS</span>
+          </TabsTrigger>
+          <TabsTrigger value="bills" className="rounded-lg text-xs font-bold gap-1.5">
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Bills & Receipts ({pharmacyInvoices.length})</span>
           </TabsTrigger>
           <TabsTrigger value="ocr_grn" className="rounded-lg text-xs font-bold gap-1.5">
             <UploadCloud className="w-3.5 h-3.5" />
@@ -417,29 +514,136 @@ export default function PharmacyPage() {
                   <CardTitle className="text-sm">Select Patient for Pharmacy Dispensing</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Patient Search</label>
-                    <input
-                      type="text"
-                      list="posPatientsList"
-                      placeholder="Type name or ID to search..."
-                      value={
-                        patients.find((p: any) => p.id === posPatientId)
-                          ? `${patients.find((p: any) => p.id === posPatientId)?.name} (${patients.find((p: any) => p.id === posPatientId)?.mrn || patients.find((p: any) => p.id === posPatientId)?.vid})`
-                          : posPatientId
-                      }
-                      onChange={(e) => {
-                        const match = patients.find((p: any) => `${p.name} (${p.mrn || p.vid})` === e.target.value);
-                        setPosPatientId(match ? match.id : e.target.value);
-                      }}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                    />
-                    <datalist id="posPatientsList">
-                      {patients.map((p: any) => (
-                        <option key={p.id} value={`${p.name} (${p.mrn || p.vid})`} />
-                      ))}
-                    </datalist>
-                  </div>
+                  {(() => {
+                    const selectedPat = patients.find((p: any) => p.id === posPatientId);
+
+                    if (selectedPat) {
+                      return (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center font-bold text-xs shadow-sm">
+                              {selectedPat.name?.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-emerald-950">{selectedPat.name}</p>
+                                <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-800 bg-white font-bold">
+                                  Ready for Dispensing
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-emerald-700 font-mono">
+                                MRN: {selectedPat.mrn || selectedPat.vid || 'N/A'} · {selectedPat.gender || 'F'} · {selectedPat.age ? `${selectedPat.age}y` : ''} · {selectedPat.phone ? `Ph: ${selectedPat.phone}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPosPatientId('');
+                              setPosPatientSearch('');
+                              setIsPosPatientDropdownOpen(true);
+                            }}
+                            className="h-8 text-xs font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-100/50"
+                          >
+                            Change Patient
+                          </Button>
+                        </div>
+                      );
+                    }
+
+                    // No patient selected yet: render searchable combobox
+                    const query = posPatientSearch.toLowerCase().trim();
+                    const filtered = patients.filter((p: any) => {
+                      if (!query) return true;
+                      return (
+                        p.name?.toLowerCase().includes(query) ||
+                        p.mrn?.toLowerCase().includes(query) ||
+                        p.vid?.toLowerCase().includes(query) ||
+                        p.phone?.toLowerCase().includes(query)
+                      );
+                    }).slice(0, 15);
+
+                    return (
+                      <div className="relative" ref={posPatientDropdownRef}>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Search Patient (Type Name, MRN, VID, or Phone) *
+                        </label>
+                        <div className="relative">
+                          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            type="text"
+                            placeholder="Type to search patient (e.g. Priya, PAT-001, 98765...)"
+                            value={posPatientSearch}
+                            onChange={(e) => {
+                              setPosPatientSearch(e.target.value);
+                              setIsPosPatientDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsPosPatientDropdownOpen(true)}
+                            className="pl-9 pr-9 h-10 text-xs bg-slate-50 border-slate-300 focus:bg-white focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                          />
+                          {posPatientSearch && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPosPatientSearch('');
+                                setIsPosPatientDropdownOpen(true);
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Combobox dropdown */}
+                        {isPosPatientDropdownOpen && (
+                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                            {filtered.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-slate-500 font-medium">
+                                No registered patients found matching "{posPatientSearch}"
+                              </div>
+                            ) : (
+                              filtered.map((p: any) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setPosPatientId(p.id);
+                                    setPosPatientSearch('');
+                                    setIsPosPatientDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left p-3 hover:bg-emerald-50/60 transition-colors flex items-center justify-between group"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-100 group-hover:text-emerald-800">
+                                      {p.name?.slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-950">
+                                        {p.name}
+                                      </p>
+                                      <p className="text-[11px] text-slate-500 font-mono">
+                                        MRN: {p.mrn || p.vid || 'N/A'} · {p.gender || 'F'} · {p.age ? `${p.age}y` : ''} · {p.phone || 'No phone'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-emerald-600 opacity-0 group-hover:opacity-100 uppercase tracking-wider">
+                                    Select Patient →
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1.5 mt-2">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                          Please search and select a patient to proceed with medication dispensing.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -560,6 +764,154 @@ export default function PharmacyPage() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* TAB: PHARMACY BILLS & RECEIPTS */}
+        <TabsContent value="bills" className="space-y-4 pt-2">
+          {/* Top stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Pharmacy Revenue</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">
+                {formatCurrency(pharmacyInvoices.reduce((sum: number, inv: any) => sum + (parseFloat(inv.paid_amount || inv.total_amount) || 0), 0))}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{pharmacyInvoices.length} total dispensed bills</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+              <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Paid / Settled Invoices</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">
+                {pharmacyInvoices.filter((i: any) => (i.status || '').toLowerCase() === 'paid').length}
+              </p>
+              <p className="text-[11px] text-emerald-600/80 mt-0.5">Fully collected at pharmacy counter</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Today's Dispenses</p>
+              <p className="text-2xl font-bold text-indigo-700 mt-1">
+                {(() => {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  return pharmacyInvoices.filter((i: any) => (i.created_at || '').startsWith(todayStr)).length;
+                })()}
+              </p>
+              <p className="text-[11px] text-indigo-600/80 mt-0.5">Dispensed today via FEFO</p>
+            </div>
+          </div>
+
+          {/* Search bar & quick action */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="relative w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={billSearchQuery}
+                onChange={(e) => setBillSearchQuery(e.target.value)}
+                placeholder="Search by invoice #, patient name, VID..."
+                className="pl-9 h-9 text-xs rounded-md"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setActiveTab('pos')}
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 rounded-md shadow-sm"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              + New POS Dispense
+            </Button>
+          </div>
+
+          {/* Invoices Table */}
+          <div className="bg-white rounded-md border border-slate-200 shadow-sm overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="p-3.5">Invoice #</th>
+                  <th className="p-3.5">Patient Details</th>
+                  <th className="p-3.5">Dispensed Medication(s)</th>
+                  <th className="p-3.5 text-center">Date &amp; Time</th>
+                  <th className="p-3.5 text-right">Billed Amount</th>
+                  <th className="p-3.5 text-center">Payment Status</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {invoicesLoading ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-slate-400">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                        <span>Loading pharmacy invoices...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredPharmacyInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-slate-400">
+                      <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="font-semibold text-slate-600">No Pharmacy Bills Found</p>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                        Dispense medications via the Dispensing POS tab to automatically generate hospital tax invoices and printable patient receipts.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPharmacyInvoices.map((inv: any) => {
+                    const itemsCount = Array.isArray(inv.items) ? inv.items.length : 0;
+                    const firstItem = Array.isArray(inv.items) && inv.items[0]
+                      ? (inv.items[0].item_name || inv.items[0].description)
+                      : null;
+
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-3.5 font-mono font-bold text-slate-900">
+                          {inv.invoice_number}
+                        </td>
+                        <td className="p-3.5">
+                          <p className="font-bold text-slate-900">{inv.patient_name || 'Walk-in Patient'}</p>
+                          <p className="text-[11px] text-slate-500 font-mono">VID: {inv.patient_vid || inv.patient_mrn || '—'}</p>
+                        </td>
+                        <td className="p-3.5">
+                          {firstItem ? (
+                            <div>
+                              <p className="text-slate-800 font-medium">{firstItem}</p>
+                              {itemsCount > 1 && (
+                                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                  +{itemsCount - 1} more medication{itemsCount > 2 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">FEFO Dispense</span>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-center text-slate-600">
+                          {formatDate(inv.created_at)}
+                        </td>
+                        <td className="p-3.5 text-right font-bold text-slate-900 font-mono">
+                          {formatCurrency(inv.total_amount)}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            {inv.status || 'PAID'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openPrintFromInvoice(inv)}
+                            className="gap-1.5 text-xs font-bold h-8 border-slate-300 hover:border-[rgb(var(--clr-primary))] hover:text-[rgb(var(--clr-primary))]"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            Print Bill / Receipt
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </TabsContent>
 
@@ -917,6 +1269,132 @@ export default function PharmacyPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* DISPENSE CONFIRMATION & INVOICE RECEIPT MODAL */}
+      {dispensedInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="bg-emerald-600 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Dispensing &amp; Invoice Complete!</h3>
+                  <p className="text-xs text-emerald-100 font-medium">Inventory stocks deducted via FEFO &amp; invoice recorded in billing</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDispensedInvoice(null)}
+                className="text-white/70 hover:text-white text-xl font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto" id="pharmacy-receipt-area">
+              {/* Receipt Header */}
+              <div className="flex justify-between items-start border-b border-slate-200 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-base text-slate-900 tracking-tight">VaidyaMD Pharmacy</span>
+                    <Badge variant="outline" className="text-[10px] border-emerald-500 text-emerald-700 bg-emerald-50 font-bold">
+                      TAX INVOICE / CASH MEMO
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Dispensed at Counter POS</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-900 font-mono">#{dispensedInvoice.invoice_number}</p>
+                  <p className="text-[11px] text-slate-500">{new Date(dispensedInvoice.created_at || Date.now()).toLocaleString('en-IN')}</p>
+                  <Badge variant="purple" className="text-[9px] uppercase font-bold mt-1">Status: PAID</Badge>
+                </div>
+              </div>
+
+              {/* Patient Info */}
+              <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 flex justify-between items-center text-xs">
+                <div>
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">Patient Name</span>
+                  <span className="font-bold text-slate-900 text-sm">{dispensedInvoice.patient_name || 'Patient'}</span>
+                </div>
+                {dispensedInvoice.patient_mrn && (
+                  <div className="text-right">
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block">Patient ID / MRN</span>
+                    <span className="font-mono font-bold text-slate-800">{dispensedInvoice.patient_mrn}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Dispensed Items Table */}
+              <div className="rounded-lg border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                    <tr>
+                      <th className="p-2.5">Medication</th>
+                      <th className="p-2.5">Batch #</th>
+                      <th className="p-2.5 text-center">Expiry</th>
+                      <th className="p-2.5 text-center">Qty</th>
+                      <th className="p-2.5 text-right">Unit Price</th>
+                      <th className="p-2.5 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {(dispensedInvoice.dispensed_batches || []).map((item: any, i: number) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 font-bold text-slate-800">{item.item_name}</td>
+                        <td className="p-2.5 font-mono text-[11px] text-[rgb(var(--clr-primary))]">{item.batch_number}</td>
+                        <td className="p-2.5 text-center text-slate-600 text-[11px]">{formatDate(item.expiry_date)}</td>
+                        <td className="p-2.5 text-center font-bold text-slate-900">{item.quantity_dispensed}</td>
+                        <td className="p-2.5 text-right text-slate-700">{formatCurrency(item.unit_price)}</td>
+                        <td className="p-2.5 text-right font-bold text-slate-900">{formatCurrency(item.total_price)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t border-slate-200">
+                    <tr>
+                      <td colSpan={5} className="p-2.5 text-right font-bold text-slate-700">Total Billed &amp; Received:</td>
+                      <td className="p-2.5 text-right font-black text-sm text-emerald-700">{formatCurrency(dispensedInvoice.total_amount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-emerald-50/70 p-3 rounded-md border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Inventory stock automatically updated. Batches were selected following strict First-Expiry-First-Out (FEFO) medical protocols.</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  openPrintFromPOS(dispensedInvoice);
+                }}
+                className="gap-1.5 text-xs font-bold border-slate-300 hover:border-[rgb(var(--clr-primary))] hover:text-[rgb(var(--clr-primary))]"
+              >
+                <Printer className="w-4 h-4" />
+                Print Pharmacy Receipt / Bill
+              </Button>
+              <Button
+                onClick={() => setDispensedInvoice(null)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-6"
+              >
+                Done / Next Patient
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable A4 Tax Invoice / Pharmacy Receipt */}
+      {receiptModalInv && (
+        <PrintableInvoice
+          invoice={receiptModalInv}
+          onClose={() => setReceiptModalInv(null)}
+        />
+      )}
     </div>
   );
 }

@@ -37,7 +37,7 @@ interface AuthContextValue {
   currentBranch: BranchItem | null;
   setCurrentBranch: (branch: BranchItem) => void;
   can: (moduleKey: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<VaidyaMdUser>;
   logout: () => void;
   switchUser: (email: string) => Promise<void>;
   setActiveDepartment: (dept: string) => void;
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true; // Default allow for standard general routes
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<VaidyaMdUser> => {
     const response = await authApi.login(email, password) as { access_token: string; user: VaidyaMdUser };
     localStorage.setItem('vaidya_md_token', response.access_token);
     localStorage.setItem('vaidya_md_user', JSON.stringify(response.user));
@@ -136,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveDepartment(response.user.departments?.[0] || '');
     wsClient.connect(response.user.id, { role: response.user.role, tenant_id: response.user.tenant_id });
     loadPermissions(response.user);
+    return response.user;
   };
 
   const switchUser = async (email: string) => {

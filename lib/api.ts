@@ -131,3 +131,8 @@ export { analyticsApi } from '@/features/analytics/api';
 // 12. Patient Documents & Reports
 // ==========================================
 export { documentsApi } from '@/features/documents/api';
+
+// ==========================================
+// 13. Pre-ART Clinical Counseling
+// ==========================================
+export { counselingApi, type CounselingNote } from '@/features/counseling/api';

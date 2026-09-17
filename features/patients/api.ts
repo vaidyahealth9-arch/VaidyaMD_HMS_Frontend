@@ -18,9 +18,9 @@ export const patientsApi = {
   unlinkPartner: (id: string) =>
     request<any>(`/core/patients/${id}/unlink-partner`, { method: 'DELETE' }),
   updateAlerts: (id: string, alertNotes: string[]) =>
-    request<any>(`/core/patients/${id}/alerts`, { method: 'POST', body: JSON.stringify({ alert_notes: alertNotes }) }),
+    request<any>(`/core/patients/${id}`, { method: 'PATCH', body: JSON.stringify({ alert_notes: alertNotes }) }),
   updateClinicalNotes: (id: string, clinicalNotes: string[]) =>
-    request<any>(`/core/patients/${id}/clinical-notes`, { method: 'POST', body: JSON.stringify({ clinical_notes: clinicalNotes }) }),
+    request<any>(`/core/patients/${id}`, { method: 'PATCH', body: JSON.stringify({ clinical_notes: clinicalNotes }) }),
   saveConsent: (id: string, data: { title: string; signature: string }) =>
     request<any>(`/core/patients/${id}/consents`, { method: 'POST', body: JSON.stringify(data) }),
 };
