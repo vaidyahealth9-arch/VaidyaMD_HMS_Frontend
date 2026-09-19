@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { appointmentsApi, patientsApi, authApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { statusColors, statusLabels, formatDateTime, isUserDoctor } from '@/lib/utils';
 import { toast } from '@/contexts/ToastContext';
 import Link from 'next/link';
@@ -122,6 +123,7 @@ const fertilityVisitTypes: FertilityVisitType[] = [
 
 export default function AppointmentsPage() {
   const router = useRouter();
+  const { user, can } = useAuth();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get('status');
 
@@ -726,7 +728,7 @@ export default function AppointmentsPage() {
                 {/* Status Actions */}
                 <div className="flex gap-2 pt-1 border-t border-slate-100 flex-wrap">
                   {/* Triage button for waiting or scheduled */}
-                  {(apt.status === 'waiting' || apt.status === 'scheduled') && (
+                  {(apt.status === 'waiting' || apt.status === 'scheduled') && can('action:record_vitals') && (
                     <button
                       onClick={() => {
                         setTriageApt(apt);
@@ -758,7 +760,7 @@ export default function AppointmentsPage() {
                     </button>
                   )}
 
-                  {apt.status === 'waiting' && (
+                  {apt.status === 'waiting' && can('action:start_consultation') && (
                     <button
                       onClick={() => handleStartConsultation(apt)}
                       className="flex-1 text-xs font-bold px-3 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
@@ -770,13 +772,15 @@ export default function AppointmentsPage() {
 
                   {apt.status === 'in_progress' && (
                     <>
-                      <button
-                        onClick={() => handleStartConsultation(apt)}
-                        className="flex-1 text-xs font-bold px-3 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
-                      >
-                        <Activity className="w-3.5 h-3.5" />
-                        <span>Open Workbench →</span>
-                      </button>
+                      {can('action:start_consultation') && (
+                        <button
+                          onClick={() => handleStartConsultation(apt)}
+                          className="flex-1 text-xs font-bold px-3 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
+                        >
+                          <Activity className="w-3.5 h-3.5" />
+                          <span>Open Workbench →</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => updateStatus(apt.id, 'completed')}
                         className="text-xs font-bold px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors"
