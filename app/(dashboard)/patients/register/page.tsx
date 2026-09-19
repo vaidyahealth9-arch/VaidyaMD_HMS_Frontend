@@ -11,7 +11,7 @@ import { Building2, Building, User, Users, AlertTriangle, X, Check, Camera, File
 import { isUserDoctor, getUserRoleDisplay } from '@/lib/utils';
 
 export default function RegisterPatientPage() {
-  const { user, currentBranch } = useAuth();
+  const { user, currentBranch, branches } = useAuth();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -165,7 +165,8 @@ export default function RegisterPatientPage() {
     if (data.is_surrogate) payload.is_surrogate = Boolean(data.is_surrogate);
 
     if (form.treating_doctor_id) payload.treating_doctor_id = form.treating_doctor_id;
-    if (currentBranch?.id) payload.branch_id = currentBranch.id;
+    const activeBranchId = currentBranch?.id || branches?.[0]?.id || user?.branch_id;
+    if (activeBranchId) payload.branch_id = activeBranchId;
 
     if (alertNotes.length > 0) payload.alert_notes = alertNotes;
     if (clinicalNotes.length > 0) payload.clinical_notes = clinicalNotes;
@@ -508,9 +509,11 @@ export default function RegisterPatientPage() {
           </div>
 
           {/* Aadhaar, Doctor & Referral Details */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Aadhaar Number</label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="flex flex-col justify-end">
+              <label className="text-xs font-bold text-slate-500 mb-1.5 min-h-[32px] flex items-end">
+                Aadhaar Number
+              </label>
               <input
                 type="text"
                 value={form.aadhaar_number}
@@ -519,9 +522,9 @@ export default function RegisterPatientPage() {
                 placeholder="9876-5432-1098"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
-                Treating Consultant <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+            <div className="flex flex-col justify-end">
+              <label className="text-xs font-bold text-slate-500 mb-1.5 min-h-[32px] flex items-end">
+                <span>Treating Consultant <span className="text-[10px] text-slate-400 font-normal">(Optional)</span></span>
               </label>
               <select
                 value={form.treating_doctor_id}
@@ -531,14 +534,14 @@ export default function RegisterPatientPage() {
                 <option value="">— Assign Doctor Later at OPD —</option>
                 {doctorsList.map((d) => (
                   <option key={d.id} value={d.id}>
-                    Dr. {d.name} ({d.specialization || (d.role === 'admin' && d.is_doctor ? 'Admin + Doctor' : 'Doctor')})
+                    {d.name?.startsWith('Dr.') ? d.name : `Dr. ${d.name}`} ({d.specialization || (d.role === 'admin' && d.is_doctor ? 'Admin + Doctor' : 'Doctor')})
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
-                Referring Doctor / Clinic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+            <div className="flex flex-col justify-end">
+              <label className="text-xs font-bold text-slate-500 mb-1.5 min-h-[32px] flex items-end">
+                <span>Referring Doctor / Clinic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span></span>
               </label>
               <input
                 type="text"
@@ -548,9 +551,9 @@ export default function RegisterPatientPage() {
                 placeholder="e.g. Dr. A. Sharma / City Clinic"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
-                Marketing Person / Lead <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+            <div className="flex flex-col justify-end">
+              <label className="text-xs font-bold text-slate-500 mb-1.5 min-h-[32px] flex items-end">
+                <span>Marketing Person / Lead <span className="text-[10px] text-slate-400 font-normal">(Optional)</span></span>
               </label>
               <input
                 type="text"

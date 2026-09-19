@@ -47,7 +47,7 @@ export default function PatientsPage() {
           pts = pts.filter((p: any) => p.registration_type === 'donor_hospital');
         }
         setPatients(pts);
-        setTotal(pts.length);
+        setTotal(filterParam ? pts.length : (data.total ?? pts.length));
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
