@@ -38,23 +38,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = async (roleEmail: string) => {
-    setEmail(roleEmail);
-    setPassword('vaidya_md_2026');
-    setError('');
-    setIsLoading(true);
-    try {
-      const loggedUser = await login(roleEmail, 'vaidya_md_2026');
-      router.replace(getRoleDestination(loggedUser?.role));
-    } catch (err: any) {
-      setError(err?.message || 'Quick login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
-
   return (
     <div className="min-h-screen bg-slate-900 flex overflow-hidden">
       {/* Left: Branding Panel */}
@@ -186,77 +169,6 @@ export default function LoginPage() {
               ) : 'Sign In to Clinical Suite'}
             </button>
           </form>
-
-          {/* Quick 1-Click Role Profiles */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                1-Click Role Login
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">pwd: vaidya_md_2026</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('accounts@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-amber-400 bg-slate-50 hover:bg-amber-50/50 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-amber-700 block uppercase tracking-wider">Reception</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-amber-900">Ramesh G.</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ Appointments</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('pharmacy@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50/50 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-emerald-700 block uppercase tracking-wider">Pharmacy</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-emerald-900">Priya Nair</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ POS Dispense</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('meera.reddy@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-blue-700 block uppercase tracking-wider">Doctor</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-900">Dr. Meera</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ OPD Queue</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('rahul.nair@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-purple-400 bg-slate-50 hover:bg-purple-50/50 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-purple-700 block uppercase tracking-wider">Embryology</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-purple-900">Dr. Rahul</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ IVF Lab</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('counsellor@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-pink-400 bg-slate-50 hover:bg-pink-50/50 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-pink-700 block uppercase tracking-wider">Counselor</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-pink-900">Ananya Sen</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ Counselor Desk</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@vaidyamd.com')}
-                className="p-2.5 rounded-md border border-slate-200 hover:border-slate-800 bg-slate-50 hover:bg-slate-100 text-left transition-all group cursor-pointer"
-              >
-                <span className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">Admin</span>
-                <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-slate-900">Dr. Vikram</span>
-                <span className="text-[10px] text-slate-400 block truncate">→ Master Dash</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
