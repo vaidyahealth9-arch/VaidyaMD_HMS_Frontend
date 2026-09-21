@@ -9,7 +9,7 @@ import {
   TrendingUp,
   AlertTriangle,
   ReceiptText,
-  DollarSign,
+  IndianRupee,
   UserX,
   CheckCircle2,
   PieChart as PieChartIcon,
@@ -132,14 +132,30 @@ export default function AnalyticsPage() {
     },
   });
 
-  // Send WhatsApp Reminder Mutation
-  const handleSendReminder = async (appointmentId: string) => {
+  // Send WhatsApp Reminder Mutation with live WhatsApp Web dispatch
+  const handleSendReminder = async (item: any) => {
+    const appointmentId = typeof item === 'string' ? item : item?.id;
+    if (!appointmentId) return;
     try {
       setSendingReminderId(appointmentId);
       const res = await analyticsApi.sendNoShowReminder(appointmentId);
       queryClient.invalidateQueries({ queryKey: ['analytics-no-shows'] });
-      setActionSuccess(res.message || 'WhatsApp recall reminder sent!');
-      setTimeout(() => setActionSuccess(null), 4000);
+
+      // If patient phone is present, trigger WhatsApp Web with tailored recall message
+      const phone = res.patient_phone || (typeof item === 'object' ? item.patient_phone : null);
+      if (phone) {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        const patientName = res.patient_name || (typeof item === 'object' ? item.patient_name : 'Patient');
+        const doctorName = res.doctor_name || (typeof item === 'object' ? item.doctor_name : 'our consultant');
+        const msg = encodeURIComponent(
+          `Dear ${patientName}, we noticed you missed your scheduled consultation with ${doctorName}. Please let us know if you would like us to reschedule your appointment at your convenience.`
+        );
+        window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
+      }
+
+      setActionSuccess(res.message || 'WhatsApp recall reminder dispatched!');
+      setTimeout(() => setActionSuccess(null), 5000);
     } catch (err: any) {
       alert(err.message || 'Failed to dispatch reminder');
     } finally {
@@ -171,6 +187,9 @@ export default function AnalyticsPage() {
       [],
       ['Referring Partner', 'Referral Type', 'Patients Referred', 'Revenue Generated (INR)'],
       ...(revenueData.referring_doctors || []).map((r: any) => [r.doctor_name, r.referral_type, r.patients_referred, r.revenue_generated]),
+      [],
+      ['Clinician / Doctor', 'Role / Dept', 'Invoices Count', 'Gross Billed (INR)', 'Cash Collected (INR)', 'Collection Rate (%)'],
+      ...(revenueData.by_clinician || []).map((c: any) => [c.doctor_name, c.role, c.invoices_count, c.total_billed, c.total_collected, `${c.collection_rate}%`]),
     ];
 
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
@@ -200,6 +219,7 @@ export default function AnalyticsPage() {
   const deptData = revenueData?.by_department || [];
   const monthlyData = revenueData?.monthly_trend || [];
   const referringDoctors = revenueData?.referring_doctors || [];
+  const clinicians = revenueData?.by_clinician || [];
   const leakageItems = leakageData?.items || [];
   const leakageSummary = leakageData?.summary || {
     total_leakage_detected: 0,
@@ -307,7 +327,7 @@ export default function AnalyticsPage() {
               </p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] flex items-center justify-center font-bold">
-              <DollarSign className="w-5 h-5" />
+              <IndianRupee className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
@@ -567,6 +587,82 @@ export default function AnalyticsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Clinician Billing & Productivity Performance */}
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800">
+                    Clinician Billing & Productivity Performance
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Revenue generation, billing volume, and cash realization rates per doctor
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-xs font-semibold">
+                  {clinicians.length} Clinicians Active
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {clinicians.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  No billing records attributed to clinicians in this timeframe.
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3.5">Clinician / Specialist</th>
+                      <th className="p-3.5">Department / Role</th>
+                      <th className="p-3.5">Invoices Count</th>
+                      <th className="p-3.5">Gross Billed</th>
+                      <th className="p-3.5">Cash Collected</th>
+                      <th className="p-3.5 text-right">Collection Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {clinicians.map((c: any) => (
+                      <tr key={c.doctor_id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3.5 font-bold text-slate-900 flex items-center gap-2">
+                          <Stethoscope className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
+                          <span>{c.doctor_name}</span>
+                        </td>
+                        <td className="p-3.5">
+                          <Badge variant="outline" className="text-[10px] uppercase font-semibold">
+                            {c.role}
+                          </Badge>
+                        </td>
+                        <td className="p-3.5 font-semibold text-slate-700">
+                          {c.invoices_count} {c.invoices_count === 1 ? 'invoice' : 'invoices'}
+                        </td>
+                        <td className="p-3.5 font-bold text-slate-900">
+                          {formatCurrency(c.total_billed)}
+                        </td>
+                        <td className="p-3.5 font-semibold text-emerald-700">
+                          {formatCurrency(c.total_collected)}
+                        </td>
+                        <td className="p-3.5 text-right font-mono font-bold">
+                          <span
+                            className={
+                              c.collection_rate >= 80
+                                ? 'text-emerald-700'
+                                : c.collection_rate >= 50
+                                ? 'text-amber-700'
+                                : 'text-slate-600'
+                            }
+                          >
+                            {c.collection_rate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TAB 2: REVENUE LEAKAGE ACTION CENTER */}
@@ -729,7 +825,7 @@ export default function AnalyticsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleSendReminder(ns.id)}
+                            onClick={() => handleSendReminder(ns)}
                             disabled={sendingReminderId === ns.id}
                             className="h-7 text-xs font-semibold border-[rgb(var(--clr-primary)/0.3)] text-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.05)] rounded gap-1"
                           >

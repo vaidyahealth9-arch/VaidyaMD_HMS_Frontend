@@ -145,6 +145,7 @@ export default function MultiDocumentUploader({
           row.id === id
             ? {
                 ...row,
+                file_obj: file,
                 file_name: file.name,
                 file_data: reader.result as string,
                 file_size: (file.size / 1024).toFixed(1) + ' KB',
@@ -176,14 +177,30 @@ export default function MultiDocumentUploader({
           : (known?.label || row.file_name || 'Document');
 
         const targetPatientId = (row.target_patient === 'partner' && partnerId) ? partnerId : primaryPatientId;
+        
+        let storedFilePath = row.file_data;
+        if ((row as any).file_obj) {
+          try {
+            const uploadRes = await documentsApi.uploadFile((row as any).file_obj, {
+              category: row.category,
+              document_type: row.doc_type,
+              patient_id: targetPatientId,
+            });
+            storedFilePath = uploadRes.url;
+          } catch (uploadErr) {
+            console.warn('Direct upload failed, falling back to base64 payload:', uploadErr);
+          }
+        }
+
         await documentsApi.create({
           patient_id: targetPatientId,
           file_name: resolvedName,
-          file_path: row.file_data,
+          file_path: storedFilePath,
           category: row.category,
           mime_type: row.mime_type,
         });
       }
+
       
       setDocUploadRows([
         {
@@ -213,7 +230,7 @@ export default function MultiDocumentUploader({
           onClick={() => setIsDocUploadExpanded(!isDocUploadExpanded)}
         >
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-            <UploadCloud className="w-4 h-4 text-indigo-600" /> Upload Patient Documents &amp; Reports
+            <UploadCloud className="w-4 h-4 text-primary" /> Upload Patient Documents &amp; Reports
           </h3>
           <button type="button" className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors">
             {isDocUploadExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -225,7 +242,7 @@ export default function MultiDocumentUploader({
             setIsDocUploadExpanded(true);
             handleAddDocRow();
           }}
-          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-md border border-indigo-200 transition-colors flex items-center gap-1"
+          className="px-3 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary font-bold text-xs rounded-md border border-primary/20 transition-colors flex items-center gap-1"
         >
           <Plus className="w-3.5 h-3.5" /> + Add Document Row
         </button>
@@ -321,7 +338,7 @@ export default function MultiDocumentUploader({
                       type="file"
                       accept=".pdf,image/*"
                       onChange={(e) => handleFilePickedForRow(row.id, e)}
-                      className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer w-full"
+                      className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/15 cursor-pointer w-full"
                     />
                   )}
                 </div>
@@ -358,7 +375,7 @@ export default function MultiDocumentUploader({
                 type="button"
                 disabled={isUploadingDoc || docUploadRows.filter((r) => r.file_data).length === 0}
                 onClick={handleBatchUploadDocuments}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-md shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="px-4 py-2 bg-primary hover:bg-primary-mid text-white font-bold text-xs rounded-md shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {isUploadingDoc ? 'Uploading Documents...' : (
                   <>

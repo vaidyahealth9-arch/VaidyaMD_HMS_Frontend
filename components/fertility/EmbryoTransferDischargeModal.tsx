@@ -19,6 +19,7 @@ import {
   Eye,
   AlertTriangle,
 } from 'lucide-react';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { treatmentCyclesApi } from '@/lib/api';
 
 export interface EmbryoTransferDischargeModalProps {
@@ -87,7 +88,7 @@ export default function EmbryoTransferDischargeModal({
   ];
 
   const [medications, setMedications] = useState<any[]>(
-    existingSummary.luteal_support_medications || DEFAULT_LUTEAL_MEDS
+    existingSummary.luteal_support_medications || []
   );
 
   // Follow-up Timer (Beta-hCG)
@@ -141,10 +142,10 @@ export default function EmbryoTransferDischargeModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70  z-50 flex items-center justify-center p-3 sm:p-6 print:p-0 print:static print:bg-white">
-      <div className="bg-white rounded-lg max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden print:max-w-none print:max-h-none print:shadow-none print:rounded-none">
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-6 print:p-0 print:static print:bg-transparent print:overflow-visible">
+      <div className="bg-white rounded-lg max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-transparent print:m-0 print:p-0">
         {/* Header Bar */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden">
+        <div className="bg-primary text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-md bg-pink-500/20 text-pink-400 flex items-center justify-center">
               <Baby className="w-4 h-4" />
@@ -351,7 +352,7 @@ export default function EmbryoTransferDischargeModal({
                     <select
                       value={embryosTransferredCount}
                       onChange={(e) => setEmbryosTransferredCount(Number(e.target.value))}
-                      className="vmd-input text-xs w-full font-bold text-indigo-700"
+                      className="vmd-input text-xs w-full font-bold text-primary"
                     >
                       <option value={1}>1 (Elective Single Embryo Transfer — eSET)</option>
                       <option value={2}>2 (Double Embryo Transfer)</option>
@@ -394,22 +395,35 @@ export default function EmbryoTransferDischargeModal({
                     <h3 className="font-bold text-sm text-slate-900">3. Luteal Phase Support Medication Schedule</h3>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMedications([
-                        ...medications,
-                        { drug: '', dose: '', route: 'Oral', frequency: 'OD', instructions: '' },
-                      ])
-                    }
-                    className="text-xs text-[rgb(var(--clr-primary))] font-bold hover:underline"
-                  >
-                    + Add Medication
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMedications(DEFAULT_LUTEAL_MEDS)}
+                      className="text-xs text-slate-600 hover:text-slate-900 border border-slate-300 rounded px-2 py-0.5"
+                    >
+                      Load Standard Protocol
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMedications([
+                          ...medications,
+                          { drug: '', dose: '', route: 'Oral', frequency: 'OD', instructions: '' },
+                        ])
+                      }
+                      className="text-xs text-[rgb(var(--clr-primary))] font-bold hover:underline"
+                    >
+                      + Add Medication
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2.5">
-                  {medications.map((m, idx) => (
+                  {medications.length === 0 ? (
+                    <div className="text-center py-4 bg-white border border-dashed border-slate-200 rounded-md text-xs text-slate-400">
+                      No medications added yet. Click &quot;+ Add Medication&quot; or &quot;Load Standard Protocol&quot; above.
+                    </div>
+                  ) : medications.map((m, idx) => (
                     <div key={idx} className="bg-white border border-slate-200 rounded-md p-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                       <div className="sm:col-span-4">
                         <input
@@ -571,9 +585,9 @@ export default function EmbryoTransferDischargeModal({
                           <span className="text-[10px] text-pink-700 block font-bold">Transferred</span>
                           <strong className="text-base text-pink-700">{embryosTransferredCount}</strong>
                         </div>
-                        <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                          <span className="text-[10px] text-blue-700 block font-bold">Remaining Stored</span>
-                          <strong className="text-base text-blue-800">{5 - Number(embryosTransferredCount)}</strong>
+                        <div className="p-2 bg-primary/5 rounded border border-primary/20">
+                          <span className="text-[10px] text-primary block font-bold">Remaining Stored</span>
+                          <strong className="text-base text-primary font-bold">{5 - Number(embryosTransferredCount)}</strong>
                         </div>
                         <div className="p-2 bg-amber-50 rounded border border-amber-200">
                           <span className="text-[10px] text-amber-700 block font-bold">Thawed Unused</span>
@@ -617,31 +631,21 @@ export default function EmbryoTransferDischargeModal({
             </div>
           ) : (
             /* PREVIEW MODE: Printable Patient Takeaway Letterhead */
-            <div className="bg-white border border-slate-300 rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-sm print:border-none print:p-0">
-              {/* Clinic Header */}
-              <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tight">
-                    VaidyaMD Centre for Reproductive Medicine
-                  </h1>
-                  <p className="text-xs text-slate-600">
-                    Department of Embryology &amp; Assisted Conception · ART Act 2021 Accredited
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    24x7 Fertility Helpline: +91 98765 43210 · info@vaidyamd.com
-                  </p>
-                </div>
-                <div className="text-right font-mono text-xs text-slate-500">
-                  <p className="font-bold text-slate-900">{cycle?.cycle_id}</p>
-                  <p>Date: {transferDate}</p>
-                </div>
-              </div>
-
-              <div className="text-center py-1 bg-slate-100 rounded-lg">
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Embryo Transfer Discharge Summary &amp; Luteal Care Protocol
-                </h2>
-              </div>
+            <div className="bg-white border border-slate-300 rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-sm printable-document print:p-6 print:border-none">
+              <PrintableReportHeader
+                title="Embryo Transfer Discharge Summary & Luteal Care Protocol"
+                subtitle="Department of Embryology & Assisted Conception · ART Act 2021 Accredited"
+                badge="ET DISCHARGE PROTOCOL"
+                patient={{
+                  name: patient?.name || 'Female Patient',
+                  vid: patient?.vid,
+                }}
+                partner={partner?.name ? { name: partner?.name } : undefined}
+                metaFields={[
+                  { label: 'Treatment Cycle ID', value: cycle?.cycle_id || '—' },
+                  { label: 'Transfer Date', value: transferDate },
+                ]}
+              />
 
               {/* Patient Demographics Box */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-md border border-slate-200">

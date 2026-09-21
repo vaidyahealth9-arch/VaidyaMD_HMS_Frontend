@@ -16,8 +16,10 @@ import {
   Clock,
   Sparkles,
   FileText,
+  FileCheck,
   Lock,
 } from 'lucide-react';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { andrologyApi } from '@/lib/api';
 
 export interface DonorEmbryoTransferModalProps {
@@ -50,82 +52,59 @@ export default function DonorEmbryoTransferModal({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Recipient Details
-  const [recipientName, setRecipientName] = useState(patient?.name || 'Female Recipient');
-  const [recipientVid, setRecipientVid] = useState(patient?.vid || 'VID-000');
-  const [recipientAge, setRecipientAge] = useState(patient?.age || '36');
-  const [recipientBloodGroup, setRecipientBloodGroup] = useState(patient?.blood_group || 'B Positive');
-  const [partnerName, setPartnerName] = useState(patient?.partner_name || activeCycle?.partner_name || 'Partner');
-  const [cycleId, setCycleId] = useState(activeCycle?.cycle_id || 'ART-DONOR-01');
-  const [consultant, setConsultant] = useState('Dr. Sneha Verma, MS (OBG), DRM');
+  const [recipientName, setRecipientName] = useState(patient?.name || '');
+  const [recipientVid, setRecipientVid] = useState(patient?.vid || '');
+  const [recipientAge, setRecipientAge] = useState(patient?.age ? String(patient.age) : '');
+  const [recipientBloodGroup, setRecipientBloodGroup] = useState(patient?.blood_group || '');
+  const [partnerName, setPartnerName] = useState(patient?.partner_name || activeCycle?.partner_name || '');
+  const [cycleId, setCycleId] = useState(activeCycle?.cycle_id || '');
+  const [consultant, setConsultant] = useState(activeCycle?.doctor_name || '');
   const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0]);
-  const [transferTime, setTransferTime] = useState('11:30');
-  const [recipientConsent, setRecipientConsent] = useState('Yes (Form 16 Signed)');
-  const [identityVerified, setIdentityVerified] = useState('Yes (Biometric + Photo ID)');
-  const [witnessVerified, setWitnessVerified] = useState('Yes (Embryologist + Nurse)');
-  const [indication, setIndication] = useState('Repeated IVF Implantation Failure + Combined Severe Ovarian & Male Factor');
+  const [transferTime, setTransferTime] = useState('');
+  const [recipientConsent, setRecipientConsent] = useState('');
+  const [identityVerified, setIdentityVerified] = useState('');
+  const [witnessVerified, setWitnessVerified] = useState('');
+  const [indication, setIndication] = useState('');
 
   // Donor Traceability & Anonymity
-  const [donorProgramId, setDonorProgramId] = useState('DON-EMB-PROG-2025');
-  const [donorCode, setDonorCode] = useState('D-EMB-8492 (Anonymized Code)');
-  const [embryoCryoId, setEmbryoCryoId] = useState('CRYO-STR-DON-1204');
-  const [donorType, setDonorType] = useState('Authorized Voluntary Embryo Donation');
-  const [screeningStatus, setScreeningStatus] = useState('Verified & Seronegative (HIV, HBsAg, HCV, VDRL, Karyotype 46,XX/XY)');
-  const [donorConsentStatus, setDonorConsentStatus] = useState('Verified Statutory Relinquishment Signed');
-  const [recipientMatching, setRecipientMatching] = useState('Phenotypic & Blood Group Matching Completed');
-  const [eligibilityVerifiedBy, setEligibilityVerifiedBy] = useState('ART Donor Registry Officer & Medical Director');
-  const [documentationRef, setDocumentationRef] = useState('ART-ACT-2021-REG-FILE-88349 (Confidential Donor Archival Vault)');
+  const [donorProgramId, setDonorProgramId] = useState('');
+  const [donorCode, setDonorCode] = useState('');
+  const [embryoCryoId, setEmbryoCryoId] = useState('');
+  const [donorType, setDonorType] = useState('');
+  const [screeningStatus, setScreeningStatus] = useState('');
+  const [donorConsentStatus, setDonorConsentStatus] = useState('');
+  const [recipientMatching, setRecipientMatching] = useState('');
+  const [eligibilityVerifiedBy, setEligibilityVerifiedBy] = useState('');
+  const [documentationRef, setDocumentationRef] = useState('');
 
   // Endometrial Preparation
   const [cycleType, setCycleType] = useState('HRT / Programmed FET');
-  const [endometrialPrep, setEndometrialPrep] = useState('Estradiol Valerate 2mg TDS + Micronized Progesterone 800mg');
+  const [endometrialPrep, setEndometrialPrep] = useState('');
   const [triggerDate, setTriggerDate] = useState('');
-  const [progesteroneStart, setProgesteroneStart] = useState('2025-01-25');
-  const [progesteroneExposure, setProgesteroneExposure] = useState('120 Hours (5 Days)');
-  const [endometrialThickness, setEndometrialThickness] = useState('10.4 mm');
-  const [endometrialPattern, setEndometrialPattern] = useState('Trilaminar (Triple Line - Grade A)');
-  const [estradiolTransferDay, setEstradiolTransferDay] = useState('285 pg/mL');
-  const [progesteroneTransferDay, setProgesteroneTransferDay] = useState('18.4 ng/mL');
-  const [uterineCavity, setUterineCavity] = useState('Normal regular contour, zero fluid');
+  const [progesteroneStart, setProgesteroneStart] = useState('');
+  const [progesteroneExposure, setProgesteroneExposure] = useState('');
+  const [endometrialThickness, setEndometrialThickness] = useState('');
+  const [endometrialPattern, setEndometrialPattern] = useState('');
+  const [estradiolTransferDay, setEstradiolTransferDay] = useState('');
+  const [progesteroneTransferDay, setProgesteroneTransferDay] = useState('');
+  const [uterineCavity, setUterineCavity] = useState('');
 
   // Donor Embryos Thaw & Transfer Table
-  const [embryos, setEmbryos] = useState<DonorEmbryoRow[]>([
-    {
-      embryoId: 'D-EMB-8492-E1',
-      day: 'Day 5 Blastocyst',
-      grade: '4AA (Expanded)',
-      pgt: 'Euploid (Normal 46,XX)',
-      vitDate: '2024-08-14',
-      thawDateTime: `${new Date().toISOString().split('T')[0]} 09:30`,
-      survival: '100% Intact',
-      reexpansion: 'Fully Re-expanded',
-      disposition: 'Transferred',
-    },
-    {
-      embryoId: 'D-EMB-8492-E2',
-      day: 'Day 5 Blastocyst',
-      grade: '4AB (Expanded)',
-      pgt: 'Euploid (Normal 46,XY)',
-      vitDate: '2024-08-14',
-      thawDateTime: `${new Date().toISOString().split('T')[0]} 09:30`,
-      survival: '100% Intact',
-      reexpansion: 'Fully Re-expanded',
-      disposition: 'Transferred',
-    },
-  ]);
+  const [embryos, setEmbryos] = useState<DonorEmbryoRow[]>([]);
 
   const addEmbryoRow = () => {
     setEmbryos([
       ...embryos,
       {
-        embryoId: `D-EMB-8492-E${embryos.length + 1}`,
+        embryoId: '',
         day: 'Day 5 Blastocyst',
-        grade: '4BB',
-        pgt: 'Euploid',
-        vitDate: '2024-08-14',
-        thawDateTime: `${new Date().toISOString().split('T')[0]} 09:30`,
-        survival: '100%',
-        reexpansion: 'Re-expanded',
-        disposition: 'Remaining in storage',
+        grade: '',
+        pgt: '',
+        vitDate: '',
+        thawDateTime: `${new Date().toISOString().split('T')[0]}`,
+        survival: '',
+        reexpansion: '',
+        disposition: 'Transferred',
       },
     ]);
   };
@@ -141,14 +120,14 @@ export default function DonorEmbryoTransferModal({
   };
 
   // Transfer Procedure
-  const [numberTransferred, setNumberTransferred] = useState('2');
-  const [catheterType, setCatheterType] = useState('Cook Sydney IVF Soft Catheter');
-  const [ultrasoundGuided, setUltrasoundGuided] = useState('Yes (Full Bladder Transabdominal)');
-  const [transferDifficulty, setTransferDifficulty] = useState('Easy / Smooth Placement');
-  const [transferDoctor, setTransferDoctor] = useState('Dr. Sneha Verma, MS (OBG)');
-  const [transferEmbryologist, setTransferEmbryologist] = useState('Senior Embryologist');
-  const [bloodOnCatheter, setBloodOnCatheter] = useState('None (Clean)');
-  const [retainedEmbryo, setRetainedEmbryo] = useState('Negative (0 Retained Embryos Verified under Stereo-Microscope)');
+  const [numberTransferred, setNumberTransferred] = useState('1');
+  const [catheterType, setCatheterType] = useState('');
+  const [ultrasoundGuided, setUltrasoundGuided] = useState('');
+  const [transferDifficulty, setTransferDifficulty] = useState('');
+  const [transferDoctor, setTransferDoctor] = useState(activeCycle?.doctor_name || '');
+  const [transferEmbryologist, setTransferEmbryologist] = useState('');
+  const [bloodOnCatheter, setBloodOnCatheter] = useState('');
+  const [retainedEmbryo, setRetainedEmbryo] = useState('');
 
   const handleSave = async () => {
     if (!patient?.id) return;
@@ -225,10 +204,10 @@ export default function DonorEmbryoTransferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rail-bg/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:static print:bg-transparent print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-transparent print:m-0 print:p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-800">
               <HeartHandshake className="w-4 h-4" />
@@ -521,7 +500,13 @@ export default function DonorEmbryoTransferModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {embryos.map((emb, idx) => (
+                      {embryos.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-4 text-center text-slate-400 italic">
+                            No donor embryos added. Click &quot;+ Add Donor Embryo&quot; above to specify thawed embryos.
+                          </td>
+                        </tr>
+                      ) : embryos.map((emb, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="p-2">
                             <input
@@ -683,17 +668,22 @@ export default function DonorEmbryoTransferModal({
             </div>
           ) : (
             /* Print Preview */
-            <div className="max-w-3xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800">
-              <div className="text-center border-b-2 border-teal-800 pb-4">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase">
-                  Donor Embryo Transfer (FET) — Official Laboratory Record
-                </h1>
-                <p className="text-xs text-slate-500 italic mt-0.5">
-                  VaidyaMD Assisted Conception &amp; Donor Gamete BioBank · ART Act 2021 Accredited
-                </p>
-              </div>
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+              <PrintableReportHeader
+                title="Donor Embryo Transfer (FET) — Official Laboratory Record"
+                subtitle="VaidyaMD Assisted Conception & Donor Gamete BioBank · ART Act 2021 Accredited"
+                badge="DONOR ET RECORD"
+                patient={{
+                  name: recipientName,
+                  vid: recipientVid,
+                }}
+                metaFields={[
+                  { label: 'Donor Anonymized Code', value: donorCode },
+                  { label: 'Transfer Date / Time', value: `${transferDate} at ${transferTime}` },
+                ]}
+              />
 
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200">
+              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
                 <div className="p-2.5 bg-slate-50 font-bold">Recipient Patient: <span className="font-normal">{recipientName}</span></div>
                 <div className="p-2.5 bg-slate-50 font-bold">Recipient VID: <span className="font-normal font-mono">{recipientVid}</span></div>
                 <div className="p-2.5">Donor Anonymized Code: <span className="font-mono font-bold text-teal-800">{donorCode}</span></div>
@@ -745,7 +735,7 @@ export default function DonorEmbryoTransferModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="text-xs text-slate-500">
             {saveSuccess && (
               <span className="text-emerald-700 font-bold flex items-center gap-1.5">

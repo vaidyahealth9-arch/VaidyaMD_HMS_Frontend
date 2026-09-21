@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { counselingApi, patientsApi } from '@/lib/api';
+import { counselingApi, patientsApi, treatmentCyclesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
 import { formatDate } from '@/lib/utils';
@@ -29,20 +29,9 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
-
-const PROCEDURES_LIST = [
-  'IVF-ICSI (Antagonist Protocol)',
-  'IVF-ICSI (Agonist Protocol)',
-  'Intrauterine Insemination (IUI)',
-  'Frozen Embryo Transfer (FET)',
-  'Oocyte Vitrification / Egg Freezing',
-  'Donor Oocyte IVF-ICSI',
-  'Donor Sperm IUI / IVF',
-  'Surrogacy ART Cycle',
-  'Surgical Sperm Retrieval (TESA/PESA/Micro-TESE)',
-  'Pre-Implantation Genetic Testing (PGT-A/M)',
-  'Fertility Preservation (Onco-fertility)',
-];
+import PrintableModal from '@/components/common/PrintableModal';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableReportFooter from '@/components/common/PrintableReportFooter';
 
 const SOURCES_LIST = [
   'OP Consultation',
@@ -57,22 +46,34 @@ export default function CounselingPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Fetch dynamic Treatment Cycle Types for procedures list
+  const { data: cycleTypes } = useQuery({
+    queryKey: ['treatment-cycle-types'],
+    queryFn: () => treatmentCyclesApi.listTypes().catch(() => []),
+  });
+
+  const dynamicProcedures: string[] =
+    cycleTypes && Array.isArray(cycleTypes) && cycleTypes.length > 0
+      ? cycleTypes.map((c: any) => c.name)
+      : [];
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilterProcedure, setSelectedFilterProcedure] = useState('');
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [viewingNote, setViewingNote] = useState<any | null>(null);
-  const [printingNote, setPrintingNote] = useState<any | null>(null);
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [selectedFilterSource, setSelectedFilterSource] = useState('');
 
-  // Form State
-  const [selectedPatientId, setSelectedPatientId] = useState('');
+  // Modal / Form state
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [printingNote, setPrintingNote] = useState<any | null>(null);
+  const [viewingNote, setViewingNote] = useState<any | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
   const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
   const patientDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     source: 'OP Consultation',
-    procedure: 'IVF-ICSI (Antagonist Protocol)',
+    procedure: '',
     egg_pick_up: '',
     discussion: '',
     laparoscopy_hysteroscopy: '',
@@ -186,7 +187,7 @@ export default function CounselingPage() {
     setPatientSearch('');
     setFormData({
       source: 'OP Consultation',
-      procedure: 'IVF-ICSI (Antagonist Protocol)',
+      procedure: '',
       egg_pick_up: '',
       discussion: '',
       laparoscopy_hysteroscopy: '',
@@ -201,7 +202,7 @@ export default function CounselingPage() {
     setSelectedPatientId(note.patient_id);
     setFormData({
       source: note.source || 'OP Consultation',
-      procedure: note.procedure || 'IVF-ICSI (Antagonist Protocol)',
+      procedure: note.procedure || '',
       egg_pick_up: note.egg_pick_up || '',
       discussion: note.discussion || '',
       laparoscopy_hysteroscopy: note.laparoscopy_hysteroscopy || '',
@@ -235,10 +236,10 @@ export default function CounselingPage() {
               resetForm();
               setShowNewModal(true);
             }}
-            className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
+            className="gap-2 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>+ New Counseling Session</span>
+            <span>New Counseling Session</span>
           </Button>
         </div>
       </div>
@@ -263,11 +264,11 @@ export default function CounselingPage() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">IVF-ICSI Protocols</p>
-            <p className="text-2xl font-bold text-indigo-700 mt-1">
+            <p className="text-[11px] font-bold text-primary uppercase tracking-wider">IVF-ICSI Protocols</p>
+            <p className="text-2xl font-bold text-primary mt-1">
               {notes.filter((n: any) => (n.procedure || '').toLowerCase().includes('ivf')).length}
             </p>
-            <p className="text-[11px] text-indigo-600/80 mt-0.5">OPU &amp; embryo transfer counseled</p>
+            <p className="text-[11px] text-primary/80 mt-0.5">OPU &amp; embryo transfer counseled</p>
           </CardContent>
         </Card>
 
@@ -302,7 +303,7 @@ export default function CounselingPage() {
             className="h-9 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-md text-slate-700 focus:outline-none"
           >
             <option value="">All Procedures</option>
-            {PROCEDURES_LIST.map((p) => (
+            {dynamicProcedures.map((p: string) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
@@ -328,7 +329,7 @@ export default function CounselingPage() {
               <tr>
                 <td colSpan={7} className="text-center py-12 text-slate-400">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span>Loading counseling records...</span>
                   </div>
                 </td>
@@ -339,7 +340,7 @@ export default function CounselingPage() {
                   <HeartHandshake className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                   <p className="font-bold text-slate-700 text-sm">No Counseling Sessions Found</p>
                   <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                    Click &quot;+ New Counseling Session&quot; above to record pre-ART counseling, discussion points, OPU/FET plans, and signatures.
+                    Click &quot;New Counseling Session&quot; above to record pre-ART counseling, discussion points, OPU/FET plans, and signatures.
                   </p>
                 </td>
               </tr>
@@ -355,7 +356,7 @@ export default function CounselingPage() {
                   <td className="p-3.5">
                     <p className="font-bold text-slate-900">{note.patient_name || 'Patient'}</p>
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
-                      <span className="font-mono font-bold text-indigo-700">{note.patient_vid || '—'}</span>
+                      <span className="font-mono font-bold text-primary">{note.patient_vid || '—'}</span>
                       {note.patient_age && <span>· {note.patient_age}y</span>}
                       {note.partner_name && <span className="truncate max-w-[120px]">· Partner: {note.partner_name}</span>}
                     </div>
@@ -366,7 +367,7 @@ export default function CounselingPage() {
                     </Badge>
                   </td>
                   <td className="p-3.5">
-                    <span className="font-bold text-indigo-900 text-xs">{note.procedure || 'General Counseling'}</span>
+                    <span className="font-bold text-text-main text-xs">{note.procedure || 'General Counseling'}</span>
                   </td>
                   <td className="p-3.5 max-w-xs">
                     <p className="text-slate-700 line-clamp-2 text-[11px] leading-relaxed">
@@ -392,7 +393,7 @@ export default function CounselingPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => setViewingNote(note)}
-                        className="h-7 text-xs font-bold px-2.5 border-slate-300 hover:border-indigo-500 hover:text-indigo-600"
+                        className="h-7 text-xs font-bold px-2.5 border-slate-300 hover:border-primary hover:text-primary"
                         title="View Complete 8-Column Counseling Sheet"
                       >
                         <FileText className="w-3.5 h-3.5 mr-1" />
@@ -411,7 +412,7 @@ export default function CounselingPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleEdit(note)}
-                        className="h-7 text-xs font-bold px-2 border-slate-300 hover:border-indigo-600 hover:text-indigo-600"
+                        className="h-7 text-xs font-bold px-2 border-slate-300 hover:border-primary hover:text-primary"
                         title="Edit Counseling Note"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -432,9 +433,9 @@ export default function CounselingPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-xs">
           <div className="bg-white max-w-4xl w-full rounded-xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col my-6 max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-pink-900 to-indigo-950 text-white flex items-center justify-between flex-shrink-0">
+            <div className="p-4 sm:p-5 bg-primary text-white flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-pink-300 border border-white/15">
+                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-accent border border-white/15">
                   <HeartHandshake className="w-5 h-5" />
                 </div>
                 <div>
@@ -574,7 +575,7 @@ export default function CounselingPage() {
                       onChange={(e) => setFormData({ ...formData, procedure: e.target.value })}
                       className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-pink-500 focus:outline-none shadow-sm"
                     >
-                      {PROCEDURES_LIST.map((p) => (
+                      {dynamicProcedures.map((p: string) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
@@ -754,7 +755,7 @@ export default function CounselingPage() {
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">2. Procedure</span>
-                  <p className="font-bold text-indigo-950 text-sm mt-1">{viewingNote.procedure || 'General Counseling'}</p>
+                  <p className="font-bold text-text-main text-sm mt-1">{viewingNote.procedure || 'General Counseling'}</p>
                 </div>
               </div>
 
@@ -836,44 +837,29 @@ export default function CounselingPage() {
       {/* PRINTABLE A4 COUNSELING CASE SHEET */}
       {/* ========================================================= */}
       {printingNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/60 print:p-0 print:static print:bg-transparent">
-          <div className="bg-white max-w-2xl w-full shadow-2xl rounded-lg overflow-hidden flex flex-col my-6 print:shadow-none print:rounded-none print:m-0 print:max-w-full">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between px-5 py-3 print:hidden bg-slate-900 text-white">
-              <p className="text-xs font-bold">Counseling Sheet Preview</p>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => window.print()}
-                  className="gap-1.5 bg-pink-700 hover:bg-pink-800 text-white text-xs font-bold"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print (A4)
-                </Button>
-                <button
-                  onClick={() => setPrintingNote(null)}
-                  className="text-white/60 hover:text-white p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Document */}
-            <div className="p-8 space-y-4 printable-document print:p-6 text-xs text-slate-900" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
-              {/* Hospital Header */}
-              <div className="flex items-start justify-between pb-3 border-b-2 border-[#0B4F6C]">
-                <div>
-                  <h1 className="font-bold text-base text-[#0B4F6C]">VaidyaMD Advanced Hospital &amp; Fertility Centre</h1>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Clinical Department of Reproductive Medicine &amp; ART Counseling</p>
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">Road No. 36, Jubilee Hills, Hyderabad · +91 40 4888 9999</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest text-[#0B4F6C] border-[#0B4F6C]">
-                    Pre-ART Counseling
-                  </Badge>
-                  <p className="text-[10px] font-mono text-slate-500 mt-1">Date: {formatDate(printingNote.created_at)}</p>
-                </div>
-              </div>
+        <PrintableModal
+          isOpen={true}
+          onClose={() => setPrintingNote(null)}
+          title="Counseling Sheet Preview"
+          subtitle={`Pre-ART counseling documentation for ${printingNote.patient_name || 'Patient'}`}
+          maxWidth="max-w-2xl"
+        >
+          {({ hideHeader }: { hideHeader: boolean }) => (
+            <div className="space-y-4 text-xs text-slate-900" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
+              {/* Dynamic Branch Header */}
+              <PrintableReportHeader
+                title="PRE-ART COUNSELING RECORD"
+                department="Department of Reproductive Medicine & ART Counseling"
+                hideHospitalHeader={hideHeader}
+                extraHeaderRight={
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest text-[#0B4F6C] border-[#0B4F6C]">
+                      Pre-ART Counseling
+                    </Badge>
+                    <p className="text-[10px] font-mono text-slate-500 mt-1">Date: {formatDate(printingNote.created_at)}</p>
+                  </div>
+                }
+              />
 
               {/* Patient Banner */}
               <div className="grid grid-cols-2 gap-4 p-3 rounded bg-slate-50 border border-slate-200">
@@ -884,7 +870,7 @@ export default function CounselingPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] font-bold text-slate-400 uppercase">Planned Procedure</p>
-                  <p className="font-bold text-xs text-indigo-900">{printingNote.procedure || 'ART Counseling'}</p>
+                  <p className="font-bold text-xs text-text-main">{printingNote.procedure || 'ART Counseling'}</p>
                   <p className="text-[10px] text-slate-500">Source: {printingNote.source || 'OP'}</p>
                 </div>
               </div>
@@ -898,7 +884,7 @@ export default function CounselingPage() {
                   </tr>
                   <tr className="border-b border-slate-200">
                     <td className="p-2.5 font-bold text-slate-600 bg-slate-50">2. Procedure</td>
-                    <td className="p-2.5 font-bold text-indigo-950">{printingNote.procedure || '—'}</td>
+                    <td className="p-2.5 font-bold text-text-main">{printingNote.procedure || '—'}</td>
                   </tr>
                   <tr className="border-b border-slate-200">
                     <td className="p-2.5 font-bold text-slate-600 bg-slate-50">3. Egg pick up (OPU)</td>
@@ -921,29 +907,22 @@ export default function CounselingPage() {
                     <td className="p-2.5 text-slate-800 leading-relaxed">{printingNote.remarks || '—'}</td>
                   </tr>
                   <tr>
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">8. Signature</td>
+                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">8. Counselor Sign-off</td>
                     <td className="p-2.5 font-bold text-slate-900 font-mono">{printingNote.signature || 'Counselor Signed'}</td>
                   </tr>
                 </tbody>
               </table>
 
-              {/* Footer Sign-off */}
-              <div className="pt-8 grid grid-cols-2 gap-4 items-end">
-                <div className="text-[10px] text-slate-400">
-                  <p>Couple received pre-ART clinical &amp; financial orientation.</p>
-                  <p>Electronically certified in VaidyaMD EMR Architecture.</p>
-                </div>
-                <div className="text-right">
-                  <div className="h-8" />
-                  <div className="pt-1 border-t border-slate-400 inline-block text-right">
-                    <p className="font-bold text-xs text-slate-800">{printingNote.signature || 'Counselor'}</p>
-                    <p className="text-[10px] text-slate-500">Authorized ART Counselor Signature</p>
-                  </div>
-                </div>
-              </div>
+              {/* Dynamic Branch Footer */}
+              <PrintableReportFooter
+                signatoryTitle={printingNote.signature || 'ART Counselor'}
+                signatorySubtitle="Authorized ART Counselor Signature"
+                showSignatory={true}
+                showComputerGeneratedNotice={true}
+              />
             </div>
-          </div>
-        </div>
+          )}
+        </PrintableModal>
       )}
     </div>
   );

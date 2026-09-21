@@ -213,9 +213,8 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                   setTargetWitnessDay(day);
                   setWitnessDialogOpen(true);
                 }}
-                className={`h-7 px-2.5 rounded-lg text-xs font-bold gap-1 ${
-                  signed ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'
-                }`}
+                className={`h-7 px-2.5 rounded-lg text-xs font-bold gap-1 ${signed ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100'
+                  }`}
               >
                 <span>Day {day}</span>
                 {signed ? <ShieldCheck className="w-3 h-3" /> : <ShieldAlert className="w-3 h-3 text-amber-600" />}
@@ -248,7 +247,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
           <Button
             onClick={() => batchCreateMutation.mutate()}
             disabled={batchCreateMutation.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl gap-2 shadow-md"
+            className="bg-primary hover:bg-primary-mid text-white font-bold rounded-xl gap-2 shadow-md"
           >
             <Plus className="w-4 h-4" />
             <span>{batchCreateMutation.isPending ? 'Creating...' : 'Initialize Day 0 Cohort (10 Oocytes)'}</span>
@@ -273,7 +272,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
               {oocytes.map((o: any) => (
                 <TableRow key={o.id} className="hover:bg-slate-50/80 text-xs">
                   <TableCell className="font-bold text-slate-900 bg-slate-50/50">
-                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-[11px]">
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold text-[11px]">
                       {o.oocyte_number}
                     </span>
                   </TableCell>
@@ -282,7 +281,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <Badge variant="purple" className="text-[10px] font-bold">{o.procedure_type || 'ICSI'}</Badge>
-                      <Badge variant="outline" className="text-[10px] font-bold bg-white text-indigo-700">{o.maturity_day0 || 'MII'}</Badge>
+                      <Badge variant="outline" className="text-[10px] font-bold bg-white text-primary">{o.maturity_day0 || 'MII'}</Badge>
                     </div>
                   </TableCell>
 
@@ -291,7 +290,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.fert_check_day1 || ''}
                       onChange={(e) => handleCellChange(o.id, 1, 'fert_check', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">-- Pending --</option>
                       <option value="2PN">2PN (Normal)</option>
@@ -307,7 +306,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.day2_data?.cells || ''}
                       onChange={(e) => handleCellChange(o.id, 2, 'cells', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">--</option>
                       <option value="2">2-Cell (Grade 1)</option>
@@ -322,7 +321,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.day3_data?.cells || ''}
                       onChange={(e) => handleCellChange(o.id, 3, 'cells', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">--</option>
                       <option value="8">8-Cell (Grade 1)</option>
@@ -338,7 +337,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.day5_data?.gardner || ''}
                       onChange={(e) => handleCellChange(o.id, 5, 'gardner', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-purple-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-purple-900 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">--</option>
                       <option value="4AA">4AA (Top Quality)</option>
@@ -356,7 +355,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.day6_data?.gardner || ''}
                       onChange={(e) => handleCellChange(o.id, 6, 'gardner', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">--</option>
                       <option value="5AA">5AA (Hatching Top)</option>
@@ -371,7 +370,7 @@ export default function OocyteGridTable({ cycleId }: OocyteGridTableProps) {
                     <select
                       value={o.disposition?.status || ''}
                       onChange={(e) => handleCellChange(o.id, 6, 'disposition', e.target.value)}
-                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-800 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">-- Select Action --</option>
                       <option value="Transferred">Fresh Transfer</option>

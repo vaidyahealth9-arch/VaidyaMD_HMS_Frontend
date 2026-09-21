@@ -17,6 +17,7 @@ import {
   UserCheck,
   Baby,
 } from 'lucide-react';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { andrologyApi } from '@/lib/api';
 
 export interface OPUAspirationReportModalProps {
@@ -211,10 +212,10 @@ export default function OPUAspirationReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rail-bg/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:static print:bg-transparent print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-transparent print:m-0 print:p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-pink-100 border border-pink-200 flex items-center justify-center text-pink-700">
               <Sparkles className="w-4 h-4" />
@@ -390,7 +391,7 @@ export default function OPUAspirationReportModal({
                       type="text"
                       value={totalGonadotrophinDose}
                       onChange={(e) => setTotalGonadotrophinDose(e.target.value)}
-                      className="vmd-input text-xs font-bold text-blue-700"
+                      className="vmd-input text-xs font-bold text-primary"
                     />
                   </div>
                   <div>
@@ -521,7 +522,7 @@ export default function OPUAspirationReportModal({
                         type="text"
                         value={triggerOpuDifference}
                         onChange={(e) => setTriggerOpuDifference(e.target.value)}
-                        className="vmd-input text-xs font-bold text-blue-700"
+                        className="vmd-input text-xs font-bold text-primary"
                       />
                     </div>
                   </div>
@@ -611,22 +612,30 @@ export default function OPUAspirationReportModal({
             </div>
           ) : (
             /* Printable Report Preview */
-            <div className="max-w-3xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800">
-              <div className="text-center border-b-2 border-pink-700 pb-4">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase">
-                  Oocyte Pick-Up (OPU) &amp; Aspiration Operative Record
-                </h1>
-                <p className="text-xs text-slate-500 italic mt-0.5">
-                  VaidyaMD Embryology Suite · Assisted Reproduction Clinical Record
-                </p>
-              </div>
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+              <PrintableReportHeader
+                title="Oocyte Pick-Up (OPU) & Aspiration Operative Record"
+                subtitle="VaidyaMD Embryology Suite · Assisted Reproduction Clinical Record"
+                badge="OPU RECORD"
+                patient={{
+                  name: patient?.name || 'Female Patient',
+                  vid: patient?.vid,
+                }}
+                doctor={{
+                  name: surgeon,
+                }}
+                metaFields={[
+                  { label: 'OPU Date / Time', value: opuDateTime.replace('T', ' ') },
+                  { label: 'Trigger-to-OPU Interval', value: triggerOpuDifference },
+                ]}
+              />
 
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200">
+              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
                 <div className="p-2.5 bg-slate-50 font-bold">Patient Name: <span className="font-normal">{patient?.name}</span></div>
                 <div className="p-2.5 bg-slate-50 font-bold">VID: <span className="font-normal font-mono">{patient?.vid}</span></div>
                 <div className="p-2.5">OPU Date/Time: <span className="font-semibold">{opuDateTime.replace('T', ' ')}</span></div>
                 <div className="p-2.5">Operating Surgeon: <span className="font-semibold">{surgeon}</span></div>
-                <div className="p-2.5">Trigger-OPU Gap: <span className="font-semibold text-blue-700">{triggerOpuDifference}</span></div>
+                <div className="p-2.5">Trigger-OPU Gap: <span className="font-semibold text-primary">{triggerOpuDifference}</span></div>
                 <div className="p-2.5">Endometrial Thickness: <span className="font-semibold text-emerald-800">{endometrialThickness}</span></div>
               </div>
 
@@ -679,7 +688,7 @@ export default function OPUAspirationReportModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="text-xs text-slate-500">
             {saveSuccess && (
               <span className="text-emerald-700 font-bold flex items-center gap-1.5">

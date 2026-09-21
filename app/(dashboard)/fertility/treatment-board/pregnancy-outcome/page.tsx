@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Printer, Save, Plus, Trash2, Baby, ChevronRight, BellRing } from 'lucide-react';
 import { toast } from '@/contexts/ToastContext';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 
 const DELIVERY_METHODS = ['Select', 'Vaginal Delivery', 'LSCS', 'Assisted Vaginal Delivery', 'Other'];
 const SEX_OPTIONS = ['Select', 'Male', 'Female', 'Other'];
@@ -135,9 +136,22 @@ export default function PregnancyOutcomePage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="printable-document max-w-5xl mx-auto px-4 sm:px-6 py-8 print:p-0 print:m-0 print:max-w-none">
+        {/* Printable Header for standard A4 layout */}
+        <div className="hidden print:block mb-4">
+          <PrintableReportHeader
+            title="TREATMENT CYCLE PREGNANCY & DELIVERY OUTCOME"
+            subtitle="Department of Reproductive Medicine & Obstetrics • Clinical Outcome Record"
+            metaFields={[
+              { label: 'Outcome Date', value: form.date_of_outcome },
+              { label: 'Gestation', value: `${form.gestation_weeks}w + ${form.gestation_days}d` },
+              { label: 'Babies Count', value: `${form.no_of_babies}` },
+            ]}
+          />
+        </div>
+
         {/* Title */}
-        <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-2xl p-6 mb-6 text-white shadow-lg print:shadow-none">
+        <div className="bg-gradient-to-r from-pink-500 to-rose-600 rounded-2xl p-6 mb-6 text-white shadow-lg print:hidden">
           <div className="flex items-center gap-3 mb-1">
             <Baby className="w-6 h-6 opacity-80" />
             <h1 className="text-xl font-bold">Cycle / Pregnancy Outcome</h1>

@@ -20,6 +20,7 @@ import {
   Check,
 } from 'lucide-react';
 import { andrologyApi } from '@/lib/api';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 
 export interface SurgicalSpermRetrievalModalProps {
   patient: any;
@@ -35,35 +36,34 @@ export default function SurgicalSpermRetrievalModal({
   onSaved,
 }: SurgicalSpermRetrievalModalProps) {
   const [viewMode, setViewMode] = useState<'form' | 'preview'>('form');
+  const [usePrePrintedPad, setUsePrePrintedPad] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Procedure Details
   const [procedureType, setProcedureType] = useState('TESA');
   const [procedureDate, setProcedureDate] = useState(new Date().toISOString().split('T')[0]);
-  const [indication, setIndication] = useState('Obstructive Azoospermia (CBAVD / Prior Vasectomy)');
-  const [laterality, setLaterality] = useState('Right Testis');
-  const [anesthesia, setAnesthesia] = useState('Local Cord Block + Sedation');
-  const [surgeonName, setSurgeonName] = useState('Dr. Anoop Sharma, M.Ch (Urology)');
-  const [needleType, setNeedleType] = useState('18G Needle with 20mL Suction Syringe');
-  const [aspirateVolume, setAspirateVolume] = useState('0.8');
-  const [tissueAppearance, setTissueAppearance] = useState('Dilated, opaque, full seminiferous tubules');
+  const [indication, setIndication] = useState('');
+  const [laterality, setLaterality] = useState('');
+  const [anesthesia, setAnesthesia] = useState('');
+  const [surgeonName, setSurgeonName] = useState('');
+  const [needleType, setNeedleType] = useState('');
+  const [aspirateVolume, setAspirateVolume] = useState('');
+  const [tissueAppearance, setTissueAppearance] = useState('');
 
   // Embryology Screening
-  const [screeningEmbryologist, setScreeningEmbryologist] = useState('Senior Andrologist / Embryologist');
-  const [searchTimeMin, setSearchTimeMin] = useState('25');
-  const [spermFound, setSpermFound] = useState<'yes_motile' | 'yes_twitching' | 'immotile' | 'none'>('yes_twitching');
-  const [motilityGrade, setMotilityGrade] = useState('Twitching / In-situ flagellar movement');
-  const [countEstimate, setCountEstimate] = useState('Moderate (2-5 spermatozoa per HPF)');
-  const [morphologyImpression, setMorphologyImpression] = useState('Normal oval heads with intact midpieces; suitable for ICSI');
+  const [screeningEmbryologist, setScreeningEmbryologist] = useState('');
+  const [searchTimeMin, setSearchTimeMin] = useState('');
+  const [spermFound, setSpermFound] = useState<'yes_motile' | 'yes_twitching' | 'immotile' | 'none'>('none');
+  const [motilityGrade, setMotilityGrade] = useState('');
+  const [countEstimate, setCountEstimate] = useState('');
+  const [morphologyImpression, setMorphologyImpression] = useState('');
 
   // Downstream Clinical Disposition
   const [disposition, setDisposition] = useState<'ICSI_TODAY' | 'CRYOPRESERVED' | 'DISCARDED'>('ICSI_TODAY');
-  const [strawsVitrified, setStrawsVitrified] = useState('2');
-  const [cryoLocation, setCryoLocation] = useState('Tank 1 / Canister 3 / Cane 4 / Yellow Goblet');
-  const [notes, setNotes] = useState(
-    'Surgical sperm aspiration performed under sterile OT conditions. Tubules teased in sperm wash media. Multiple twitching spermatozoa confirmed. Sample allocated for ICSI of wife oocytes.'
-  );
+  const [strawsVitrified, setStrawsVitrified] = useState('0');
+  const [cryoLocation, setCryoLocation] = useState('');
+  const [notes, setNotes] = useState('');
 
   const handleSave = async () => {
     if (!patient?.id) return;
@@ -112,15 +112,15 @@ export default function SurgicalSpermRetrievalModal({
     <div className="fixed inset-0 bg-black/70  z-50 flex items-center justify-center p-3 sm:p-6 print:p-0 print:static print:bg-white">
       <div className="bg-white rounded-lg max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden print:max-w-none print:max-h-none print:shadow-none print:rounded-none">
         {/* Header Bar */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden">
+        <div className="bg-primary text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-md bg-primary/100/20 text-accent flex items-center justify-center">
               <Scissors className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-base font-bold flex items-center gap-2">
                 <span>Surgical Sperm Retrieval Operative Record</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/100/20 border border-white/20 text-white">
                   {procedureType}
                 </span>
               </h2>
@@ -151,7 +151,10 @@ export default function SurgicalSpermRetrievalModal({
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => {
+                setViewMode('preview');
+                setTimeout(() => window.print(), 100);
+              }}
               className="px-3 py-1.5 rounded-md bg-[rgb(var(--clr-primary))] hover:opacity-90 text-xs font-bold text-white transition-colors flex items-center gap-1.5 shadow-sm"
               title="Print Operative Report"
             >
@@ -170,7 +173,7 @@ export default function SurgicalSpermRetrievalModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 print:overflow-visible print:p-0">
           {saveSuccess && (
             <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-xs font-bold animate-fadeIn">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -230,6 +233,7 @@ export default function SurgicalSpermRetrievalModal({
                       onChange={(e) => setLaterality(e.target.value)}
                       className="vmd-input text-xs w-full"
                     >
+                      <option value="">Select Laterality...</option>
                       <option value="Right Testis">Right Testis</option>
                       <option value="Left Testis">Left Testis</option>
                       <option value="Bilateral (Right + Left)">Bilateral (Right + Left)</option>
@@ -245,6 +249,7 @@ export default function SurgicalSpermRetrievalModal({
                       onChange={(e) => setAnesthesia(e.target.value)}
                       className="vmd-input text-xs w-full"
                     >
+                      <option value="">Select Anesthesia...</option>
                       <option value="Local Cord Block + Sedation">Local Cord Block + Sedation</option>
                       <option value="Local Infiltration (Lidocaine 2%)">Local Infiltration only</option>
                       <option value="General Anesthesia (GA)">General Anesthesia (GA)</option>
@@ -463,41 +468,26 @@ export default function SurgicalSpermRetrievalModal({
             </div>
           ) : (
             /* PREVIEW MODE: Printable Operative Report */
-            <div className="bg-white border border-slate-300 rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-sm print:border-none print:p-0">
-              <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tight">
-                    VaidyaMD Andrology &amp; Reproductive Surgery
-                  </h1>
-                  <p className="text-xs text-slate-600">
-                    Surgical Sperm Retrieval Operative &amp; Embryology Search Report
-                  </p>
-                </div>
-                <div className="text-right font-mono text-xs text-slate-500">
-                  <p className="font-bold text-slate-900">{procedureType}</p>
-                  <p>Date: {procedureDate}</p>
-                </div>
-              </div>
-
-              {/* Patient Info */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-md border border-slate-200">
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Patient (Husband)</span>
-                  <strong>{patient?.name}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">VID</span>
-                  <strong className="font-mono">{patient?.vid}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Age</span>
-                  <strong>{patient?.age} yrs</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Indication</span>
-                  <strong>{indication}</strong>
-                </div>
-              </div>
+            <div className="printable-document bg-white border border-slate-300 rounded-lg p-6 sm:p-8 max-w-4xl mx-auto space-y-6 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0">
+              <PrintableReportHeader
+                title={`SURGICAL SPERM RETRIEVAL (${procedureType}) REPORT`}
+                subtitle="VaidyaMD Andrology & Reproductive Surgery • Operative & Embryology Assessment"
+                hideHospitalHeader={usePrePrintedPad}
+                onTogglePrePrintedPad={() => setUsePrePrintedPad(!usePrePrintedPad)}
+                patient={{
+                  name: patient?.name,
+                  vid: patient?.vid,
+                  age: patient?.age,
+                  gender: 'Male',
+                  partner_name: activeCycle?.patient_name || patient?.partner_name,
+                }}
+                metaFields={[
+                  { label: 'Procedure', value: `${procedureType} (${laterality})` },
+                  { label: 'Date', value: procedureDate },
+                  { label: 'Indication', value: indication },
+                  { label: 'Surgeon', value: surgeonName },
+                ]}
+              />
 
               {/* Surgical Protocol */}
               <div className="space-y-2">
@@ -588,7 +578,7 @@ export default function SurgicalSpermRetrievalModal({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-6 py-2 bg-[rgb(var(--clr-primary))] hover:opacity-90 text-white font-bold text-xs rounded-md shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
+            className="px-6 py-2 bg-[rgb(var(--clr-primary))] hover:opacity-90 text-white font-bold text-xs rounded-md shadow-md shadow-primary/20 transition-all flex items-center gap-2"
           >
             {isSaving ? 'Saving...' : 'Save Surgical Retrieval Report'}
           </button>

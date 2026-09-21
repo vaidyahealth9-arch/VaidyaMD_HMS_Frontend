@@ -110,7 +110,7 @@ export default function TemplateManagementDialog({
   const [rxName, setRxName] = useState('');
   const [rxCategory, setRxCategory] = useState('Stimulation / OI');
   const [rxMedications, setRxMedications] = useState<RxMedicationItem[]>([
-    { drug_name: '', dose: '1 tab', frequency: 'OD', duration: '', instructions: 'After food' },
+    { drug_name: '', dose: '', frequency: 'OD', duration: '', instructions: '' },
   ]);
   const [rxAdvice, setRxAdvice] = useState('');
 
@@ -209,7 +209,7 @@ export default function TemplateManagementDialog({
     setClinicalPlan('');
     setRxName('');
     setRxCategory('Stimulation / OI');
-    setRxMedications([{ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: 'After food' }]);
+    setRxMedications([{ drug_name: '', dose: '', frequency: 'OD', instructions: '' }]);
     setRxAdvice('');
   };
 
@@ -238,7 +238,7 @@ export default function TemplateManagementDialog({
     setRxMedications(
       tmpl.medications.length > 0
         ? [...tmpl.medications]
-        : [{ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: 'After food' }]
+        : [{ drug_name: '', dose: '', frequency: 'OD', instructions: '' }]
     );
     setRxAdvice(tmpl.advice || '');
     setIsFormOpen(true);
@@ -358,7 +358,7 @@ export default function TemplateManagementDialog({
   const handleAddMedRow = () => {
     setRxMedications((prev) => [
       ...prev,
-      { drug_name: '', dose: '1 tab', frequency: 'OD', duration: '', instructions: 'After food' },
+      { drug_name: '', dose: '', frequency: 'OD', duration: '', instructions: '' },
     ]);
   };
 
@@ -380,7 +380,7 @@ export default function TemplateManagementDialog({
         <DialogTitle className="sr-only">Clinical &amp; Prescription Template Management</DialogTitle>
 
         {/* Modal Top Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-primary text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[rgb(var(--clr-primary))] text-white flex items-center justify-center font-bold">
               <Sparkles className="w-5 h-5" />
@@ -479,7 +479,7 @@ export default function TemplateManagementDialog({
                         }}
                         className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-indigo-50/80 border-indigo-300 ring-1 ring-indigo-400'
+                            ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/40'
                             : 'bg-white border-slate-200 hover:bg-slate-50'
                         }`}
                       >
@@ -552,7 +552,7 @@ export default function TemplateManagementDialog({
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Edit3 className="w-4 h-4 text-indigo-600" />
+                    <Edit3 className="w-4 h-4 text-primary" />
                     <h3 className="text-sm font-bold text-slate-900">
                       {editingId ? `Edit ${activeTab === 'clinical' ? 'Clinical' : 'Rx'} Template` : `Create New ${activeTab === 'clinical' ? 'Clinical' : 'Rx'} Template`}
                     </h3>
@@ -587,7 +587,7 @@ export default function TemplateManagementDialog({
                             onChange={(e) => setClinicalComplaint(e.target.value)}
                             rows={3}
                             placeholder="Primary symptoms..."
-                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                         </div>
 
@@ -598,7 +598,7 @@ export default function TemplateManagementDialog({
                             onChange={(e) => setClinicalHopi(e.target.value)}
                             rows={3}
                             placeholder="Clinical duration, evolution..."
-                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                           />
                         </div>
                       </div>
@@ -620,7 +620,7 @@ export default function TemplateManagementDialog({
                           onChange={(e) => setClinicalInvestigations(e.target.value)}
                           rows={3}
                           placeholder="Investigations, scans, imaging (one per line)..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                         />
                       </div>
 
@@ -631,7 +631,7 @@ export default function TemplateManagementDialog({
                           onChange={(e) => setClinicalPlan(e.target.value)}
                           rows={3}
                           placeholder="Management roadmap, lifestyle advice, next review..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                         />
                       </div>
                     </form>
@@ -655,7 +655,7 @@ export default function TemplateManagementDialog({
                           <select
                             value={rxCategory}
                             onChange={(e) => setRxCategory(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                           >
                             <option value="Stimulation / OI">Stimulation / Ovulation Induction</option>
                             <option value="PCOS Protocol">PCOS Protocol</option>
@@ -678,7 +678,7 @@ export default function TemplateManagementDialog({
                             size="sm"
                             variant="outline"
                             onClick={handleAddMedRow}
-                            className="h-7 text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1"
+                            className="h-7 text-xs font-bold text-primary border-primary/20 hover:bg-primary/10 gap-1"
                           >
                             <Plus className="w-3 h-3" />
                             <span>Add Drug</span>
@@ -772,7 +772,7 @@ export default function TemplateManagementDialog({
                           onChange={(e) => setRxAdvice(e.target.value)}
                           rows={2}
                           placeholder="e.g. Maintain hydration, report on Day 10 for TVS scan..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                         />
                       </div>
                     </form>
@@ -801,31 +801,38 @@ export default function TemplateManagementDialog({
                 {activeTab === 'clinical' && selectedClinical ? (
                   <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Header */}
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-slate-900">{selectedClinical.name}</h3>
+                    <div className="px-6 py-4 border-b border-slate-200 bg-white shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                            Clinical Protocol
+                          </span>
                           {selectedClinical.isCustom ? (
-                            <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-300">
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-purple-50 text-purple-700 border-purple-200">
                               Custom Template
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 border-slate-300">
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-slate-100 text-slate-600 border-slate-200">
                               Built-in Protocol
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">Clinical Outpatient Consultation Template</p>
+                        <h3 className="text-base font-bold text-slate-900 leading-snug break-words">
+                          {selectedClinical.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                          Clinical Outpatient Consultation Template &amp; Documentation Set
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         {selectedClinical.isCustom ? (
                           <>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleOpenEditClinical(selectedClinical)}
-                              className="h-8 text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5"
+                              className="h-8.5 text-xs font-semibold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5 shadow-2xs"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span>Edit</span>
@@ -834,7 +841,7 @@ export default function TemplateManagementDialog({
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteTemplate(selectedClinical.id, selectedClinical.name)}
-                              className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50 gap-1.5"
+                              className="h-8.5 text-xs font-semibold border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 gap-1.5 shadow-2xs"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete</span>
@@ -855,7 +862,7 @@ export default function TemplateManagementDialog({
                               setClinicalPlan(selectedClinical.plan);
                               setIsFormOpen(true);
                             }}
-                            className="h-8 text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5"
+                            className="h-8.5 text-xs font-semibold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5 shadow-2xs"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Copy &amp; Customize</span>
@@ -869,9 +876,9 @@ export default function TemplateManagementDialog({
                               onApplyClinicalTemplate(selectedClinical);
                               onOpenChange(false);
                             }}
-                            className="h-8 text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white gap-1.5 shadow-xs"
+                            className="h-8.5 text-xs font-semibold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white gap-1.5 shadow-xs"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Apply to Workbench</span>
                           </Button>
                         )}
@@ -901,7 +908,7 @@ export default function TemplateManagementDialog({
                           <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
                             Provisional Diagnosis
                           </span>
-                          <p className="text-xs font-bold text-indigo-900 mt-0.5">
+                          <p className="text-xs font-bold text-primary mt-0.5">
                             {selectedClinical.diagnosis || '—'}
                           </p>
                         </div>
@@ -931,34 +938,38 @@ export default function TemplateManagementDialog({
                 ) : activeTab === 'rx' && selectedRx ? (
                   <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Header */}
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-slate-900">{selectedRx.name}</h3>
-                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 border-emerald-300 font-bold">
+                    <div className="px-6 py-4 border-b border-slate-200 bg-white shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border-emerald-300">
                             {selectedRx.category}
                           </Badge>
                           {selectedRx.isCustom ? (
-                            <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-300">
-                              Custom Rx
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-purple-50 text-purple-700 border-purple-200">
+                              Custom Rx Regimen
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 border-slate-300">
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-slate-100 text-slate-600 border-slate-200">
                               Default Regimen
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">Structured Outpatient Prescription Regimen</p>
+                        <h3 className="text-base font-bold text-slate-900 leading-snug break-words">
+                          {selectedRx.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                          Structured Outpatient Prescription Regimen &amp; Dosing Guidelines
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         {selectedRx.isCustom ? (
                           <>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleOpenEditRx(selectedRx)}
-                              className="h-8 text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5"
+                              className="h-8.5 text-xs font-semibold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5 shadow-2xs"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span>Edit</span>
@@ -967,7 +978,7 @@ export default function TemplateManagementDialog({
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteTemplate(selectedRx.id, selectedRx.name)}
-                              className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50 gap-1.5"
+                              className="h-8.5 text-xs font-semibold border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 gap-1.5 shadow-2xs"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete</span>
@@ -986,7 +997,7 @@ export default function TemplateManagementDialog({
                               setRxAdvice(selectedRx.advice || '');
                               setIsFormOpen(true);
                             }}
-                            className="h-8 text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5"
+                            className="h-8.5 text-xs font-semibold border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5 shadow-2xs"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Copy &amp; Customize</span>
@@ -1000,9 +1011,9 @@ export default function TemplateManagementDialog({
                               onApplyRxTemplate(selectedRx);
                               onOpenChange(false);
                             }}
-                            className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
+                            className="h-8.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Apply to Prescription</span>
                           </Button>
                         )}

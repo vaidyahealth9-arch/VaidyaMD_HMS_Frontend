@@ -19,7 +19,8 @@ import {
   Activity,
   X,
 } from 'lucide-react';
-import { treatmentCyclesApi } from '@/lib/api';
+import { treatmentCyclesApi, protocolsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface DayData {
   day_number: number;
@@ -66,70 +67,6 @@ const DEFAULT_DRUGS = [
   { name: 'Oral Estradiol Valerate (Progynova 2mg)', defaultDose: '2 mg', route: 'PO', frequency: 'TDS' },
 ];
 
-// ─── Clinic Standard Protocol Presets ─────────────────────────────────
-// Based on "All treatment protocols (2).xlsx" from clinic
-interface ClinicProtocol {
-  id: string;
-  name: string;
-  drugs: string[];
-  // day-by-day: drug → dose for days 1-14+
-  schedule: Record<string, Record<number, string>>;
-}
-
-const CLINIC_PROTOCOLS: ClinicProtocol[] = [
-  {
-    id: 'antagonist',
-    name: 'Antagonist Protocol (Flexible)',
-    drugs: ['rFSH (Follisurge / Gonal-F)', 'HMG (Menopur)', 'GnRH Antagonist (Cetrotide 0.25mg)', 'Ovitrelle / hCG Trigger'],
-    schedule: {
-      'rFSH (Follisurge / Gonal-F)': { 2: '225 IU', 3: '225 IU', 4: '225 IU', 5: '225 IU', 6: '225 IU', 7: '225 IU', 8: '225 IU', 9: '150 IU', 10: '150 IU', 11: '150 IU' },
-      'HMG (Menopur)': { 6: '75 IU', 7: '75 IU', 8: '75 IU', 9: '75 IU', 10: '75 IU', 11: '75 IU' },
-      'GnRH Antagonist (Cetrotide 0.25mg)': { 6: '0.25 mg', 7: '0.25 mg', 8: '0.25 mg', 9: '0.25 mg', 10: '0.25 mg', 11: '0.25 mg', 12: '0.25 mg' },
-      'Ovitrelle / hCG Trigger': { 12: '250 mcg (Stat)' },
-    },
-  },
-  {
-    id: 'microflare',
-    name: 'Microflare Short Protocol (GnRH Flare)',
-    drugs: ['Leuprolide (Lupride 0.5mg Flare)', 'rFSH (Follisurge / Gonal-F)', 'HMG (Menopur)', 'Ovitrelle / hCG Trigger'],
-    schedule: {
-      'Leuprolide (Lupride 0.5mg Flare)': { 1: '0.5 mg', 2: '0.5 mg', 3: '0.5 mg', 4: '0.5 mg', 5: '0.5 mg', 6: '0.5 mg', 7: '0.5 mg', 8: '0.5 mg', 9: '0.5 mg', 10: '0.5 mg', 11: '0.5 mg', 12: '0.5 mg' },
-      'rFSH (Follisurge / Gonal-F)': { 2: '300 IU', 3: '300 IU', 4: '300 IU', 5: '300 IU', 6: '300 IU', 7: '225 IU', 8: '225 IU', 9: '225 IU', 10: '225 IU', 11: '225 IU' },
-      'HMG (Menopur)': { 5: '75 IU', 6: '75 IU', 7: '75 IU', 8: '75 IU', 9: '75 IU', 10: '75 IU', 11: '75 IU' },
-      'Ovitrelle / hCG Trigger': { 12: '10,000 IU (Stat)' },
-    },
-  },
-  {
-    id: 'ovulation_induction_iui',
-    name: 'Ovulation Induction (IUI-H / OI)',
-    drugs: ['Tab Letrozole 2.5mg', 'HMG (Menopur)', 'Ovitrelle / hCG Trigger'],
-    schedule: {
-      'Tab Letrozole 2.5mg': { 2: '2.5 mg', 3: '2.5 mg', 4: '2.5 mg', 5: '2.5 mg', 6: '2.5 mg' },
-      'HMG (Menopur)': { 6: '75 IU', 8: '75 IU', 10: '75 IU' },
-      'Ovitrelle / hCG Trigger': { 12: '250 mcg (Stat)' },
-    },
-  },
-  {
-    id: 'ppos',
-    name: 'PPOS Protocol (Progestin Primed)',
-    drugs: ['rFSH (Follisurge / Gonal-F)', 'MPA (Medroxyprogesterone Acetate 10mg)', 'Ovitrelle / hCG Trigger'],
-    schedule: {
-      'rFSH (Follisurge / Gonal-F)': { 2: '225 IU', 3: '225 IU', 4: '225 IU', 5: '225 IU', 6: '225 IU', 7: '225 IU', 8: '225 IU', 9: '150 IU', 10: '150 IU', 11: '150 IU', 12: '150 IU' },
-      'MPA (Medroxyprogesterone Acetate 10mg)': { 2: '10 mg', 3: '10 mg', 4: '10 mg', 5: '10 mg', 6: '10 mg', 7: '10 mg', 8: '10 mg', 9: '10 mg', 10: '10 mg', 11: '10 mg', 12: '10 mg' },
-      'Ovitrelle / hCG Trigger': { 12: '250 mcg (Stat)' },
-    },
-  },
-  {
-    id: 'natural_cycle',
-    name: 'Natural Cycle (NC-FET / NC-IUI)',
-    drugs: ['Ovitrelle / hCG Trigger', 'Micronized Progesterone (Susten 400mg)'],
-    schedule: {
-      'Ovitrelle / hCG Trigger': { 12: '250 mcg (Stat)' },
-      'Micronized Progesterone (Susten 400mg)': { 14: '400 mg', 15: '400 mg', 16: '400 mg', 17: '400 mg', 18: '400 mg', 19: '400 mg', 20: '400 mg', 21: '400 mg' },
-    },
-  },
-];
-
 export default function StimulationCalendarGrid({
   cycleId,
   startDate,
@@ -140,6 +77,15 @@ export default function StimulationCalendarGrid({
   protocolCategory,
   sentinelDates,
 }: StimulationCalendarGridProps) {
+  const { currentBranch, user } = useAuth();
+  const hospitalName = user?.hospital_name || currentBranch?.receipt_header?.hospital_name || 'VaidyaMD Advanced Hospital';
+  const branchSubtitle = [
+    currentBranch?.name,
+    currentBranch?.address,
+    currentBranch?.phone ? `Tel: ${currentBranch.phone}` : '',
+    currentBranch?.gstin ? `GSTIN: ${currentBranch.gstin}` : '',
+  ].filter(Boolean).join(' · ') || 'Centre for Reproductive Medicine & Advanced IVF';
+
   const isFetDefault = Boolean(
     treatmentType?.includes('FET') ||
     protocolCategory === 'fet' ||
@@ -158,6 +104,13 @@ export default function StimulationCalendarGrid({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedProtocolId, setSelectedProtocolId] = useState<string>('');
   const [showProtocolConfirm, setShowProtocolConfirm] = useState(false);
+  const [dbProtocols, setDbProtocols] = useState<any[]>([]);
+
+  useEffect(() => {
+    protocolsApi.list().then((res: any) => {
+      if (Array.isArray(res)) setDbProtocols(res);
+    }).catch(() => {});
+  }, []);
 
   // Batch Day-Range Picker modal state (for rFSH / any drug)
   const [batchModal, setBatchModal] = useState<{
@@ -192,27 +145,31 @@ export default function StimulationCalendarGrid({
     setBatchModal(null);
   };
 
-  // Apply a clinic protocol preset to the medication grid
+  // Apply a dynamic database protocol preset to the medication grid
   const applyProtocol = (protocolId: string) => {
-    const proto = CLINIC_PROTOCOLS.find((p) => p.id === protocolId);
+    const proto = dbProtocols.find((p) => p.id === protocolId);
     if (!proto) return;
 
+    const rules = proto.rules || [];
+    const protoDrugs = Array.from(new Set(rules.map((r: any) => r.drug_name).filter(Boolean))) as string[];
+
     // Merge protocol drugs into drugList
-    const newDrugs = new Set([...drugList, ...proto.drugs]);
+    const newDrugs = new Set([...drugList, ...protoDrugs]);
     setDrugList(Array.from(newDrugs));
 
-    // Pre-fill day-by-day doses
+    // Pre-fill day-by-day doses according to DB rules
     setDays((prev) =>
       prev.map((day) => {
         const updatedMeds = [...(day.medications || [])];
-        for (const drugName of proto.drugs) {
-          const dayDose = proto.schedule[drugName]?.[day.day_number];
-          if (dayDose) {
-            const idx = updatedMeds.findIndex((m) => m.drug_name === drugName);
+        for (const rule of rules) {
+          const start = rule.day_start_offset;
+          const end = rule.day_end_offset;
+          if (day.day_number >= start && day.day_number <= end) {
+            const idx = updatedMeds.findIndex((m) => m.drug_name === rule.drug_name);
             if (idx >= 0) {
-              updatedMeds[idx] = { ...updatedMeds[idx], dose: dayDose };
+              updatedMeds[idx] = { ...updatedMeds[idx], dose: rule.dose };
             } else {
-              updatedMeds.push({ drug_name: drugName, dose: dayDose });
+              updatedMeds.push({ drug_name: rule.drug_name, dose: rule.dose });
             }
           }
         }
@@ -429,8 +386,8 @@ export default function StimulationCalendarGrid({
 </head><body>
 <div class="clinic-header">
   <div>
-    <div class="clinic-name">VaidyaMD Fertility &amp; ART Hospital</div>
-    <div class="clinic-sub">Centre for Reproductive Medicine &amp; Advanced IVF · Reg No: TS/MED/2024/09812</div>
+    <div class="clinic-name">${hospitalName}</div>
+    <div class="clinic-sub">${branchSubtitle}</div>
   </div>
   <div>
     <div class="doc-title">Patient Stimulation &amp; Follicular Tracking Sheet</div>
@@ -495,7 +452,7 @@ export default function StimulationCalendarGrid({
             onClick={() => setProtocolMode('stimulation')}
             className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
               protocolMode === 'stimulation'
-                ? 'bg-indigo-600 text-white shadow-xs'
+                ? 'bg-primary text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -534,7 +491,7 @@ export default function StimulationCalendarGrid({
           {/* Top Controls Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 rounded-lg p-3 print:hidden">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-indigo-600 text-white flex items-center justify-center">
+              <div className="w-8 h-8 rounded-md bg-primary text-white flex items-center justify-center">
                 <FileSpreadsheet className="w-4 h-4" />
               </div>
               <div>
@@ -550,19 +507,19 @@ export default function StimulationCalendarGrid({
             {/* ── Protocol Auto-Populate Picker ──────── */}
             {!readonly && (
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span className="text-[11px] font-bold text-indigo-700 whitespace-nowrap">Protocol:</span>
+                <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-[11px] font-bold text-primary whitespace-nowrap">Protocol:</span>
                   <select
                     value={selectedProtocolId}
                     onChange={(e) => {
                       setSelectedProtocolId(e.target.value);
                       if (e.target.value) setShowProtocolConfirm(true);
                     }}
-                    className="text-[11px] text-indigo-800 bg-transparent border-0 font-semibold focus:ring-0 pr-1 cursor-pointer"
+                    className="text-[11px] text-primary bg-transparent border-0 font-semibold focus:ring-0 pr-1 cursor-pointer"
                   >
                     <option value="">— Select to auto-fill —</option>
-                    {CLINIC_PROTOCOLS.map((p) => (
+                    {dbProtocols.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
@@ -570,7 +527,7 @@ export default function StimulationCalendarGrid({
                     <button
                       type="button"
                       onClick={() => applyProtocol(selectedProtocolId)}
-                      className="ml-1 px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 flex items-center gap-1"
+                      className="ml-1 px-2 py-0.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary-mid flex items-center gap-1"
                     >
                       <ArrowRight className="w-3 h-3" /> Apply
                     </button>
@@ -594,7 +551,7 @@ export default function StimulationCalendarGrid({
                 onClick={() => setShowAddDrug(!showAddDrug)}
                 className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-md text-xs font-bold transition-colors flex items-center gap-1"
               >
-                <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                <Plus className="w-3.5 h-3.5 text-primary" />
                 <span>Add Drug Row</span>
               </button>
 
@@ -602,7 +559,7 @@ export default function StimulationCalendarGrid({
                 type="button"
                 onClick={handleSaveCalendar}
                 disabled={isSaving}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-md text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-1.5 bg-primary hover:bg-primary-mid disabled:opacity-50 text-white rounded-md text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSaving ? 'Saving...' : 'Save Matrix'}</span>
@@ -668,7 +625,7 @@ export default function StimulationCalendarGrid({
 
       {/* Add Custom Drug Dialog Popover */}
       {showAddDrug && (
-        <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-md flex items-center gap-2 max-w-md print:hidden">
+        <div className="p-3 bg-primary/5 border border-primary/20 rounded-md flex items-center gap-2 max-w-md print:hidden">
           <input
             type="text"
             placeholder="e.g. Rekovelle 12 mcg, Decapeptyl 0.1mg..."
@@ -699,7 +656,7 @@ export default function StimulationCalendarGrid({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <Pill className="w-4 h-4 text-indigo-600" />
+                <Pill className="w-4 h-4 text-primary" />
                 Batch Fill — {batchModal.drugName}
               </h3>
               <button type="button" onClick={() => setBatchModal(null)} className="text-slate-400 hover:text-slate-700">✕</button>
@@ -717,8 +674,8 @@ export default function StimulationCalendarGrid({
                   autoFocus
                 />
               </div>
-              <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-200 space-y-2">
-                <label className="text-[11px] font-bold text-indigo-700 block">Day range to fill:</label>
+              <div className="bg-primary/10 rounded-lg p-3 border border-primary/20 space-y-2">
+                <label className="text-[11px] font-bold text-primary block">Day range to fill:</label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500">Day</span>
                   <input
@@ -749,7 +706,7 @@ export default function StimulationCalendarGrid({
                         key={preset.label}
                         type="button"
                         onClick={() => setBatchModal({ ...batchModal, fromDay: preset.from, toDay: preset.to })}
-                        className="text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-700 font-bold rounded hover:bg-indigo-200"
+                        className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary font-bold rounded hover:bg-primary/20"
                       >
                         {preset.label}
                       </button>
@@ -760,7 +717,7 @@ export default function StimulationCalendarGrid({
             </div>
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={() => setBatchModal(null)} className="flex-1 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={applyBatchFill} className="flex-1 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-xs">
+              <button type="button" onClick={applyBatchFill} className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary-mid shadow-xs">
                 Fill Days {batchModal.fromDay}–{batchModal.toDay}
               </button>
             </div>
@@ -794,10 +751,10 @@ export default function StimulationCalendarGrid({
                       <button
                         type="button"
                         onClick={() => !readonly && setBatchModal({ drugName, dose: '', fromDay: 1, toDay: totalDays })}
-                        className="text-[11px] font-bold text-indigo-900 truncate flex items-center gap-1 hover:text-indigo-600 transition-colors cursor-pointer"
+                        className="text-[11px] font-bold text-text-main truncate flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
                         title={readonly ? drugName : `Click to batch-fill ${drugName} for a day range`}
                       >
-                        <Pill className="w-3 h-3 inline text-indigo-500 shrink-0" />
+                        <Pill className="w-3 h-3 inline text-primary shrink-0" />
                         {drugName}
                       </button>
                       {!readonly && (
@@ -846,7 +803,7 @@ export default function StimulationCalendarGrid({
                   {/* Milestone */}
                   <td className="p-2 border-b border-slate-100">
                     {day.milestone && (
-                      <span className="inline-block text-[10px] font-bold uppercase tracking-tight px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-tight px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                         {day.milestone}
                       </span>
                     )}
@@ -867,8 +824,8 @@ export default function StimulationCalendarGrid({
                           onChange={(e) => handleCellChange(day.day_number, drugName, e.target.value)}
                           className={`w-full text-center text-xs py-1.5 px-2 rounded-md transition-all ${
                             doseVal
-                              ? 'font-bold bg-indigo-50/80 text-indigo-900 border border-indigo-200'
-                              : 'text-slate-400 bg-transparent hover:bg-slate-100 border border-transparent focus:border-indigo-300 focus:bg-white'
+                              ? 'font-bold bg-primary/10 text-primary border border-primary/20'
+                              : 'text-slate-400 bg-transparent hover:bg-slate-100 border border-transparent focus:border-primary/40 focus:bg-white'
                           }`}
                         />
                         {/* Batch Fill (Day Range) Button */}
@@ -876,7 +833,7 @@ export default function StimulationCalendarGrid({
                           <button
                             type="button"
                             onClick={() => handleFillForward(drugName, day.day_number, 3)}
-                            className="hidden group-hover/cell:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-indigo-600 text-white z-20 shadow-xs hover:scale-110 transition-transform translate-x-1/2"
+                            className="hidden group-hover/cell:flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-primary text-white z-20 shadow-xs hover:scale-110 transition-transform translate-x-1/2"
                             title="Fill next 3 days"
                           >
                             <ArrowRight className="w-2.5 h-2.5" />

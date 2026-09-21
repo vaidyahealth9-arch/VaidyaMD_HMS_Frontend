@@ -18,6 +18,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { andrologyApi, cryoApi } from '@/lib/api';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 
 export interface SpermFreezingModalProps {
   patient: any;
@@ -47,6 +48,7 @@ export default function SpermFreezingModal({
 }: SpermFreezingModalProps) {
   const resolvedCycle = activeCycle || cycle;
   const [viewMode, setViewMode] = useState<'form' | 'preview'>('form');
+  const [usePrePrintedPad, setUsePrePrintedPad] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -54,43 +56,39 @@ export default function SpermFreezingModal({
   const [femalePartnerName, setFemalePartnerName] = useState(
     resolvedCycle?.patient_name || partner?.name || patient?.partner_name || ''
   );
-  const [patientAge, setPatientAge] = useState(patient?.age || '34');
-  const [treatmentCycleId, setTreatmentCycleId] = useState(resolvedCycle?.cycle_id || 'ART-2025-01');
+  const [patientAge, setPatientAge] = useState(patient?.age ? String(patient.age) : '');
+  const [treatmentCycleId, setTreatmentCycleId] = useState(resolvedCycle?.cycle_id || '');
   const [freezingType, setFreezingType] = useState('General Autologous');
-  const [indication, setIndication] = useState('Prior to IVF/ICSI cycle (Backup Freezing)');
+  const [indication, setIndication] = useState('');
   const [freezingId, setFreezingId] = useState(
     `SP-FRZ-${patient?.vid || '001'}-${Math.floor(1000 + Math.random() * 9000)}`
   );
-  const [consentObtained, setConsentObtained] = useState('Yes (Form 15 Signed)');
-  const [infectionScreening, setInfectionScreening] = useState('HIV Negative, HBsAg Negative, HCV Negative, VDRL Non-reactive');
+  const [consentObtained, setConsentObtained] = useState('');
+  const [infectionScreening, setInfectionScreening] = useState('');
 
   // Section 2: Semen Collection
-  const [productionDateTime, setProductionDateTime] = useState(
-    `${new Date().toISOString().split('T')[0]}T09:00`
-  );
-  const [freezingDateTime, setFreezingDateTime] = useState(
-    `${new Date().toISOString().split('T')[0]}T10:30`
-  );
-  const [collectionMethod, setCollectionMethod] = useState('Masturbation');
-  const [collectionPlace, setCollectionPlace] = useState('Lab Private Room');
-  const [abstinenceDays, setAbstinenceDays] = useState('3');
+  const [productionDateTime, setProductionDateTime] = useState('');
+  const [freezingDateTime, setFreezingDateTime] = useState('');
+  const [collectionMethod, setCollectionMethod] = useState('');
+  const [collectionPlace, setCollectionPlace] = useState('');
+  const [abstinenceDays, setAbstinenceDays] = useState('');
 
   // Section 3: Semen Parameters
-  const [semenVolume, setSemenVolume] = useState('2.8');
-  const [liquefactionTime, setLiquefactionTime] = useState('30 min');
-  const [ph, setPh] = useState('7.6');
-  const [viscosity, setViscosity] = useState('Normal');
-  const [spermConc, setSpermConc] = useState('42.0');
-  const [totalMotility, setTotalMotility] = useState('55');
-  const [progressiveMotility, setProgressiveMotility] = useState('40');
-  const [normalMorphology, setNormalMorphology] = useState('5');
+  const [semenVolume, setSemenVolume] = useState('');
+  const [liquefactionTime, setLiquefactionTime] = useState('');
+  const [ph, setPh] = useState('');
+  const [viscosity, setViscosity] = useState('');
+  const [spermConc, setSpermConc] = useState('');
+  const [totalMotility, setTotalMotility] = useState('');
+  const [progressiveMotility, setProgressiveMotility] = useState('');
+  const [normalMorphology, setNormalMorphology] = useState('');
 
   // Cryoprotectant & Media
-  const [cryoMedia, setCryoMedia] = useState('SpermFreeze (Vitrolife) / TEST-Yolk');
-  const [batchNo, setBatchNo] = useState('LOT-SF-8894A');
-  const [mediaExpiryDate, setMediaExpiryDate] = useState('2026-12-31');
-  const [dilutionRatio, setDilutionRatio] = useState('1:1 dropwise');
-  const [equilibrationMin, setEquilibrationMin] = useState('10 min room temperature');
+  const [cryoMedia, setCryoMedia] = useState('');
+  const [batchNo, setBatchNo] = useState('');
+  const [mediaExpiryDate, setMediaExpiryDate] = useState('');
+  const [dilutionRatio, setDilutionRatio] = useState('');
+  const [equilibrationMin, setEquilibrationMin] = useState('');
 
   // Duration & Expiry
   const [durationDays, setDurationDays] = useState('365');
@@ -101,32 +99,13 @@ export default function SpermFreezingModal({
   };
   const [expiryDate, setExpiryDate] = useState(calculateExpiry('365'));
 
-  const [embryologistName, setEmbryologistName] = useState('Senior Embryologist');
-  const [witnessName, setWitnessName] = useState('Lab Witness Embryologist');
-  const [remarks, setRemarks] = useState(
-    'Sperm cryopreserved in liquid nitrogen vapor phase at -196°C. Excellent pre-freeze motility. Good cryo-recovery anticipated.'
-  );
+  const [embryologistName, setEmbryologistName] = useState('');
+  const [witnessName, setWitnessName] = useState('');
+  const [remarks, setRemarks] = useState('');
   const [isDiscarded, setIsDiscarded] = useState(false);
 
   // Dynamic Cryo Vials
-  const [vials, setVials] = useState<CryoVialRow[]>([
-    {
-      vialNo: 'Vial 1 (0.5 mL)',
-      tankNo: 'Tank 1 (Main BioBank)',
-      canisterNo: 'Canister 2',
-      caneNo: 'Cane 1',
-      gobletColor: 'Blue Goblet',
-      comments: 'Aliquoted with 1:1 SpermFreeze media',
-    },
-    {
-      vialNo: 'Vial 2 (0.5 mL)',
-      tankNo: 'Tank 1 (Main BioBank)',
-      canisterNo: 'Canister 2',
-      caneNo: 'Cane 1',
-      gobletColor: 'Blue Goblet',
-      comments: 'Backup aliquot for micro-ICSI',
-    },
-  ]);
+  const [vials, setVials] = useState<CryoVialRow[]>([]);
 
   const addVial = () => {
     const nextIdx = vials.length + 1;
@@ -134,11 +113,11 @@ export default function SpermFreezingModal({
       ...vials,
       {
         vialNo: `Vial ${nextIdx} (0.5 mL)`,
-        tankNo: 'Tank 1 (Main BioBank)',
-        canisterNo: 'Canister 2',
-        caneNo: 'Cane 1',
-        gobletColor: 'Blue Goblet',
-        comments: 'Standard Cryo Aliquot',
+        tankNo: '',
+        canisterNo: '',
+        caneNo: '',
+        gobletColor: '',
+        comments: '',
       },
     ]);
   };
@@ -242,12 +221,12 @@ export default function SpermFreezingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rail-bg/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:static print:bg-white print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:w-full print:p-0 print:m-0 print:max-h-none print:overflow-visible">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <Snowflake className="w-4 h-4" />
             </div>
             <div>
@@ -292,7 +271,7 @@ export default function SpermFreezingModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar print:overflow-visible print:p-0">
           {viewMode === 'form' ? (
             <div className="space-y-6">
               {/* Section 1: Clinical & Identification */}
@@ -307,7 +286,7 @@ export default function SpermFreezingModal({
                       type="text"
                       value={freezingId}
                       onChange={(e) => setFreezingId(e.target.value)}
-                      className="vmd-input text-xs font-mono font-bold text-blue-700"
+                      className="vmd-input text-xs font-mono font-bold text-primary"
                     />
                   </div>
                   <div>
@@ -505,12 +484,12 @@ export default function SpermFreezingModal({
 
               {/* Section 4: Cryo Vials & Physical Storage Coordinates */}
               <div className="border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
-                <div className="bg-blue-900 text-white px-4 py-2.5 flex items-center justify-between font-bold text-xs uppercase tracking-wider">
+                <div className="bg-primary text-white px-4 py-2.5 flex items-center justify-between font-bold text-xs uppercase tracking-wider">
                   <span>4. Cryo Vial Inventory &amp; Physical Coordinates</span>
                   <button
                     type="button"
                     onClick={addVial}
-                    className="px-2.5 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                    className="px-2.5 py-1 bg-primary hover:bg-primary-mid text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Vial / Straw
                   </button>
@@ -529,7 +508,13 @@ export default function SpermFreezingModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {vials.map((v, idx) => (
+                      {vials.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-4 text-center text-slate-400 italic">
+                            No cryo vials added. Click &quot;+ Add Vial / Straw&quot; above to log frozen aliquots.
+                          </td>
+                        </tr>
+                      ) : vials.map((v, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="p-2">
                             <input
@@ -644,23 +629,33 @@ export default function SpermFreezingModal({
             </div>
           ) : (
             /* Printable Lab Certificate */
-            <div className="max-w-3xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800">
-              <div className="text-center border-b-2 border-slate-900 pb-4">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase">
-                  Semen Cryopreservation &amp; BioBank Storage Certificate
-                </h1>
-                <p className="text-xs text-slate-500 italic mt-0.5">
-                  VaidyaMD Cryobank · In compliance with ART (Regulation) Act 2021 Form 15
-                </p>
-              </div>
+            <div className="printable-document max-w-4xl mx-auto bg-white p-6 sm:p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 print:border-none print:shadow-none print:p-0 print:m-0">
+              <PrintableReportHeader
+                title="SEMEN CRYOPRESERVATION & BIOBANK CERTIFICATE"
+                subtitle="VaidyaMD BioBank • In Compliance with ART (Regulation) Act 2021 Form 15"
+                hideHospitalHeader={usePrePrintedPad}
+                onTogglePrePrintedPad={() => setUsePrePrintedPad(!usePrePrintedPad)}
+                patient={{
+                  name: patient?.name,
+                  vid: patient?.vid,
+                  age: patientAge,
+                  gender: 'Male',
+                  partner_name: femalePartnerName,
+                }}
+                metaFields={[
+                  { label: 'Freezing ID', value: freezingId },
+                  { label: 'Cryo Date', value: freezingDateTime.replace('T', ' ') },
+                  { label: 'Cycle ID', value: treatmentCycleId },
+                  { label: 'Storage Valid Till', value: expiryDate },
+                ]}
+              />
 
               <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200">
-                <div className="p-2.5 bg-slate-50 font-bold">Patient Name: <span className="font-normal">{patient?.name}</span></div>
-                <div className="p-2.5 bg-slate-50 font-bold">VID / UHID: <span className="font-normal font-mono">{patient?.vid}</span></div>
-                <div className="p-2.5">Freezing ID: <span className="font-mono font-bold text-blue-800">{freezingId}</span></div>
-                <div className="p-2.5">Freezing Date: <span className="font-semibold">{freezingDateTime.replace('T', ' ')}</span></div>
-                <div className="p-2.5">Freezing Type: <span className="font-semibold">{freezingType}</span></div>
-                <div className="p-2.5">Duration: <span className="font-semibold">{durationDays} Days (Expires: {expiryDate})</span></div>
+                <div className="p-2.5 bg-slate-50 font-bold">Freezing Type: <span className="font-semibold text-slate-800">{freezingType}</span></div>
+                <div className="p-2.5 bg-slate-50 font-bold">Indication: <span className="font-semibold text-slate-800">{indication}</span></div>
+                <div className="p-2.5">Storage Duration: <span className="font-semibold">{durationDays} Days (Expires: {expiryDate})</span></div>
+                <div className="p-2.5">Statutory Consent: <span className="font-semibold">{consentObtained}</span></div>
+                <div className="p-2.5 col-span-2">Viral Screening: <span className="font-medium text-emerald-800">{infectionScreening}</span></div>
               </div>
 
               <div>
@@ -680,7 +675,7 @@ export default function SpermFreezingModal({
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Progressive PR</span>
-                    <strong className="text-sm text-blue-700">{progressiveMotility}%</strong>
+                    <strong className="text-sm text-primary">{progressiveMotility}%</strong>
                   </div>
                 </div>
               </div>
@@ -735,7 +730,7 @@ export default function SpermFreezingModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between print:hidden">
           <div className="text-xs text-slate-500">
             {saveSuccess && (
               <span className="text-emerald-700 font-bold flex items-center gap-1.5">
@@ -766,7 +761,7 @@ export default function SpermFreezingModal({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+              className="px-5 py-2 bg-primary hover:bg-primary-mid text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               {isSaving ? 'Saving...' : 'Save Freezing Record'}

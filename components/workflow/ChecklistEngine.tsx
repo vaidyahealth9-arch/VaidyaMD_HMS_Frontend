@@ -22,7 +22,7 @@ export default function ChecklistEngine({ title, items, completedItems, onToggle
       {/* Header */}
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center gap-3">
         {stepNumber && (
-          <div className="w-8 h-8 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+          <div className="w-8 h-8 rounded bg-primary/15 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
             {stepNumber}
           </div>
         )}
@@ -42,7 +42,7 @@ export default function ChecklistEngine({ title, items, completedItems, onToggle
       {/* Progress bar */}
       <div className="h-1 bg-slate-100">
         <div
-          className="h-full bg-indigo-500 transition-all duration-500 rounded-r"
+          className="h-full bg-primary transition-all duration-500 rounded-r"
           style={{ width: `${(totalComplete / items.length) * 100}%` }}
         />
       </div>
@@ -66,7 +66,7 @@ export default function ChecklistEngine({ title, items, completedItems, onToggle
                 type="checkbox"
                 checked={isComplete}
                 onChange={() => onToggle(item.id)}
-                className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 ${isComplete ? 'accent-emerald-600' : 'accent-indigo-600'}`}
+                className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 ${isComplete ? 'accent-emerald-600' : 'accent-primary'}`}
               />
               <div>
                 <p className={`text-sm font-bold ${isComplete ? 'text-emerald-900' : 'text-slate-700 group-hover:text-slate-900'}`}>

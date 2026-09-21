@@ -391,7 +391,7 @@ export default function DFIHaloChart({
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Microscopy Photo Attachment</label>
-                <input type="file" accept="image/*" className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                <input type="file" accept="image/*" className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/15" />
               </div>
             </div>
           </div>

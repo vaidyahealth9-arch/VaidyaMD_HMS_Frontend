@@ -111,9 +111,20 @@ export default function CosGynDashboard() {
       return;
     }
 
+    let finalTreatmentId = selectedTreatmentId;
+    let singleEquipment = undefined;
+    if (selectedTreatmentId === 'custom_jet') {
+      finalTreatmentId = 'manual';
+      singleEquipment = 'Jet Plasma';
+    } else if (selectedTreatmentId === 'custom_tesla') {
+      finalTreatmentId = 'manual';
+      singleEquipment = 'Tesla Chair';
+    }
+
     createPlanMutation.mutate({
       patient_id: selectedPatientId,
-      treatment_id: selectedTreatmentId,
+      treatment_id: finalTreatmentId !== 'manual' ? finalTreatmentId : undefined,
+      equipment: singleEquipment,
       start_date: startDate,
       frequency: frequency,
     });
@@ -217,7 +228,7 @@ export default function CosGynDashboard() {
               <p className="text-2xl font-black text-slate-900 mt-1">{jetPlasmaCount}</p>
               <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Vaginal rejuvenation</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Zap className="w-5 h-5" />
             </div>
           </CardContent>
@@ -301,7 +312,7 @@ export default function CosGynDashboard() {
                 <button
                   onClick={() => setEquipmentFilter('Jet Plasma')}
                   className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    equipmentFilter === 'Jet Plasma' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    equipmentFilter === 'Jet Plasma' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   Jet Plasma
@@ -399,7 +410,7 @@ export default function CosGynDashboard() {
                             variant="outline"
                             className={`text-xs font-bold gap-1.5 ${
                               isJet
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                ? 'bg-primary/10 border-primary/20 text-primary'
                                 : 'bg-purple-50 border-purple-200 text-purple-700'
                             }`}
                           >
@@ -485,7 +496,7 @@ export default function CosGynDashboard() {
                   <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100 font-medium">
                     <div className="flex items-center justify-between text-slate-700">
                       <span className="flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-indigo-500" />
+                        <Zap className="w-3.5 h-3.5 text-primary" />
                         Jet Plasma Sessions:
                       </span>
                       <span className="font-bold text-slate-900">
@@ -689,11 +700,17 @@ export default function CosGynDashboard() {
                   required
                 >
                   <option value="">-- Choose Protocol --</option>
-                  {treatments.map((t: any) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} — {formatCurrency(t.price)}
-                    </option>
-                  ))}
+                  <optgroup label="Single Standalone Sessions">
+                    <option value="custom_jet">Single Session: Jet Plasma</option>
+                    <option value="custom_tesla">Single Session: Tesla Chair</option>
+                  </optgroup>
+                  <optgroup label="Pre-configured Packages">
+                    {treatments.map((t: any) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {formatCurrency(t.price)}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 

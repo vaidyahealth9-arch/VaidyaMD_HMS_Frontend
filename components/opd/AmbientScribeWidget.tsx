@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Mic,
   MicOff,
@@ -10,215 +10,161 @@ import {
   Edit3,
   X,
   AlertCircle,
+  GripVertical,
   Minimize2,
+  Maximize2,
+  EyeOff,
+  PanelRightClose,
+  PanelLeftClose,
+  Radio,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
-
-// Extend Window interface for SpeechRecognition
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
+import { useAmbientScribe } from '@/contexts/AmbientScribeContext';
 
 export default function AmbientScribeWidget() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [lastParsedStatus, setLastParsedStatus] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [liveTranscript, setLiveTranscript] = useState('');
+  const {
+    isRecording,
+    seconds,
+    isProcessing,
+    liveTranscript,
+    errorMessage,
+    lastStatus,
+    isWidgetVisible,
+    isCollapsed,
+    isDocked,
+    dockEdge,
+    position,
+    startRecording,
+    stopRecording,
+    toggleRecording,
+    injectText,
+    clearMessages,
+    setIsWidgetVisible,
+    setIsCollapsed,
+    setIsDocked,
+    setDockEdge,
+    setPosition,
+  } = useAmbientScribe();
+
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualText, setManualText] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const recognitionRef = useRef<any>(null);
-  const finalTranscriptRef = useRef<string>('');
+  // Drag state refs
+  const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({
+    startX: 0,
+    startY: 0,
+    posX: 0,
+    posY: 0,
+  });
+  const hasMovedRef = useRef(false);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
-  // Seconds timer effect
+  // Initialize position to bottom-right (above 10% from bottom) if uninitialized
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setSeconds(0);
+    if (typeof window !== 'undefined' && position.x === -1 && position.y === -1) {
+      // Default: ~24px from right, ~11% above bottom (elevated above bottom toolbars/footers)
+      const defaultX = Math.max(16, window.innerWidth - 240);
+      const defaultY = Math.max(80, Math.floor(window.innerHeight * 0.89) - 44);
+      setPosition({ x: defaultX, y: defaultY });
     }
-    return () => clearInterval(interval);
-  }, [isRecording]);
+  }, [position, setPosition]);
 
-  // Clean up speech recognition on unmount
+  // Handle window resize to clamp within viewport
   useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
+    const handleResize = () => {
+      if (typeof window === 'undefined' || position.x === -1) return;
+      const widgetWidth = widgetRef.current?.offsetWidth || 200;
+      const widgetHeight = widgetRef.current?.offsetHeight || 44;
+      const maxX = Math.max(12, window.innerWidth - widgetWidth - 12);
+      const maxY = Math.max(60, window.innerHeight - widgetHeight - 16);
+
+      const clampedX = Math.min(Math.max(12, position.x), maxX);
+      const clampedY = Math.min(Math.max(60, position.y), maxY);
+
+      if (clampedX !== position.x || clampedY !== position.y) {
+        setPosition({ x: clampedX, y: clampedY });
       }
     };
-  }, []);
 
-  const startSpeechRecognition = () => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
-      setErrorMessage('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
-      return false;
-    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [position, setPosition]);
 
-    try {
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-IN'; // Indian English / Global English
+  // Pointer Drag Handlers
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Only drag with primary mouse button / touch
+    if (e.button !== 0) return;
 
-      finalTranscriptRef.current = '';
-      setLiveTranscript('');
-
-      recognition.onstart = () => {
-        setErrorMessage(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = finalTranscriptRef.current;
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcriptSegment = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            final += (final ? ' ' : '') + transcriptSegment;
-          } else {
-            interim += transcriptSegment;
-          }
-        }
-
-        finalTranscriptRef.current = final;
-        setLiveTranscript(final + (interim ? ' ' + interim : ''));
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition event error:', event.error);
-        if (event.error === 'not-allowed') {
-          setErrorMessage('Microphone access denied. Please allow microphone permissions in your browser.');
-        } else if (event.error !== 'no-speech') {
-          setErrorMessage(`Microphone notice: ${event.error}`);
-        }
-      };
-
-      recognition.onend = () => {
-        if (isRecording && recognitionRef.current) {
-          try {
-            recognition.start();
-          } catch {
-            // ignore
-          }
-        }
-      };
-
-      recognition.start();
-      recognitionRef.current = recognition;
-      return true;
-    } catch (err: any) {
-      console.error('Failed to start SpeechRecognition:', err);
-      setErrorMessage(err.message || 'Failed to initialize speech recognition.');
-      return false;
-    }
-  };
-
-  const stopSpeechRecognition = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {
-        // ignore
-      }
-      recognitionRef.current = null;
-    }
-  };
-
-  const injectTextIntoActiveElement = (transcriptText: string) => {
-    if (!transcriptText.trim()) {
-      setErrorMessage('No speech detected.');
+    // Don't drag if clicking interactive buttons or inputs
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('textarea')) {
       return;
     }
 
-    setIsProcessing(true);
-    setErrorMessage(null);
+    e.preventDefault();
+    setIsDragging(true);
+    hasMovedRef.current = false;
 
-    try {
-      const activeElement = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
-      
-      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-        const start = activeElement.selectionStart || 0;
-        const end = activeElement.selectionEnd || 0;
-        const currentText = activeElement.value;
-        const prefix = currentText.slice(0, start);
-        const suffix = currentText.slice(end);
-        
-        // Add a space before if we're appending to existing text
-        const textToInsert = (prefix && !prefix.endsWith(' ') ? ' ' : '') + transcriptText.trim();
-        const newText = prefix + textToInsert + suffix;
+    const currentX = position.x >= 0 ? position.x : (typeof window !== 'undefined' ? window.innerWidth - 220 : 100);
+    const currentY = position.y >= 0 ? position.y : (typeof window !== 'undefined' ? Math.floor(window.innerHeight * 0.38) : 200);
 
-        // Use native setter to trigger React's onChange
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      posX: currentX,
+      posY: currentY,
+    };
 
-        if (activeElement.tagName === 'INPUT' && nativeInputValueSetter) {
-          nativeInputValueSetter.call(activeElement, newText);
-        } else if (activeElement.tagName === 'TEXTAREA' && nativeTextAreaValueSetter) {
-          nativeTextAreaValueSetter.call(activeElement, newText);
-        } else {
-          activeElement.value = newText;
-        }
-
-        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        // Move cursor to the end of the inserted text
-        const newCursorPos = start + textToInsert.length;
-        activeElement.setSelectionRange(newCursorPos, newCursorPos);
-
-        setLastParsedStatus('Text inserted into active field.');
-      } else {
-        // Fallback: Copy to clipboard if no input is focused
-        navigator.clipboard.writeText(transcriptText.trim());
-        setLastParsedStatus('Copied to clipboard! (Focus a text field first to auto-insert)');
-      }
-
-      setLiveTranscript('');
-      finalTranscriptRef.current = '';
-      setShowManualModal(false);
-      setManualText('');
-      setTimeout(() => setLastParsedStatus(null), 5000);
-    } catch (err: any) {
-      console.error('Insertion error:', err);
-      setErrorMessage(err.message || 'Failed to insert text.');
-    } finally {
-      setIsProcessing(false);
-    }
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  const handleToggleRecord = () => {
-    if (!isRecording) {
-      setErrorMessage(null);
-      setLastParsedStatus(null);
-      const started = startSpeechRecognition();
-      if (started) {
-        setIsRecording(true);
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - dragStartRef.current.startX;
+    const deltaY = e.clientY - dragStartRef.current.startY;
+
+    if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+      hasMovedRef.current = true;
+    }
+
+    const widgetWidth = widgetRef.current?.offsetWidth || 200;
+    const widgetHeight = widgetRef.current?.offsetHeight || 44;
+    const maxX = Math.max(12, window.innerWidth - widgetWidth - 12);
+    const maxY = Math.max(60, window.innerHeight - widgetHeight - 16);
+
+    const newX = Math.min(Math.max(12, dragStartRef.current.posX + deltaX), maxX);
+    const newY = Math.min(Math.max(60, dragStartRef.current.posY + deltaY), maxY);
+
+    setPosition({ x: newX, y: newY });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+
+    // If widget dropped very close to screen edge (within 30px), auto-dock
+    if (hasMovedRef.current) {
+      const widgetWidth = widgetRef.current?.offsetWidth || 200;
+      if (position.x > window.innerWidth - widgetWidth - 30) {
+        setDockEdge('right');
+      } else if (position.x < 30) {
+        setDockEdge('left');
       }
-    } else {
-      setIsRecording(false);
-      stopSpeechRecognition();
-      const captured = finalTranscriptRef.current || liveTranscript;
-      injectTextIntoActiveElement(captured);
     }
   };
 
   const handleManualSubmit = () => {
     if (!manualText.trim()) return;
-    injectTextIntoActiveElement(manualText);
+    injectText(manualText);
+    setManualText('');
+    setShowManualModal(false);
   };
 
   const formatTimer = (s: number) => {
@@ -227,233 +173,489 @@ export default function AmbientScribeWidget() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <div className="fixed bottom-20 right-6 z-[100] flex flex-col items-end gap-2 max-w-lg select-none pointer-events-none">
-      {/* Error Alert Bubble */}
-      {errorMessage && (
-        <div className="pointer-events-auto flex items-center gap-2 bg-amber-600 text-white text-xs font-semibold px-4 py-2.5 rounded-md shadow-xl animate-in fade-in slide-in-from-bottom-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} className="ml-1 opacity-80 hover:opacity-100">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+  // If user explicitly hid the widget, keep hidden (accessible via TopBar)
+  if (!isWidgetVisible) {
+    return null;
+  }
 
-      {/* Success Notification Bubble */}
-      {lastParsedStatus && (
-        <div className="pointer-events-auto flex items-center gap-2 bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-md shadow-xl animate-in fade-in slide-in-from-bottom-2">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-          <span>{lastParsedStatus}</span>
-        </div>
-      )}
+  // Calculate current display coordinates
+  const currentX = position.x >= 0 ? position.x : (typeof window !== 'undefined' ? window.innerWidth - 240 : 100);
+  const currentY = position.y >= 0 ? position.y : (typeof window !== 'undefined' ? Math.floor(window.innerHeight * 0.89) - 44 : 200);
 
-      {/* Real-time Streaming Transcript Box while recording */}
-      {isRecording && liveTranscript && !isCollapsed && (
-        <div className="pointer-events-auto bg-slate-900/95 text-white p-3 rounded-md border border-slate-700 shadow-2xl w-80 text-xs animate-in fade-in slide-in-from-bottom-1">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>LIVE AMBIENT STREAM</span>
+  // Determine whether expanded card should open upwards or downwards based on Y position
+  const opensUpwards = typeof window !== 'undefined' && currentY > window.innerHeight * 0.6;
+
+  // -------------------------------------------------------------
+  // MODE 1: DOCKED TO SCREEN EDGE (Zero-Obstruction Mode)
+  // -------------------------------------------------------------
+  if (isDocked) {
+    const isRight = dockEdge === 'right';
+    return (
+      <div
+        ref={widgetRef}
+        style={{
+          top: `${currentY}px`,
+          [isRight ? 'right' : 'left']: 0,
+        }}
+        className="fixed z-40 select-none group pointer-events-auto"
+      >
+        <div
+          onClick={() => {
+            if (isRecording) {
+              setIsExpanded(true);
+            } else {
+              setIsDocked(false);
+            }
+          }}
+          className={`flex items-center gap-1.5 py-2 px-2.5 shadow-lg border backdrop-blur-md cursor-pointer transition-all duration-200 ${
+            isRight
+              ? 'rounded-l-xl border-r-0 hover:translate-x-[-4px]'
+              : 'rounded-r-xl border-l-0 hover:translate-x-[4px]'
+          } ${
+            isRecording
+              ? 'bg-rose-600 text-white border-rose-500 shadow-rose-500/30 animate-pulse'
+              : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-white shadow-slate-900/10 hover:border-primary/50'
+          }`}
+          title="Ambient Scribe (Docked) - Click to expand or press Alt+D"
+        >
+          {isRecording ? (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping flex-shrink-0" />
+              <Mic className="w-4 h-4 text-white flex-shrink-0" />
+              <span className="text-[11px] font-mono font-bold">{formatTimer(seconds)}</span>
             </div>
-            <span className="text-[10px] text-slate-400">{formatTimer(seconds)}</span>
-          </div>
-          <p className="line-clamp-4 text-slate-200 leading-relaxed italic">
-            "{liveTranscript}"
-          </p>
-        </div>
-      )}
-
-      {/* Manual Dictation / Notes Paste Modal */}
-      {showManualModal && (
-        <div className="pointer-events-auto bg-white p-4 rounded-lg border border-slate-200 shadow-2xl w-96 text-xs space-y-3 animate-in fade-in zoom-in-95">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-bold text-slate-900">
-              <Edit3 className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
-              <span>Manual Dictation &amp; Notes</span>
-            </div>
-            <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-600">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Paste or type text here. It will be inserted directly into whichever field you have focused, or copied to your clipboard.
-          </p>
-          <textarea
-            rows={4}
-            value={manualText}
-            onChange={(e) => setManualText(e.target.value)}
-            placeholder="E.g.: Patient BP 130/85, pulse 78."
-            className="w-full p-2.5 rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:ring-2 focus:ring-[rgb(var(--clr-primary))] focus:outline-none"
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowManualModal(false)}
-              className="text-xs font-semibold rounded-md h-8"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleManualSubmit}
-              disabled={isProcessing || !manualText.trim()}
-              className="text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-md h-8 gap-1"
-            >
-              {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>Insert Text</span>
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Grammarly-Style Pinned Floating Scribe Button - Always Visible at Bottom-Right */}
-      {isCollapsed ? (
-        <div className="pointer-events-auto relative flex items-center">
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setIsCollapsed(false)}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 backdrop-blur-md border cursor-pointer ${
-              isRecording
-                ? 'bg-rose-600 text-white ring-4 ring-rose-300/60 animate-pulse border-rose-400'
-                : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white ring-2 ring-indigo-300/40 border-indigo-400 hover:shadow-indigo-500/30'
-            }`}
-            title="Global Dictation (Pinned to screen - click to open)"
-          >
-            {isRecording ? (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-                <Mic className="w-4 h-4" />
-                <span className="text-xs font-bold font-mono tracking-tight">{formatTimer(seconds)}</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                <Mic className="w-4 h-4" />
-                <span className="text-xs font-bold tracking-wide">Dictate</span>
-              </>
-            )}
-          </button>
-
-          {/* Direct quick action: Start/Stop toggle button right on the pinned pin */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={handleToggleRecord}
-            disabled={isProcessing}
-            className={`w-7 h-7 rounded-full flex items-center justify-center -ml-2 z-10 transition-colors shadow-md border ${
-              isRecording
-                ? 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
-                : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
-            }`}
-            title={isRecording ? 'Stop & Insert Text' : 'Quick Start Dictation'}
-          >
-            {isProcessing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-            ) : isRecording ? (
-              <MicOff className="w-3.5 h-3.5" />
-            ) : (
-              <Mic className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
-      ) : (
-        /* Expanded Scribe Control Card (Opens upwards from bottom-right pin) */
-        <div className={`pointer-events-auto p-3 rounded-lg border shadow-2xl flex items-center gap-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${
-          isRecording ? 'border-rose-400 ring-2 ring-rose-400/30 bg-rose-50/95' : 'border-slate-200 bg-white/95 backdrop-blur-md'
-        }`}>
-          <div className="flex items-center gap-2.5 pl-1">
-            <div className="relative">
-              <span className={`w-3 h-3 rounded-full block ${isRecording ? 'bg-rose-500 animate-ping' : 'bg-[rgb(var(--clr-primary))]'}`} />
-              <span className={`w-3 h-3 rounded-full absolute top-0 left-0 ${isRecording ? 'bg-rose-600' : 'bg-[rgb(var(--clr-primary))]'}`} />
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                <span className="text-xs font-bold text-slate-800">
-                  {isRecording ? 'Listening...' : isProcessing ? 'Inserting Text...' : 'Global Dictation'}
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-medium">
-                {isRecording ? `Recording: ${formatTimer(seconds)}` : isProcessing ? 'Pasting to active field...' : 'Live browser mic listen'}
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <Mic className="w-4 h-4 text-slate-700 flex-shrink-0 group-hover:text-primary transition-colors" />
+              <span className="text-[11px] font-bold tracking-tight hidden group-hover:inline transition-all">
+                Scribe
               </span>
-            </div>
-          </div>
-
-          {/* Live CSS Waveform Animation while recording */}
-          {isRecording && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-rose-100/60 rounded-md h-8">
-              {[0.4, 0.8, 0.3, 1, 0.6, 0.9, 0.5, 0.7, 0.2].map((height, idx) => (
-                <div
-                  key={idx}
-                  className="w-1 bg-rose-500 rounded-full animate-pulse"
-                  style={{
-                    height: `${height * 20 + 4}px`,
-                    animationDuration: `${0.4 + (idx % 3) * 0.2}s`,
-                  }}
-                />
-              ))}
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1.5">
-            {!isRecording && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setShowManualModal(!showManualModal)}
-                title="Type or paste consultation notes"
-                className="h-9 w-9 p-0 rounded-md border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-[rgb(var(--clr-primary))]"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </Button>
+          {/* Undock button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDocked(false);
+            }}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+            title="Undock / Float Widget"
+          >
+            <Maximize2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // MODE 2 & 3: DRAGGABLE FLOATING PILL & EXPANDED AUDIO PALETTE
+  // -------------------------------------------------------------
+  return (
+    <div
+      ref={widgetRef}
+      style={{
+        transform: `translate3d(${currentX}px, ${currentY}px, 0)`,
+        touchAction: 'none',
+      }}
+      className={`fixed top-0 left-0 z-40 select-none pointer-events-auto transition-shadow ${
+        isDragging ? 'cursor-grabbing opacity-90 scale-[1.02]' : 'cursor-grab'
+      }`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    >
+      <div className="relative flex flex-col items-end">
+        {/* Status / Error Toast Bubble */}
+        {(errorMessage || lastStatus) && (
+          <div
+            className={`absolute ${
+              opensUpwards ? 'bottom-full mb-2' : 'top-full mt-2'
+            } right-0 flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xl animate-in fade-in zoom-in-95 z-50 whitespace-nowrap max-w-sm ${
+              errorMessage
+                ? 'bg-amber-600 text-white border border-amber-500'
+                : 'bg-emerald-600 text-white border border-emerald-500'
+            }`}
+          >
+            {errorMessage ? (
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            )}
+            <span className="truncate">{errorMessage || lastStatus}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                clearMessages();
+              }}
+              className="ml-1 opacity-80 hover:opacity-100"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* Live Audio & Streaming Transcript Palette (Expanded or Recording) */}
+        {(isRecording || isExpanded) && (
+          <div
+            className={`absolute ${
+              opensUpwards ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
+            } right-0 w-80 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-2xl p-3.5 space-y-2.5 text-xs animate-in fade-in zoom-in-95 z-50`}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {/* Palette Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isRecording ? 'bg-rose-500 animate-ping' : 'bg-emerald-500'
+                  }`}
+                />
+                <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">
+                  {isRecording ? 'Listening Ambiently...' : 'Scribe Standby'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {isRecording && (
+                  <span className="font-mono font-bold text-[11px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    {formatTimer(seconds)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  title="Minimize palette"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Live Waveform Indicator when recording */}
+            {isRecording && (
+              <div className="flex items-center justify-center gap-1 py-1.5 bg-rose-50/70 rounded-lg border border-rose-100">
+                {[0.3, 0.7, 0.4, 0.95, 0.6, 0.85, 0.5, 0.75, 0.35, 0.65].map((h, i) => (
+                  <div
+                    key={i}
+                    className="w-1 bg-rose-500 rounded-full animate-pulse"
+                    style={{
+                      height: `${h * 18 + 4}px`,
+                      animationDuration: `${0.35 + (i % 4) * 0.15}s`,
+                    }}
+                  />
+                ))}
+              </div>
             )}
 
-            <Button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleToggleRecord}
-              disabled={isProcessing}
-              size="sm"
-              className={`h-9 px-3.5 rounded-md text-xs font-bold shadow-sm transition-all ${
+            {/* Live Streaming Transcript */}
+            <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100 min-h-[52px] max-h-28 overflow-y-auto">
+              {liveTranscript ? (
+                <p className="text-slate-700 italic text-[11px] leading-relaxed">
+                  "{liveTranscript}"
+                </p>
+              ) : (
+                <p className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 animate-pulse text-slate-400" />
+                  <span>
+                    {isRecording
+                      ? 'Speak naturally (patient complaints, vitals, exam findings)...'
+                      : 'Click an input field, then start dictating.'}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {/* Quick Actions in Palette */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowManualModal(true);
+                  setIsExpanded(false);
+                }}
+                className="text-[11px] h-7 px-2 text-slate-600 hover:text-primary gap-1"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Paste Notes</span>
+              </Button>
+
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={toggleRecording}
+                  disabled={isProcessing}
+                  className={`text-xs font-bold h-7 px-3 rounded-lg shadow-sm gap-1.5 ${
+                    isRecording
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                      : 'bg-primary hover:bg-primary/90 text-white'
+                  }`}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : isRecording ? (
+                    <MicOff className="w-3 h-3" />
+                  ) : (
+                    <Mic className="w-3 h-3" />
+                  )}
+                  <span>{isRecording ? 'Stop & Insert' : 'Start Dictation'}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Mini Pill / Control Bar (Collapsed vs Expanded Mode) */}
+        {isCollapsed && !isExpanded ? (
+          <div className="relative group flex items-center">
+            {/* Hover Tooltip / Expand Button */}
+            <div className="absolute right-full mr-2 hidden group-hover:flex items-center gap-1.5 bg-slate-900/90 text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg shadow-lg whitespace-nowrap animate-in fade-in zoom-in-95 pointer-events-none">
+              <span>{isRecording ? 'Recording Live... (Alt+D)' : 'AI Voice Scribe (Alt+D)'}</span>
+            </div>
+
+            {/* Collapsed Circular FAB */}
+            <div
+              className={`relative flex items-center justify-center rounded-full shadow-xl transition-all duration-200 select-none ${
                 isRecording
-                  ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
-                  : 'bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white'
+                  ? 'w-12 h-12 bg-rose-600 text-white border-2 border-white ring-4 ring-rose-500/30 animate-pulse cursor-pointer'
+                  : 'w-11 h-11 bg-gradient-to-tr from-[rgb(var(--clr-primary))] via-[#0B4F6C] to-emerald-600 text-white border-2 border-white/80 hover:scale-105 hover:shadow-2xl cursor-pointer'
               }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleRecording();
+              }}
+              title={isRecording ? 'Click to Stop & Insert' : 'Click to start AI Scribe (Alt+D)'}
             >
               {isProcessing ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isRecording ? (
+                <div className="flex flex-col items-center justify-center">
+                  <Mic className="w-4 h-4" />
+                  <span className="text-[9px] font-mono font-bold leading-none mt-0.5">{formatTimer(seconds)}</span>
+                </div>
+              ) : (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                  <span>Inserting...</span>
+                  <Mic className="w-5 h-5" />
+                  <Sparkles className="w-3 h-3 text-amber-300 absolute top-1.5 right-1.5 animate-pulse" />
                 </>
+              )}
+
+              {/* Small Expand Button On Hover */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCollapsed(false);
+                }}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-slate-700 shadow-md border border-slate-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-100"
+                title="Expand Scribe Toolbar"
+              >
+                <Maximize2 className="w-2.5 h-2.5 text-slate-700" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`flex items-center gap-1.5 p-1 rounded-full shadow-lg border backdrop-blur-md transition-all duration-200 ${
+              isRecording
+                ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-400/20'
+                : 'bg-white/95 border-slate-200/90 hover:border-slate-300'
+            }`}
+          >
+            {/* Drag Handle */}
+            <div
+              className="flex items-center justify-center pl-1.5 pr-0.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing"
+              title="Drag to reposition widget"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+
+            {/* Primary Voice Scribe Toggle Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleRecording();
+              }}
+              disabled={isProcessing}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-all ${
+                isRecording
+                  ? 'bg-rose-600 text-white hover:bg-rose-700 ring-2 ring-rose-300/60 animate-pulse'
+                  : 'bg-gradient-to-r from-primary via-primary-mid to-accent text-white hover:opacity-95'
+              }`}
+              title={
+                isRecording
+                  ? 'Stop Recording & Insert Text (Alt+D)'
+                  : 'Start AI Voice Dictation (Alt+D)'
+              }
+            >
+              {isProcessing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : isRecording ? (
                 <>
-                  <MicOff className="w-3.5 h-3.5 mr-1" />
-                  <span>Stop &amp; Insert</span>
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <Mic className="w-3.5 h-3.5" />
+                  <span className="font-mono font-bold">{formatTimer(seconds)}</span>
                 </>
               ) : (
                 <>
-                  <Mic className="w-3.5 h-3.5 mr-1" />
-                  <span>Start Dictating</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Dictate</span>
+                  <span className="text-[10px] opacity-70 font-mono hidden sm:inline">Alt+D</span>
                 </>
               )}
-            </Button>
+            </button>
 
-            {/* Minimize to pinned button */}
+            {/* Expand / Details Toggle Button */}
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setIsCollapsed(true)}
-              className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 transition-colors ml-1"
-              title="Pin to bottom-right corner"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+              className={`p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${
+                isExpanded ? 'text-primary bg-primary/10' : ''
+              }`}
+              title="Toggle Live Audio Palette"
+            >
+              <Radio className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Quick Paste Notes Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowManualModal(true);
+              }}
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Type or paste consultation notes manually"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Collapse to Floating FAB Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCollapsed(true);
+                setIsExpanded(false);
+              }}
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Collapse to compact floating button"
             >
               <Minimize2 className="w-3.5 h-3.5" />
             </button>
+
+            {/* Dock to Edge Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const isCloserToLeft = currentX < (typeof window !== 'undefined' ? window.innerWidth / 2 : 400);
+                setDockEdge(isCloserToLeft ? 'left' : 'right');
+                setIsDocked(true);
+                setIsExpanded(false);
+              }}
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Dock to screen margin (Zero-Obstruction Mode)"
+            >
+              {currentX < (typeof window !== 'undefined' ? window.innerWidth / 2 : 400) ? (
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              ) : (
+                <PanelRightClose className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Hide / Dismiss Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsWidgetVisible(false);
+              }}
+              className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors mr-0.5"
+              title="Hide floating widget (Can reopen anytime from the top bar)"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Manual Dictation / Notes Paste Modal */}
+      {showManualModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 pointer-events-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowManualModal(false);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Manual Clinical Dictation</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Paste external transcription or notes to insert into active input.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <textarea
+              rows={5}
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder="E.g.: Patient presents with primary infertility for 3 years. Pelvic ultrasound reveals right ovary AFC 8, left ovary AFC 7. Endometrial thickness 7.2mm..."
+              className="w-full p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none leading-relaxed transition-all"
+            />
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-slate-400">
+                Tip: Focus any form input field before clicking Insert.
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowManualModal(false)}
+                  className="text-xs font-semibold h-8 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleManualSubmit}
+                  disabled={isProcessing || !manualText.trim()}
+                  className="text-xs font-bold bg-primary hover:bg-primary/90 text-white h-8 rounded-lg gap-1.5"
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  <span>Insert Text</span>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

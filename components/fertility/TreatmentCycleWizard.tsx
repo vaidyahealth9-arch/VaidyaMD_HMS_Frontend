@@ -141,39 +141,16 @@ export default function TreatmentCycleWizard({
   });
 
   useEffect(() => {
-    // Hardcoded fallback protocols matching clinic's standard protocols
-    const FALLBACK_PROTOCOLS = [
-      { id: 'antagonist', name: 'Antagonist Protocol (Flexible)', category: 'Stimulation' },
-      { id: 'microflare', name: 'Microflare Short Protocol (GnRH Flare)', category: 'Stimulation' },
-      { id: 'ppos', name: 'PPOS Protocol (Progestin Primed)', category: 'Stimulation' },
-      { id: 'long_agonist', name: 'Long Agonist Protocol', category: 'Stimulation' },
-      { id: 'oi_iui', name: 'Ovulation Induction (IUI-H / OI)', category: 'IUI' },
-      { id: 'natural_cycle', name: 'Natural Cycle (NC-FET / NC-IUI)', category: 'FET' },
-      { id: 'hrt_fet', name: 'HRT-FET (Programmed Estrogen + Progesterone)', category: 'FET' },
-      { id: 'modified_natural', name: 'Modified Natural Cycle FET', category: 'FET' },
-    ];
-
     protocolsApi.list().then((p: any) => {
       if (Array.isArray(p) && p.length > 0) {
         setProtocols(p);
-        setForm((prev) => ({ ...prev, protocol_template_id: p[0].id }));
-      } else {
-        // Use hardcoded fallbacks when API returns empty
-        setProtocols(FALLBACK_PROTOCOLS);
-        setForm((prev) => ({ ...prev, protocol_template_id: FALLBACK_PROTOCOLS[0].id }));
       }
-    }).catch(() => {
-      setProtocols(FALLBACK_PROTOCOLS);
-      setForm((prev) => ({ ...prev, protocol_template_id: FALLBACK_PROTOCOLS[0].id }));
-    });
+    }).catch(() => {});
 
     authApi.listUsers().then((u: any) => {
       if (Array.isArray(u)) {
         const docs = u.filter((x: any) => isUserDoctor(x));
         setDoctors(docs);
-        if (docs.length > 0) {
-          setForm((prev) => ({ ...prev, treating_doctor_id: docs[0].id }));
-        }
       }
     }).catch(() => {});
 
@@ -182,62 +159,6 @@ export default function TreatmentCycleWizard({
       if (Array.isArray(types)) setCycleTypes(types);
     }).catch(() => {});
   }, []);
-
-  const getFallbackMedsForDay = (protocolId: string, dayNum: number) => {
-    const p = (protocolId || '').toLowerCase();
-    const meds: any[] = [];
-    if (p.includes('antag') || !p) {
-      if (dayNum >= 2 && dayNum <= 11) {
-        meds.push({ drug_name: 'rFSH (Follisurge / Gonal-F)', dose: dayNum >= 9 ? '150 IU' : '225 IU', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum >= 6 && dayNum <= 11) {
-        meds.push({ drug_name: 'HMG (Menopur)', dose: '75 IU', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum >= 6 && dayNum <= 12) {
-        meds.push({ drug_name: 'GnRH Antagonist (Cetrotide 0.25mg)', dose: '0.25 mg', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum === 12) {
-        meds.push({ drug_name: 'Ovitrelle / hCG Trigger', dose: '250 mcg', frequency: 'Stat', route: 'SC' });
-      }
-    } else if (p.includes('microflare')) {
-      if (dayNum >= 1 && dayNum <= 12) {
-        meds.push({ drug_name: 'Leuprolide (Lupride 0.5mg Flare)', dose: '0.5 mg', frequency: 'BD', route: 'SC' });
-      }
-      if (dayNum >= 2 && dayNum <= 11) {
-        meds.push({ drug_name: 'rFSH (Follisurge / Gonal-F)', dose: dayNum >= 7 ? '225 IU' : '300 IU', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum >= 5 && dayNum <= 11) {
-        meds.push({ drug_name: 'HMG (Menopur)', dose: '75 IU', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum === 12) {
-        meds.push({ drug_name: 'Ovitrelle / hCG Trigger', dose: '10,000 IU', frequency: 'Stat', route: 'IM' });
-      }
-    } else if (p.includes('hrt') || p.includes('fet')) {
-      if (dayNum <= 13) {
-        meds.push({ drug_name: 'Tab. Progynova (Estradiol Valerate 2mg)', dose: '2 mg', frequency: 'TDS', route: 'Oral' });
-      } else {
-        meds.push({ drug_name: 'Tab. Progynova (Estradiol Valerate 2mg)', dose: '2 mg', frequency: 'TDS', route: 'Oral' });
-        meds.push({ drug_name: 'Cap. Susten (Micronized Progesterone 400mg)', dose: '400 mg', frequency: 'BD', route: 'Vaginal' });
-        meds.push({ drug_name: 'Inj. Gestone (Progesterone 100mg)', dose: '100 mg', frequency: 'OD', route: 'IM' });
-      }
-    } else if (p.includes('ppos')) {
-      if (dayNum >= 2 && dayNum <= 11) {
-        meds.push({ drug_name: 'rFSH (Follisurge 225 IU)', dose: '225 IU', frequency: 'OD', route: 'SC' });
-        meds.push({ drug_name: 'Tab. MPA (Medroxyprogesterone 10mg)', dose: '10 mg', frequency: 'OD', route: 'Oral' });
-      }
-      if (dayNum === 12) {
-        meds.push({ drug_name: 'Decapeptyl Trigger 0.2mg', dose: '0.2 mg', frequency: 'Stat', route: 'SC' });
-      }
-    } else {
-      if (dayNum >= 2 && dayNum <= 11) {
-        meds.push({ drug_name: 'rFSH (Gonadotropin)', dose: '225 IU', frequency: 'OD', route: 'SC' });
-      }
-      if (dayNum === 12) {
-        meds.push({ drug_name: 'Trigger Injection', dose: '250 mcg', frequency: 'Stat', route: 'SC' });
-      }
-    }
-    return meds;
-  };
 
   const generateFallbackCalendar = () => {
     const baseDateStr = form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0];
@@ -259,8 +180,6 @@ export default function TreatmentCycleWizard({
       else if (iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval)';
       else if (iso === form.sentinel_dates.et) milestone = 'Embryo Transfer';
 
-      const meds = getFallbackMedsForDay(form.protocol_template_id, dayNum);
-
       days.push({
         date: iso,
         day_number: dayNum,
@@ -268,7 +187,7 @@ export default function TreatmentCycleWizard({
         day_of_week: dayNames[d.getDay()],
         stim_day_label: dayNum >= 2 && dayNum <= 12 ? `Stim Day ${dayNum - 1}` : null,
         milestone: milestone || null,
-        medications: meds,
+        medications: [],
       });
     }
     return {
@@ -362,9 +281,9 @@ export default function TreatmentCycleWizard({
         {
           date: new Date().toISOString().split('T')[0],
           day_of_cycle: nextDay,
-          thickness_mm: 8.0,
-          pattern: 'Trilaminar',
-          vascularity: 'Zone 3',
+          thickness_mm: 0,
+          pattern: '',
+          vascularity: '',
         },
       ],
     }));
@@ -391,8 +310,8 @@ export default function TreatmentCycleWizard({
       if (d.day_number === dayNumber) {
         const meds = d.medications ? [...d.medications] : [];
         meds.push({
-          drug_name: 'Inj. Cetrotide',
-          dose: '0.25 mg',
+          drug_name: '',
+          dose: '',
           frequency: 'OD',
         });
         return { ...d, medications: meds };
@@ -471,7 +390,7 @@ export default function TreatmentCycleWizard({
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden w-full flex flex-col">
       {/* Header & Steps Bar */}
-      <div className="bg-slate-900 text-white p-6 border-b border-slate-800 flex-shrink-0">
+      <div className="bg-primary text-white p-6 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold">Add New Treatment Cycle</h2>
@@ -537,7 +456,7 @@ export default function TreatmentCycleWizard({
                         ))}
                     </datalist>
                     {form.treatment_type && (
-                      <p className="text-[11px] text-indigo-600 font-semibold mt-1">✓ {form.treatment_type}</p>
+                      <p className="text-[11px] text-primary font-semibold mt-1">✓ {form.treatment_type}</p>
                     )}
                   </>
                 ) : (
@@ -578,6 +497,7 @@ export default function TreatmentCycleWizard({
                   onChange={(e) => setForm({ ...form, treating_doctor_id: e.target.value })}
                   className="vmd-input"
                 >
+                  <option value="">Select Treating Consultant...</option>
                   {doctors.map((d) => (
                     <option key={d.id} value={d.id}>{d.name} ({d.specialization})</option>
                   ))}
@@ -591,7 +511,7 @@ export default function TreatmentCycleWizard({
                     id="treatment_at_other_centre"
                     checked={form.treatment_at_other_centre}
                     onChange={(e) => setForm({ ...form, treatment_at_other_centre: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                    className="w-4 h-4 text-primary rounded cursor-pointer"
                   />
                   <label htmlFor="treatment_at_other_centre" className="text-xs font-bold text-slate-700 cursor-pointer">
                     Treatment initiated at another centre / Referral cycle
@@ -657,8 +577,8 @@ export default function TreatmentCycleWizard({
                 )}
               </div>
 
-              <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4 space-y-3">
-                <h4 className="font-bold text-xs text-blue-800">Sperm Source</h4>
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+                <h4 className="font-bold text-xs text-primary font-bold">Sperm Source</h4>
                 <div className="flex flex-wrap gap-4 text-xs font-semibold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -724,7 +644,7 @@ export default function TreatmentCycleWizard({
                   type="checkbox"
                   checked={form.pgs_pgd_data.indicated}
                   onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, indicated: e.target.checked } })}
-                  className="w-5 h-5 text-indigo-600 rounded"
+                  className="w-5 h-5 text-primary rounded"
                 />
                 <div>
                   <p className="font-bold text-xs text-slate-900">Preimplantation Genetic Testing Indicated</p>
@@ -827,8 +747,9 @@ export default function TreatmentCycleWizard({
               <select
                 value={form.protocol_template_id}
                 onChange={(e) => setForm({ ...form, protocol_template_id: e.target.value })}
-                className="vmd-input font-bold text-indigo-900 bg-indigo-50/40"
+                className="vmd-input font-bold text-text-main bg-surface-muted"
               >
+                <option value="">Select Protocol Template...</option>
                 {protocols.map((p) => (
                   <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
                 ))}
@@ -843,7 +764,7 @@ export default function TreatmentCycleWizard({
                 </span>
               </div>
             ) : (
-              <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-md text-xs text-indigo-800 flex items-center gap-2">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-md text-xs text-primary flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-amber-600 inline mr-1" />
                 <span>
                   <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, and Day 19 ET. You can adjust any date manually.
@@ -897,7 +818,7 @@ export default function TreatmentCycleWizard({
               <button
                 type="button"
                 onClick={handleAddEndometrialRow}
-                className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-md hover:bg-indigo-100 transition-colors shadow-sm"
+                className="px-3 py-1.5 bg-primary/10 border border-primary/20 text-primary font-bold text-xs rounded-md hover:bg-primary/15 transition-colors shadow-sm"
               >
                 + Add Scan Date
               </button>
@@ -1051,7 +972,7 @@ export default function TreatmentCycleWizard({
             <button
               type="button"
               onClick={() => setCurrentStep(currentStep + 1)}
-              className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 text-xs transition-colors shadow-md shadow-indigo-500/20"
+              className="px-6 py-2 bg-primary text-white font-bold rounded-md hover:bg-primary-mid text-xs transition-colors shadow-md shadow-primary/20"
             >
               Next Step →
             </button>

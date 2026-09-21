@@ -15,10 +15,9 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex items-center gap-0 border-b text-sm',
+      'inline-flex items-center gap-0 border-b border-border text-sm',
       className
     )}
-    style={{ borderColor: 'rgb(var(--clr-border))' }}
     {...props}
   />
 ));
@@ -31,53 +30,22 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Underline tab style — active gets a bottom border in primary colour
       'relative px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors',
-      'border-b-2 border-transparent -mb-px',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+      'border-b-2 border-transparent -mb-px text-text-muted hover:text-text-main',
+      'data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-semibold',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
       'disabled:pointer-events-none disabled:opacity-40',
-      'data-[state=active]:font-semibold',
       className
     )}
-    style={
-      {
-        color: 'rgb(var(--clr-text-muted))',
-        '--active-border': 'rgb(var(--clr-primary))',
-        '--active-color':  'rgb(var(--clr-primary))',
-      } as React.CSSProperties
-    }
-    onMouseEnter={(e) => {
-      const el = e.currentTarget;
-      if (el.dataset.state !== 'active') {
-        el.style.color = 'rgb(var(--clr-text))';
-      }
-    }}
-    onMouseLeave={(e) => {
-      const el = e.currentTarget;
-      if (el.dataset.state !== 'active') {
-        el.style.color = 'rgb(var(--clr-text-muted))';
-      }
-    }}
-    onFocus={(e) => {
-      e.currentTarget.style.outlineColor = 'rgb(var(--clr-primary))';
-    }}
     {...props}
   />
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
 /**
- * We use a global CSS rule for data-[state=active] because inline styles
- * can't target pseudo/data selectors cleanly.
+ * Backward compatibility dummy component so existing imports don't break
  */
-const TabsActiveStyle = () => (
-  <style>{`
-    [data-radix-tabs-trigger][data-state="active"] {
-      color: rgb(var(--clr-primary)) !important;
-      border-bottom-color: rgb(var(--clr-primary)) !important;
-    }
-  `}</style>
-);
+const TabsActiveStyle = () => null;
 
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,

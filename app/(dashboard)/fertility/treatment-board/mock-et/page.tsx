@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Printer, Save, RotateCcw, Stethoscope, FlaskConical, ChevronRight } from 'lucide-react';
-import { getApiBase } from '@/lib/api';
+import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
-
-const API = getApiBase();
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 
 const UTERUS_OPTIONS = ['Select', 'Anteverted', 'Retroverted', 'Axial', 'Mid-Position'];
 const VAGINA_OPTS = ['Select', 'Yes', 'No'];
@@ -41,15 +40,10 @@ export default function MockETPage() {
   useEffect(() => {
     const fetchStaff = async () => {
       try {
-        const res = await fetch(`${API}/users?per_page=100`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const all: any[] = Array.isArray(data) ? data : data.users || [];
-          setDoctors(all.filter((u: any) => u.is_doctor || u.role === 'doctor' || u.role === 'admin'));
-          setEmbryologists(all.filter((u: any) => u.role === 'embryologist' || u.role === 'doctor'));
-        }
+        const data = await authApi.listUsers({ per_page: 100 });
+        const all: any[] = Array.isArray(data) ? data : (data as any)?.users || [];
+        setDoctors(all.filter((u: any) => u.is_doctor || u.role === 'doctor' || u.role === 'admin'));
+        setEmbryologists(all.filter((u: any) => u.role === 'embryologist' || u.role === 'doctor'));
       } catch {
         // silently ignore if user list fails
       }
@@ -104,11 +98,11 @@ export default function MockETPage() {
     </div>
   );
 
-  const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition';
+  const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition';
   const selectCls = `${inputCls} cursor-pointer`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 print:bg-white">
+    <div className="min-h-screen bg-surface-muted print:bg-white">
       {/* Top bar */}
       <div className="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 print:hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -139,8 +133,7 @@ export default function MockETPage() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm text-white rounded-lg transition disabled:opacity-60"
-              style={{ background: 'rgb(var(--clr-primary))' }}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm text-white rounded-lg transition disabled:opacity-60 bg-primary hover:bg-primary-mid"
             >
               <Save className="w-3.5 h-3.5" />
               {isSaving ? 'Saving…' : 'Save Record'}
@@ -150,14 +143,27 @@ export default function MockETPage() {
       </div>
 
       {/* Page content */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="printable-document max-w-5xl mx-auto px-4 sm:px-6 py-8 print:p-0 print:m-0 print:max-w-none">
+        {/* Printable Header for standard A4 layout */}
+        <div className="hidden print:block mb-4">
+          <PrintableReportHeader
+            title="MOCK EMBRYO TRANSFER (MOCK ET) RECORD"
+            subtitle="Department of Reproductive Medicine & ART • Cavity Assessment & Negotiation Plan"
+            metaFields={[
+              { label: 'Report Date', value: form.report_date },
+              { label: 'Uterus Position', value: form.uterus },
+              { label: 'Catheter Choice', value: form.catheter_choice },
+            ]}
+          />
+        </div>
+
         {/* Title card */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-lg print:shadow-none">
+        <div className="bg-gradient-to-r from-primary to-primary-mid rounded-2xl p-6 mb-6 text-white shadow-lg print:hidden">
           <div className="flex items-center gap-3 mb-1">
             <FlaskConical className="w-6 h-6 opacity-80" />
             <h1 className="text-xl font-bold">Mock Embryo Transfer (Mock ET)</h1>
           </div>
-          <p className="text-blue-100 text-sm">Trial uterine cavity assessment prior to actual embryo transfer</p>
+          <p className="text-white/80 text-sm">Trial uterine cavity assessment prior to actual embryo transfer</p>
         </div>
 
         {/* Form card */}

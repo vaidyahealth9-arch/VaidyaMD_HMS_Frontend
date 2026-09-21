@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { cryoApi } from '@/lib/api';
+import React, { useState, useEffect } from 'react';
+import { cryoApi, templatesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CryoVitrifyModalProps {
@@ -13,27 +13,42 @@ interface CryoVitrifyModalProps {
 
 export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSaved }: CryoVitrifyModalProps) {
   const { user } = useAuth();
+  const [cryoTanks, setCryoTanks] = useState<any[]>([]);
   const [vitrifyForm, setVitrifyForm] = useState({
     patient_id: '',
     straw_number: '',
     no_of_embryos: 1,
-    tank_number: 'Tank 1 (Main Cryobank)',
-    canister_number: 'Canister 1',
-    canister_colour: 'Red',
-    cane_number: 'Cane 1',
-    goblet_position: 'Top Goblet',
-    goblet_colour: 'Blue',
-    cryo_device_colour: 'White',
+    tank_number: '',
+    canister_number: '',
+    canister_colour: '',
+    cane_number: '',
+    goblet_position: '',
+    goblet_colour: '',
+    cryo_device_colour: '',
     expiry_date: '',
-    consent_form_reference: 'ART-FORM-15',
+    consent_form_reference: '',
   });
+
+  useEffect(() => {
+    templatesApi.list('fertility_cryo').then((res) => {
+      if (Array.isArray(res) && res.length > 0) {
+        setCryoTanks(res);
+      }
+    }).catch(() => {});
+  }, []);
+
 
   const handleVitrifyStraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const targetPatientId = vitrifyForm.patient_id || activeCycle?.patient_id;
+    if (!targetPatientId) {
+      alert('Please select a patient for this cryo vitrification record.');
+      return;
+    }
     try {
       await cryoApi.createSample({
-        patient_id: vitrifyForm.patient_id || patients[0]?.id,
+        patient_id: targetPatientId,
         treatment_cycle_id: activeCycle?.id,
         sample_type: 'embryo',
         straw_number: vitrifyForm.straw_number,
@@ -114,49 +129,75 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
               Physical Biological Coordinates (LN2 Storage)
             </span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">Storage Tank</label>
-                <select
-                  value={vitrifyForm.tank_number}
-                  onChange={(e) => setVitrifyForm({ ...vitrifyForm, tank_number: e.target.value })}
-                  className="vmd-input text-xs font-bold text-slate-900 bg-white w-full"
-                >
-                  <option value="Tank 1 (Main Cryobank)">Tank 1 — Main Cryobank (Auto LN2)</option>
-                  <option value="Tank 2 (Donor Bank)">Tank 2 — Donor Gamete Bank (Lock)</option>
-                  <option value="Tank 3 (Quarantine/Infectious)">Tank 3 — Quarantine / Infectious</option>
-                </select>
-              </div>
+            {(() => {
+              const currentTankObj = cryoTanks.find((t) => (t.title || t.schema_json?.tank_name) === vitrifyForm.tank_number);
+              const tankCanisterColours = currentTankObj?.schema_json?.canister_colours || ['Red', 'Blue', 'Green', 'Yellow', 'White', 'Orange'];
+              const tankCanisterCount = currentTankObj?.schema_json?.canister_count || tankCanisterColours.length || 6;
+              const canisterOptions = Array.from({ length: tankCanisterCount }, (_, i) => ({
+                name: `Canister ${i + 1}`,
+                colour: tankCanisterColours[i % tankCanisterColours.length] || 'Red',
+              }));
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">Canister</label>
-                <select
-                  value={vitrifyForm.canister_number}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const colorMap: Record<string, string> = {
-                      'Canister 1': 'Red',
-                      'Canister 2': 'Blue',
-                      'Canister 3': 'Green',
-                      'Canister 4': 'Yellow',
-                      'Canister 5': 'White',
-                    };
-                    setVitrifyForm({
-                      ...vitrifyForm,
-                      canister_number: val,
-                      canister_colour: colorMap[val] || 'Red',
-                    });
-                  }}
-                  className="vmd-input text-xs font-bold text-slate-800 bg-white w-full"
-                >
-                  <option value="Canister 1">Canister 1 (Red Band)</option>
-                  <option value="Canister 2">Canister 2 (Blue Band)</option>
-                  <option value="Canister 3">Canister 3 (Green Band)</option>
-                  <option value="Canister 4">Canister 4 (Yellow Band)</option>
-                  <option value="Canister 5">Canister 5 (White Band)</option>
-                </select>
-              </div>
-            </div>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Storage Tank</label>
+                    <select
+                      value={vitrifyForm.tank_number}
+                      onChange={(e) => {
+                        const selectedName = e.target.value;
+                        const tObj = cryoTanks.find((t) => (t.title || t.schema_json?.tank_name) === selectedName);
+                        const colours = tObj?.schema_json?.canister_colours || ['Red'];
+                        setVitrifyForm({
+                          ...vitrifyForm,
+                          tank_number: selectedName,
+                          canister_number: 'Canister 1',
+                          canister_colour: colours[0] || 'Red',
+                        });
+                      }}
+                      className="vmd-input text-xs font-bold text-slate-900 bg-white w-full"
+                    >
+                      <option value="">Select Tank...</option>
+                      {cryoTanks.length > 0 ? (
+                        cryoTanks.map((t) => (
+                          <option key={t.id || t.title} value={t.title || t.schema_json?.tank_name}>
+                            {t.title || t.schema_json?.tank_name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Tank 1 (Main Cryobank)">Tank 1 — Main Cryobank (Auto LN2)</option>
+                          <option value="Tank 2 (Donor Bank)">Tank 2 — Donor Gamete Bank (Lock)</option>
+                          <option value="Tank 3 (Quarantine/Infectious)">Tank 3 — Quarantine / Infectious</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Canister</label>
+                    <select
+                      value={vitrifyForm.canister_number}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = canisterOptions.find((c) => c.name === val);
+                        setVitrifyForm({
+                          ...vitrifyForm,
+                          canister_number: val,
+                          canister_colour: match?.colour || '',
+                        });
+                      }}
+                      className="vmd-input text-xs font-bold text-slate-800 bg-white w-full"
+                    >
+                      <option value="">Select Canister...</option>
+                      {canisterOptions.map((c) => (
+                        <option key={c.name} value={c.name}>{c.name} ({c.colour} Band)</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-3 gap-2">
               <div>
@@ -166,6 +207,7 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
                   onChange={(e) => setVitrifyForm({ ...vitrifyForm, cane_number: e.target.value })}
                   className="vmd-input text-xs font-mono font-bold bg-white w-full"
                 >
+                  <option value="">Select Cane...</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                     <option key={n} value={`Cane ${n}`}>Cane {n}</option>
                   ))}
@@ -179,6 +221,7 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
                   onChange={(e) => setVitrifyForm({ ...vitrifyForm, goblet_position: e.target.value })}
                   className="vmd-input text-xs font-bold bg-white w-full"
                 >
+                  <option value="">Select Position...</option>
                   <option value="Top Goblet">Top Goblet</option>
                   <option value="Bottom Goblet">Bottom Goblet</option>
                 </select>
@@ -191,6 +234,7 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
                   onChange={(e) => setVitrifyForm({ ...vitrifyForm, goblet_colour: e.target.value })}
                   className="vmd-input text-xs font-bold bg-white w-full"
                 >
+                  <option value="">Select Color...</option>
                   <option value="Blue">Blue</option>
                   <option value="Red">Red</option>
                   <option value="Yellow">Yellow</option>
@@ -208,6 +252,7 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
                   onChange={(e) => setVitrifyForm({ ...vitrifyForm, cryo_device_colour: e.target.value })}
                   className="vmd-input text-xs font-bold bg-white w-full"
                 >
+                  <option value="">Select Device Color...</option>
                   <option value="White">White Straw</option>
                   <option value="Blue">Blue Straw</option>
                   <option value="Red">Red Straw</option>
@@ -218,7 +263,7 @@ export default function CryoVitrifyModal({ patients, activeCycle, onClose, onSav
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Canister Color Tag</label>
                 <span className="inline-block w-full py-1.5 px-3 bg-white border border-slate-200 rounded-md text-xs font-mono font-bold text-slate-700">
-                  {vitrifyForm.canister_colour}
+                  {vitrifyForm.canister_colour || 'None'}
                 </span>
               </div>
             </div>

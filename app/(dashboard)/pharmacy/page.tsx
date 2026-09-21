@@ -20,7 +20,6 @@ import {
   ShoppingCart,
   Layers,
   Calendar,
-  DollarSign,
   Loader2,
   Trash2,
   User,
@@ -38,7 +37,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function PharmacyPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -71,6 +70,9 @@ export default function PharmacyPage() {
   const posPatientDropdownRef = useRef<HTMLDivElement>(null);
   const [posCart, setPosCart] = useState<Array<{ item_code: string; item_name: string; quantity: number; unit_price: number; batch_number: string }>>([]);
   const [dispensedInvoice, setDispensedInvoice] = useState<any | null>(null);
+  
+  const [posDiscount, setPosDiscount] = useState<number>(0);
+  const [posAmountPaid, setPosAmountPaid] = useState<number | ''>('');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -318,6 +320,8 @@ export default function PharmacyPage() {
         items: posCart.map((i) => ({ item_code: i.item_code, quantity: i.quantity })),
         doctor_id: user?.id,
         notes: 'Dispensed via Point of Sale counter',
+        discount: posDiscount,
+        amount_paid: posAmountPaid === '' ? Math.max(0, cartTotal - posDiscount) : Number(posAmountPaid),
       });
     },
     onSuccess: (data: any) => {
@@ -325,6 +329,8 @@ export default function PharmacyPage() {
       queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
       setPosCart([]);
+      setPosDiscount(0);
+      setPosAmountPaid('');
       setDispensedInvoice(data);
       setActionSuccess(`Prescription successfully dispensed! Invoice #${data.invoice_number} created.`);
       setTimeout(() => setActionSuccess(null), 8000);
@@ -375,7 +381,7 @@ export default function PharmacyPage() {
 
         <Button
           onClick={() => setActiveTab('ocr_grn')}
-          className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
+          className="gap-2 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
         >
           <Sparkles className="w-4 h-4" />
           <span>Smart OCR Invoice Ingestion</span>
@@ -743,24 +749,50 @@ export default function PharmacyPage() {
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-slate-100 space-y-2">
-                    <div className="flex justify-between text-xs">
+                  <div className="pt-3 border-t border-slate-100 space-y-3">
+                    <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-500">Subtotal:</span>
                       <span className="font-bold text-slate-900">{formatCurrency(cartTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-bold">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Discount (₹):</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={posDiscount || ''}
+                        onChange={(e) => setPosDiscount(Number(e.target.value))}
+                        className="h-7 text-xs w-24 text-right"
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm font-bold border-t border-slate-100 pt-2">
                       <span className="text-slate-900">Total Billed:</span>
-                      <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(cartTotal)}</span>
+                      <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(Math.max(0, cartTotal - posDiscount))}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs bg-emerald-50 p-2 rounded-md border border-emerald-100">
+                      <span className="text-emerald-800 font-bold">Amount Paid (₹):</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={posAmountPaid}
+                        onChange={(e) => setPosAmountPaid(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder={(Math.max(0, cartTotal - posDiscount)).toString()}
+                        className="h-7 text-xs w-24 text-right bg-white border-emerald-200"
+                      />
                     </div>
                   </div>
-
-                  <Button
-                    onClick={() => dispenseMutation.mutate()}
-                    disabled={dispenseMutation.isPending || !posPatientId || posCart.length === 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-md shadow-md text-xs mt-2"
-                  >
-                    {dispenseMutation.isPending ? 'Dispensing & Deducting Stock...' : '1-Click Dispense & Bill'}
-                  </Button>
+                  {can('action:dispense_pharmacy') ? (
+                    <Button
+                      onClick={() => dispenseMutation.mutate()}
+                      disabled={dispenseMutation.isPending || !posPatientId || posCart.length === 0}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-md shadow-md text-xs mt-2"
+                    >
+                      {dispenseMutation.isPending ? 'Dispensing & Deducting Stock...' : '1-Click Dispense & Bill'}
+                    </Button>
+                  ) : (
+                    <div className="w-full p-2.5 mt-2 bg-slate-100 border border-slate-200 rounded-md text-slate-500 text-xs font-bold text-center">
+                      Not Authorized to Dispense Medication
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -788,14 +820,14 @@ export default function PharmacyPage() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Today's Dispenses</p>
-              <p className="text-2xl font-bold text-indigo-700 mt-1">
+              <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Today's Dispenses</p>
+              <p className="text-2xl font-bold text-primary mt-1">
                 {(() => {
                   const todayStr = new Date().toISOString().split('T')[0];
                   return pharmacyInvoices.filter((i: any) => (i.created_at || '').startsWith(todayStr)).length;
                 })()}
               </p>
-              <p className="text-[11px] text-indigo-600/80 mt-0.5">Dispensed today via FEFO</p>
+              <p className="text-[11px] text-primary/80 mt-0.5">Dispensed today via FEFO</p>
             </div>
           </div>
 
@@ -954,7 +986,7 @@ export default function PharmacyPage() {
                 <Button
                   type="button"
                   size="sm"
-                  className="text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-md shadow-sm"
+                  className="text-xs font-bold bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-md shadow-sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();

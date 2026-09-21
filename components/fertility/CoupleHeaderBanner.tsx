@@ -349,7 +349,7 @@ export default function CoupleHeaderBanner({
                     treatmentCycle.status === 'running'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : treatmentCycle.status === 'completed'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      ? 'bg-primary/10 text-primary border border-primary/20'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}
                 >

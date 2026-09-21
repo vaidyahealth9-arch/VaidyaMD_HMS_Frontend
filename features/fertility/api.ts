@@ -39,6 +39,13 @@ export const treatmentCyclesApi = {
   addMedication: (cycleId: string, data: { day_number: number; drug_name: string; dose: string; frequency?: string; instructions?: string }) =>
     request<any>(`/plugins/fertility/treatment-cycles/${cycleId}/medications`, { method: 'POST', body: JSON.stringify(data) }),
   listTypes: () => request<any[]>('/plugins/fertility/treatment-cycles/types'),
+  getTypes: () => request<any[]>('/plugins/fertility/treatment-cycles/types'),
+  createType: (data: Record<string, unknown>) =>
+    request<any>('/plugins/fertility/treatment-cycles/types', { method: 'POST', body: JSON.stringify(data) }),
+  updateType: (id: string, data: Record<string, unknown>) =>
+    request<any>(`/plugins/fertility/treatment-cycles/types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteType: (id: string) =>
+    request<any>(`/plugins/fertility/treatment-cycles/types/${id}`, { method: 'DELETE' }),
 };
 
 export const fertilityApi = {
@@ -96,6 +103,10 @@ export const protocolsApi = {
   get: (id: string) => request<any>(`/plugins/fertility/protocols/${id}`),
   create: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/protocols/', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Record<string, unknown>) =>
+    request<any>(`/plugins/fertility/protocols/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<any>(`/plugins/fertility/protocols/${id}`, { method: 'DELETE' }),
   previewCalendar: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/protocols/preview-calendar', { method: 'POST', body: JSON.stringify(data) }),
 };

@@ -16,6 +16,7 @@ export interface VaidyaMdUser {
   phone?: string;
   tenant_id: string;
   hospital_name?: string;
+  hospital_logo_url?: string;
   active_plugins?: string[];
   permission_profile_id?: string;
   branch_id?: string;
@@ -25,6 +26,11 @@ export interface BranchItem {
   id: string;
   name: string;
   code: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
+  receipt_header?: Record<string, any>;
   is_main_branch?: boolean;
 }
 

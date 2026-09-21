@@ -8,20 +8,20 @@ import { cn } from '@/lib/utils';
  * No hover colour change — badges are not buttons.
  */
 const badgeVariants = cva(
-  'inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-medium leading-none transition-none focus:outline-none',
+  'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium leading-none transition-none focus:outline-none',
   {
     variants: {
       variant: {
-        default:     'border-transparent text-white',
-        secondary:   'border-[rgb(var(--clr-border))] bg-[rgb(var(--clr-surface-muted))] text-[rgb(var(--clr-text-muted))]',
-        destructive: 'border-[rgb(var(--clr-danger-bg))] bg-[rgb(var(--clr-danger-bg))] text-[rgb(var(--clr-danger))]',
-        outline:     'border-[rgb(var(--clr-border-strong))] text-[rgb(var(--clr-text-muted))] bg-transparent',
-        success:     'border-[rgb(var(--clr-success-bg))] bg-[rgb(var(--clr-success-bg))] text-[rgb(var(--clr-success))]',
-        warning:     'border-[rgb(var(--clr-warning-bg))] bg-[rgb(var(--clr-warning-bg))] text-[rgb(var(--clr-warning))]',
-        info:        'border-[rgb(var(--clr-info-bg))]    bg-[rgb(var(--clr-info-bg))]    text-[rgb(var(--clr-info))]',
-        accent:      'border-[rgb(var(--clr-accent-light))] bg-[rgb(var(--clr-accent-light))] text-[rgb(var(--clr-accent))]',
+        default:     'border-primary/20 bg-primary/10 text-primary',
+        secondary:   'border-border bg-surface-muted text-text-muted',
+        destructive: 'border-danger/20 bg-danger-bg text-danger',
+        outline:     'border-border-strong text-text-muted bg-transparent',
+        success:     'border-success/20 bg-success-bg text-success',
+        warning:     'border-warning/20 bg-warning-bg text-warning',
+        info:        'border-info/20 bg-info-bg text-info',
+        accent:      'border-accent/30 bg-accent-light text-accent font-semibold',
         // Legacy alias — keep compatibility with existing code that uses 'purple'
-        purple:      'border-purple-100 bg-purple-50 text-purple-700',
+        purple:      'border-purple-200 bg-purple-50 text-purple-700',
       },
     },
     defaultVariants: {
@@ -34,17 +34,10 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, style, ...props }: BadgeProps) {
-  // Default variant needs the primary colour applied inline (CSS var)
-  const inlineStyle =
-    variant === 'default' || !variant
-      ? { background: 'rgb(var(--clr-primary))', ...style }
-      : style;
-
+function Badge({ className, variant, ...props }: BadgeProps) {
   return (
     <div
       className={cn(badgeVariants({ variant }), className)}
-      style={inlineStyle}
       {...props}
     />
   );

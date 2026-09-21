@@ -146,11 +146,11 @@ export default function StatutoryConsentModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 bg-slate-900/70 z-[100] flex flex-col items-center justify-start pt-24 sm:pt-28 pb-8 px-3 sm:px-6 overflow-y-auto print:p-0 print:static print:bg-white"
+      className="fixed inset-0 bg-rail-bg/50 z-[100] flex flex-col items-center justify-start pt-24 sm:pt-28 pb-8 px-3 sm:px-6 overflow-y-auto print:p-0 print:static print:bg-white"
     >
       <div className="bg-white rounded-lg max-w-5xl w-full max-h-[calc(100vh-8.5rem)] flex flex-col shadow-2xl overflow-hidden print:max-w-none print:max-h-none print:shadow-none print:rounded-none border border-slate-200 my-auto sm:my-0">
         {/* Header Bar */}
-        <div className="sticky top-0 z-20 bg-slate-900 text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden border-b border-slate-800">
+        <div className="sticky top-0 z-20 bg-primary text-white px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -225,7 +225,7 @@ export default function StatutoryConsentModal({
         </div>
 
         {/* Form Body Scrollable Area */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 text-slate-800 custom-scrollbar print:overflow-visible print:p-4">
+        <div className="printable-document flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 text-slate-800 custom-scrollbar print:overflow-visible print:p-0">
           {/* Statutory Title Banner */}
           <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -322,7 +322,7 @@ export default function StatutoryConsentModal({
           {/* Interactive Digital Signature Pads */}
           <div className="pt-4 border-t-2 border-slate-200">
             <h4 className="text-xs font-bold uppercase text-slate-800 tracking-wider mb-3 flex items-center gap-1.5">
-              <PenTool className="w-4 h-4 text-indigo-600" />
+              <PenTool className="w-4 h-4 text-primary" />
               <span>Digital Signatures &amp; Execution</span>
             </h4>
 
@@ -363,9 +363,9 @@ export default function StatutoryConsentModal({
               </div>
 
               {/* Husband Signature Pad */}
-              <div className="p-4 bg-indigo-50/30 border border-indigo-200 rounded-lg space-y-2">
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-900">
+                  <span className="text-xs font-bold text-text-main">
                     Signature of Husband / Partner (♂)
                   </span>
                   <button
@@ -377,7 +377,7 @@ export default function StatutoryConsentModal({
                     <span>Clear</span>
                   </button>
                 </div>
-                <div className="bg-white border-2 border-dashed border-indigo-300 rounded-xl overflow-hidden touch-none">
+                <div className="bg-white border-2 border-dashed border-primary/40 rounded-xl overflow-hidden touch-none">
                   <canvas
                     ref={canvasHusbandRef}
                     width={400}

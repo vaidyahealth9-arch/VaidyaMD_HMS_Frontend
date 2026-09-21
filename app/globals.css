@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: rgb(var(--clr-primary));
+  --color-primary-mid: rgb(var(--clr-primary-mid));
+  --color-primary-light: rgb(var(--clr-primary-light));
+  --color-accent: rgb(var(--clr-accent));
+  --color-accent-light: rgb(var(--clr-accent-light));
+  --color-surface: rgb(var(--clr-surface));
+  --color-surface-muted: rgb(var(--clr-surface-muted));
+  --color-surface-raised: rgb(var(--clr-surface-raised));
+  --color-border: rgb(var(--clr-border));
+  --color-border-strong: rgb(var(--clr-border-strong));
+  --color-foreground: rgb(var(--clr-text));
+  --color-text-main: rgb(var(--clr-text));
+  --color-text-muted: rgb(var(--clr-text-muted));
+  --color-text-subtle: rgb(var(--clr-text-subtle));
+  --color-success: rgb(var(--clr-success));
+  --color-success-bg: rgb(var(--clr-success-bg));
+  --color-warning: rgb(var(--clr-warning));
+  --color-warning-bg: rgb(var(--clr-warning-bg));
+  --color-danger: rgb(var(--clr-danger));
+  --color-danger-bg: rgb(var(--clr-danger-bg));
+  --color-info: rgb(var(--clr-info));
+  --color-info-bg: rgb(var(--clr-info-bg));
+  --color-rail-bg: rgb(var(--clr-rail-bg));
+  --color-rail-active: rgb(var(--clr-rail-active));
+  --color-topbar-bg: rgb(var(--clr-topbar-bg));
+}
+
 /* ─────────────────────────────────────────────────
    VaidyaMD HMS — Design Tokens
    Palette: Deep Teal-Navy + Warm Gold (medical premium)
@@ -139,9 +167,9 @@
 
   /* ── Form input base ── */
   .vmd-input {
-    @apply w-full bg-white border border-[rgb(var(--clr-border))] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[rgb(var(--clr-text))]
-    focus:outline-none focus:border-[rgb(var(--clr-primary))] focus:ring-1 focus:ring-[rgb(var(--clr-primary))]
-    transition-colors placeholder:text-[rgb(var(--clr-text-subtle))] disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply w-full bg-white border border-border rounded-[var(--radius-md)] px-3 py-2 text-sm text-text-main
+    focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary
+    transition-colors placeholder:text-text-subtle disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   /* ── Status indicator dot (no animation — performance) ── */
@@ -226,7 +254,10 @@
   /* Unconstrain parents containing printable documents */
   body > *:has(.printable-document),
   div:has(> .printable-document),
-  div:has(.printable-document) {
+  div:has(.printable-document),
+  main:has(.printable-document),
+  section:has(.printable-document),
+  article:has(.printable-document) {
     position: static !important;
     height: auto !important;
     min-height: auto !important;
@@ -237,6 +268,7 @@
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
+    transform: none !important;
   }
 
   /* Make only the designated printable document visible in standard flow */
@@ -248,6 +280,7 @@
   .printable-document {
     position: static !important;
     width: 100% !important;
+    max-width: 100% !important;
     margin: 0 !important;
     padding: 16px !important;
     border: none !important;
@@ -261,15 +294,25 @@
     page-break-inside: auto !important;
   }
 
-  /* Print-specific table borders */
-  .print-table th,
-  .print-table td {
-    border: 0.5pt solid #cbd5e1;
-    padding: 4pt 6pt;
+  /* Print-specific table borders & layout */
+  .print-table,
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
   }
 
-  /* Page break control */
-  .page-break-before { page-break-before: always; }
-  .page-break-avoid  { page-break-inside: avoid; }
-  tr { page-break-inside: avoid; }
+  .print-table th,
+  .print-table td {
+    border: 0.5pt solid #cbd5e1 !important;
+    padding: 4pt 6pt !important;
+  }
+
+  /* Page break controls */
+  .page-break-before { page-break-before: always !important; break-before: page !important; }
+  .page-break-avoid  { page-break-inside: avoid !important; break-inside: avoid !important; }
+  tr, .print-card, .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
+

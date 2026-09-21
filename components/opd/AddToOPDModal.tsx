@@ -26,7 +26,7 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
   const { user } = useAuth();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
-  const [consultationFee, setConsultationFee] = useState<number>(500);
+  const [consultationFee, setConsultationFee] = useState<number>(0);
   const [visitType, setVisitType] = useState<string>('consultation');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,19 +37,19 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
         .then((docList) => {
           if (Array.isArray(docList) && docList.length > 0) {
             setDoctors(docList);
-            // Default to patient's assigned doctor, or current user if doctor, or first doctor
+            // Default to patient's assigned doctor, or current user if doctor, otherwise leave empty for user selection
             if (patient?.treating_doctor_id && docList.some((d) => d.id === patient.treating_doctor_id)) {
               setSelectedDoctorId(patient.treating_doctor_id);
             } else if (user?.is_doctor || user?.role === 'doctor') {
               setSelectedDoctorId(user.id);
             } else {
-              setSelectedDoctorId(docList[0].id);
+              setSelectedDoctorId('');
             }
           }
         })
         .catch(() => {});
       
-      setConsultationFee(500);
+      setConsultationFee(0);
       setVisitType('consultation');
       setNotes('');
     }
@@ -143,6 +143,7 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
               className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] focus:border-transparent"
               required
             >
+              <option value="">Select Consultant...</option>
               {doctors.map((doc) => (
                 <option key={doc.id} value={doc.id}>
                   {doc.name} {doc.specialization ? `(${doc.specialization})` : ''}

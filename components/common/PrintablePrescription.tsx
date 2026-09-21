@@ -1,21 +1,50 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { formatDate } from '@/lib/utils';
-import { Printer, X } from 'lucide-react';
+import PrintableModal from './PrintableModal';
+import PrintableReportHeader from './PrintableReportHeader';
+import PrintableReportFooter from './PrintableReportFooter';
 
-interface MedRow { drug: string; dose?: string; route?: string; freq?: string; duration?: string; instructions?: string; }
+interface MedRow {
+  drug: string;
+  dose?: string;
+  route?: string;
+  freq?: string;
+  duration?: string;
+  instructions?: string;
+}
 
 interface PrescriptionProps {
   hospitalName?: string;
   hospitalSubtext?: string;
-  patient: { name: string; vid?: string; mrn?: string; age?: number | string; gender?: string; phone?: string; blood_group?: string; address?: string; };
-  doctor: { name: string; qualification?: string; reg_number?: string; department?: string; };
+  patient: {
+    name: string;
+    vid?: string;
+    mrn?: string;
+    age?: number | string;
+    gender?: string;
+    phone?: string;
+    blood_group?: string;
+    address?: string;
+  };
+  doctor: {
+    name: string;
+    qualification?: string;
+    reg_number?: string;
+    department?: string;
+  };
   visitDate?: string;
   chiefComplaint?: string;
   hopi?: string;
   pastHistory?: string;
-  vitals?: { bp?: string; pulse?: string; temp?: string; weight?: string; spo2?: string; };
+  vitals?: {
+    bp?: string;
+    pulse?: string;
+    temp?: string;
+    weight?: string;
+    spo2?: string;
+  };
   diagnosis?: string;
   investigations?: string;
   medications: MedRow[];
@@ -31,7 +60,7 @@ function MedTable({ medications, label }: { medications: MedRow[]; label: string
   return (
     <div className="space-y-1.5 page-break-avoid">
       <div className="flex items-center gap-2 pb-1" style={{ borderBottom: '1px solid #d1d5db' }}>
-        <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '1.1rem', color: '#0B4F6C' }}>℞</span>
+        <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '1.1rem', color: '#0B4F6C' }}>℞</span>
         <h3 className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#374151' }}>{label}</h3>
       </div>
       <table className="w-full text-left text-xs border-collapse print-table">
@@ -63,8 +92,8 @@ function MedTable({ medications, label }: { medications: MedRow[]; label: string
 }
 
 export default function PrintablePrescription({
-  hospitalName = 'VaidyaMD Fertility & ART Hospital',
-  hospitalSubtext = 'Centre for Reproductive Medicine & Advanced IVF · Reg No: TS/MED/2024/09812',
+  hospitalName,
+  hospitalSubtext,
   patient,
   doctor,
   visitDate = new Date().toISOString().split('T')[0],
@@ -81,124 +110,42 @@ export default function PrintablePrescription({
   nextFollowUp,
   onClose,
 }: PrescriptionProps) {
-  const [includeHeader, setIncludeHeader] = React.useState(true);
-
-  // Close on Escape key press
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   return (
-    <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-20 sm:pt-24 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible"
-      style={{ background: 'rgba(0,0,0,0.65)' }}
+    <PrintableModal
+      isOpen={true}
+      onClose={onClose}
+      title="Prescription Print Preview"
+      subtitle="Toggle header if printing on pre-printed clinic letterhead"
+      maxWidth="max-w-3xl"
     >
-      <div className="bg-white max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-lg print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent">
-
-        {/* Preview toolbar — hidden in print */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-5 py-3 gap-2 print:hidden"
-          style={{ background: 'rgb(var(--clr-rail-bg))', color: 'white' }}>
-          <div>
-            <p className="text-sm font-semibold">Prescription Print Preview</p>
-            <p className="text-xs opacity-60 mt-0.5">Toggle header if printing on pre-printed clinic letterhead</p>
-          </div>
-          <div className="flex items-center gap-3 self-end sm:self-center flex-wrap">
-            {/* Header / Letterhead Toggle */}
-            <div className="flex items-center bg-slate-800/80 p-0.5 rounded-md border border-slate-600 text-xs">
-              <button
-                type="button"
-                onClick={() => setIncludeHeader(true)}
-                className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                  includeHeader
-                    ? 'bg-[rgb(var(--clr-primary))] text-white font-bold'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                With Header
-              </button>
-              <button
-                type="button"
-                onClick={() => setIncludeHeader(false)}
-                className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                  !includeHeader
-                    ? 'bg-amber-600 text-white font-bold'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                title="Use this for pre-printed letterhead pads"
-              >
-                Pre-printed Pad (No Header)
-              </button>
-            </div>
-
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-opacity hover:opacity-90 shadow-sm"
-              style={{ background: 'rgb(var(--clr-primary))', color: 'white' }}
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print (A4)
-            </button>
-            <button onClick={onClose} className="p-1 opacity-60 hover:opacity-100 transition-opacity">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* ── Printable Document Sheet ── */}
-        <div className="p-8 space-y-5 printable-document print:p-6" style={{ fontFamily: 'Inter, Arial, sans-serif', fontSize: '11px', color: '#111827' }}>
-
-          {/* Hospital Header & Doctor Demographics (Conditional on includeHeader) */}
-          {includeHeader ? (
-            <>
-              {/* Hospital Header */}
-              <div className="flex items-start justify-between pb-3" style={{ borderBottom: '1.5px solid #0B4F6C' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center rounded-md flex-shrink-0"
-                    style={{ background: '#0B4F6C' }}>
-                    <img src="/logo.svg" alt="VM" className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h1 className="font-bold text-base leading-tight" style={{ color: '#0B4F6C', fontFamily: 'Inter, Arial, sans-serif' }}>
-                      {hospitalName}
-                    </h1>
-                    <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>{hospitalSubtext}</p>
-                    <p className="text-[9px] mt-0.5" style={{ color: '#9ca3af' }}>
-                      Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · +91 40 4888 9999 · care@vaidyamd.com
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '2rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
-                  <p className="text-[9px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: '#9ca3af' }}>Outpatient Rx</p>
-                </div>
+      {({ hideHeader }: { hideHeader: boolean }) => (
+        <div className="space-y-5">
+          {/* Dynamic Branch Header */}
+          <PrintableReportHeader
+            title="OUTPATIENT PRESCRIPTION"
+            subtitle={doctor.department || 'Reproductive Medicine & ART'}
+            hospitalName={hospitalName}
+            hospitalSubtext={hospitalSubtext}
+            hideHospitalHeader={hideHeader}
+            extraHeaderRight={
+              <div className="text-right flex-shrink-0">
+                <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '2rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
+                <p className="text-[9px] font-semibold uppercase tracking-wider mt-0.5 text-gray-400">Outpatient Rx</p>
               </div>
+            }
+          />
 
-              {/* Doctor Demographics */}
-              <div className="flex justify-between items-center py-2" style={{ borderBottom: '0.5px solid #e5e7eb' }}>
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: '#111827' }}>{doctor.name || 'Treating Consultant'}</p>
-                  <p className="text-[10px]" style={{ color: '#1A6E8E' }}>{doctor.qualification || 'MBBS, MS (OBG), DRM (Germany) · Senior Fertility Specialist'}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>Reg. No: {doctor.reg_number || 'TSMC/2016/54210'}</p>
-                  <p className="text-[10px]" style={{ color: '#374151' }}>{doctor.department || 'Reproductive Medicine & ART'}</p>
-                </div>
+          {/* Doctor Demographics (When header is not hidden) */}
+          {!hideHeader && doctor.name && (
+            <div className="flex justify-between items-center py-2" style={{ borderBottom: '0.5px solid #e5e7eb' }}>
+              <div>
+                <p className="font-semibold text-sm" style={{ color: '#111827' }}>{doctor.name}</p>
+                {doctor.qualification && <p className="text-[10px]" style={{ color: '#1A6E8E' }}>{doctor.qualification}</p>}
               </div>
-            </>
-          ) : (
-            /* Spacer for Pre-printed Letterhead Pads (Leaves approx 2.8 - 3 inches margin at top) */
-            <div className="h-28 sm:h-32 print:h-36 flex items-end justify-between border-b border-dashed border-slate-200 pb-1.5 print:border-none">
-              <span className="text-[9px] font-bold text-amber-600 print:hidden italic">
-                [Pre-printed Letterhead Pad Mode: Header Hidden — Content starts 3 inches from top]
-              </span>
-              <span style={{ fontFamily: 'var(--font-instrument-serif, Georgia, serif)', fontStyle: 'italic', fontSize: '1.8rem', color: '#0B4F6C', lineHeight: 1 }}>℞</span>
+              <div className="text-right">
+                {doctor.reg_number && <p className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>Reg. No: {doctor.reg_number}</p>}
+                {doctor.department && <p className="text-[10px]" style={{ color: '#374151' }}>{doctor.department}</p>}
+              </div>
             </div>
           )}
 
@@ -215,38 +162,75 @@ export default function PrintablePrescription({
                 <span className={`font-semibold text-xs ${mono ? 'font-mono' : ''}`} style={{ color: mono ? '#0B4F6C' : '#111827' }}>{value}</span>
               </div>
             ))}
+            {(patient.blood_group || patient.phone) && (
+              <>
+                {patient.blood_group && (
+                  <div>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>Blood Group</span>
+                    <span className="font-semibold text-xs" style={{ color: '#111827' }}>{patient.blood_group}</span>
+                  </div>
+                )}
+                {patient.phone && (
+                  <div>
+                    <span className="block text-[9px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>Phone</span>
+                    <span className="font-mono text-xs" style={{ color: '#111827' }}>{patient.phone}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Clinical Findings */}
-          {(vitals || chiefComplaint || diagnosis) && (
-            <div className="p-3 rounded-md space-y-1.5" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
-              {vitals && (vitals.bp || vitals.weight || vitals.pulse) && (
-                <div className="flex gap-4 text-[10px]" style={{ color: '#374151' }}>
-                  {vitals.bp     && <span><strong>BP:</strong> {vitals.bp} mmHg</span>}
-                  {vitals.pulse  && <span><strong>Pulse:</strong> {vitals.pulse} bpm</span>}
-                  {vitals.weight && <span><strong>Weight:</strong> {vitals.weight} kg</span>}
-                  {vitals.spo2   && <span><strong>SpO₂:</strong> {vitals.spo2}%</span>}
+          {/* Vitals Bar */}
+          {vitals && Object.values(vitals).some(Boolean) && (
+            <div className="flex items-center gap-6 px-3 py-2 rounded-md" style={{ background: '#F0F9FF', border: '0.5px solid #BAE6FD', fontSize: '10px' }}>
+              <span className="font-bold text-[9px] uppercase tracking-wider" style={{ color: '#0369A1' }}>Vitals:</span>
+              {vitals.bp     && <span>BP: <strong style={{ color: '#0C4A6E' }}>{vitals.bp} mmHg</strong></span>}
+              {vitals.pulse  && <span>Pulse: <strong style={{ color: '#0C4A6E' }}>{vitals.pulse} bpm</strong></span>}
+              {vitals.weight && <span>Weight: <strong style={{ color: '#0C4A6E' }}>{vitals.weight} kg</strong></span>}
+              {vitals.temp   && <span>Temp: <strong style={{ color: '#0C4A6E' }}>{vitals.temp} °F</strong></span>}
+              {vitals.spo2   && <span>SpO2: <strong style={{ color: '#0C4A6E' }}>{vitals.spo2}%</strong></span>}
+            </div>
+          )}
+
+          {/* Clinical Presentation: Complaints & History */}
+          {(chiefComplaint || hopi || pastHistory) && (
+            <div className="space-y-1.5 pt-1">
+              {chiefComplaint && (
+                <div>
+                  <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>Chief Complaint: </span>
+                  <span className="text-xs" style={{ color: '#111827' }}>{chiefComplaint}</span>
                 </div>
               )}
-              {chiefComplaint && (
-                <p className="text-[10px]"><strong style={{ color: '#111827' }}>Chief Complaints: </strong><span style={{ color: '#374151' }}>{chiefComplaint}</span></p>
+              {hopi && (
+                <div>
+                  <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>HOPI: </span>
+                  <span className="text-xs" style={{ color: '#374151' }}>{hopi}</span>
+                </div>
               )}
-              {diagnosis && (
-                <p className="text-[10px]"><strong style={{ color: '#111827' }}>Provisional Diagnosis: </strong><span className="font-semibold" style={{ color: '#0B4F6C' }}>{diagnosis}</span></p>
+              {pastHistory && (
+                <div>
+                  <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>Past Medical / Surgical History: </span>
+                  <span className="text-xs" style={{ color: '#374151' }}>{pastHistory}</span>
+                </div>
               )}
             </div>
           )}
 
-          {/* Primary Medications */}
-          <MedTable
-            medications={medications}
-            label={partnerName ? `Medications for ${patient.name}` : 'Prescribed Medications'}
-          />
+          {/* Provisional / Final Diagnosis */}
+          {diagnosis && (
+            <div className="p-2.5 rounded-md" style={{ background: '#F8FAFC', border: '0.5px solid #E2E8F0' }}>
+              <span className="block text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#0B4F6C' }}>Diagnosis</span>
+              <p className="font-semibold text-xs" style={{ color: '#0F172A' }}>{diagnosis}</p>
+            </div>
+          )}
 
-          {/* Partner Medications */}
+          {/* Rx Medications — Female / Primary Patient */}
+          <MedTable medications={medications} label={`Prescription — ${patient.name}`} />
+
+          {/* Rx Medications — Male / Partner (Couples Protocol) */}
           {partnerMedications.length > 0 && (
-            <div className="pt-3" style={{ borderTop: '0.5px solid #e5e7eb' }}>
-              <MedTable medications={partnerMedications} label={`Medications for Partner (${partnerName || 'Spouse'})`} />
+            <div className="pt-2">
+              <MedTable medications={partnerMedications} label={`Partner Prescription — ${partnerName || 'Spouse / Partner'}`} />
             </div>
           )}
 
@@ -272,30 +256,23 @@ export default function PrintablePrescription({
             </div>
           )}
 
-          {/* Footer — follow-up + signature */}
-          <div className="pt-5 flex items-end justify-between page-break-avoid" style={{ borderTop: '1px solid #d1d5db' }}>
-            <div>
-              {nextFollowUp && (
-                <div className="inline-block px-3 py-1.5 rounded-md mb-2" style={{ background: '#D1ECF7', border: '0.5px solid #1A6E8E' }}>
-                  <span className="block text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#0B4F6C' }}>Next Review / Follow-Up</span>
-                  <strong className="text-xs" style={{ color: '#083348' }}>{nextFollowUp}</strong>
-                </div>
-              )}
-              <p className="text-[9px]" style={{ color: '#9ca3af' }}>
-                * Bring this prescription on your next visit. For emergencies, contact the hospital emergency desk immediately.
-              </p>
+          {/* Next Follow-Up Banner if present */}
+          {nextFollowUp && (
+            <div className="inline-block px-3 py-1.5 rounded-md" style={{ background: '#D1ECF7', border: '0.5px solid #1A6E8E' }}>
+              <span className="block text-[9px] font-semibold uppercase tracking-wide" style={{ color: '#0B4F6C' }}>Next Review / Follow-Up</span>
+              <strong className="text-xs" style={{ color: '#083348' }}>{nextFollowUp}</strong>
             </div>
-            <div className="text-right">
-              <div className="h-10" />
-              <div className="pt-1" style={{ borderTop: '0.5px solid #6b7280' }}>
-                <p className="font-semibold text-xs" style={{ color: '#111827' }}>{doctor.name || 'Doctor Signature'}</p>
-                <p className="text-[9px]" style={{ color: '#6b7280' }}>Authorized Signatory</p>
-              </div>
-            </div>
-          </div>
+          )}
 
+          {/* Dynamic Branch Footer with Doctor Signatory */}
+          <PrintableReportFooter
+            signatoryTitle={doctor.name ? (doctor.name.startsWith('Dr') ? doctor.name : `Dr. ${doctor.name}`) : 'Treating Consultant'}
+            signatorySubtitle="Authorized Medical Practitioner"
+            showSignatory={true}
+            showComputerGeneratedNotice={true}
+          />
         </div>
-      </div>
-    </div>
+      )}
+    </PrintableModal>
   );
 }

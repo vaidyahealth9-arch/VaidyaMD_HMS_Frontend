@@ -121,12 +121,12 @@ export default function EditPatientDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rail-bg/50 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
               <UserCheck className="w-4 h-4" />
             </div>
             <div>
@@ -403,7 +403,7 @@ export default function EditPatientDetailsModal({
             type="button"
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-md transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-60"
+            className="px-4 py-2 bg-primary hover:bg-primary-mid text-white text-xs font-bold rounded-md transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-60"
           >
             {isSaving ? (
               <>

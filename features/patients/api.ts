@@ -23,4 +23,6 @@ export const patientsApi = {
     request<any>(`/core/patients/${id}`, { method: 'PATCH', body: JSON.stringify({ clinical_notes: clinicalNotes }) }),
   saveConsent: (id: string, data: { title: string; signature: string }) =>
     request<any>(`/core/patients/${id}/consents`, { method: 'POST', body: JSON.stringify(data) }),
+  createClinicalRecord: (id: string, data: Record<string, unknown>) =>
+    request<any>(`/core/patients/${id}/clinical-records`, { method: 'POST', body: JSON.stringify(data) }),
 };

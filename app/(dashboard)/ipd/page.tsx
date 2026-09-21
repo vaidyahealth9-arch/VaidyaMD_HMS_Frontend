@@ -18,7 +18,7 @@ import {
   ArrowRightLeft,
   LogOut,
   HeartPulse,
-  DollarSign,
+  IndianRupee,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -177,7 +177,7 @@ export default function IPDBedboardPage() {
     setAdmitSheetOpen(true);
   };
 
-  const vacantCount = beds.filter((b: any) => b.status === 'Vacant').length;
+  const vacantCount = beds.filter((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available').length;
   const occupiedCount = beds.filter((b: any) => b.status === 'Occupied').length;
   const cleaningCount = beds.filter((b: any) => b.status === 'Cleaning' || b.status === 'Maintenance').length;
 
@@ -203,7 +203,7 @@ export default function IPDBedboardPage() {
             disabled={accrualMutation.isPending}
             className="gap-1.5 text-xs font-bold bg-white text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] h-9 rounded-md shadow-sm"
           >
-            <DollarSign className="w-4 h-4 text-emerald-600" />
+            <IndianRupee className="w-4 h-4 text-emerald-600" />
             <span>{accrualMutation.isPending ? 'Accruing...' : 'Daily Bed Charge Accrual'}</span>
           </Button>
         </div>
@@ -318,7 +318,7 @@ export default function IPDBedboardPage() {
             {beds.map((bed: any) => {
               const isOccupied = bed.status === 'Occupied';
               const isCleaning = bed.status === 'Cleaning';
-              const isVacant = bed.status === 'Vacant';
+              const isVacant = bed.status === 'Vacant' || bed.status?.toLowerCase() === 'available';
 
               return (
                 <Card

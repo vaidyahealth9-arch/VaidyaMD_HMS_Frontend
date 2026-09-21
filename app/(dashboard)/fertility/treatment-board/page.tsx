@@ -149,7 +149,7 @@ export default function TreatmentBoardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-[rgb(var(--clr-primary))] flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
               <Activity className="w-5 h-5" />
             </div>
             <div>
@@ -179,7 +179,7 @@ export default function TreatmentBoardPage() {
           <button
             type="button"
             onClick={() => setShowWizard(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[rgb(var(--clr-primary))] hover:opacity-90 text-white text-xs font-bold rounded-md transition-all shadow-md shadow-indigo-500/20"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-md transition-all shadow-md shadow-primary/20"
           >
             <Plus className="w-4 h-4" />
             <span>New Treatment Cycle</span>
@@ -207,7 +207,7 @@ export default function TreatmentBoardPage() {
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               In Stimulation
             </span>
-            <Pill className="w-4 h-4 text-indigo-500" />
+            <Pill className="w-4 h-4 text-primary" />
           </div>
           <p className="text-3xl font-bold text-slate-900 mt-1">{inStimulation}</p>
           <span className="text-[11px] font-semibold text-[rgb(var(--clr-primary))] mt-1 block">
@@ -249,7 +249,7 @@ export default function TreatmentBoardPage() {
           className="flex items-center gap-4 bg-white border border-slate-200/80 rounded-lg p-4 shadow-xs hover:shadow-md hover:border-blue-200 transition-all group"
         >
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-100 transition">
-            <FlaskConical className="w-5 h-5 text-blue-600" />
+            <FlaskConical className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-800">Mock ET Record</p>
@@ -379,7 +379,7 @@ export default function TreatmentBoardPage() {
                     <tr key={cycle.id} className="hover:bg-slate-50/60 transition-colors">
                       {/* Cycle ID */}
                       <td className="py-4 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
-                        <span className="bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
+                        <span className="bg-primary/10 px-2 py-1 rounded-lg border border-primary/20">
                           {cycle.cycle_id}
                         </span>
                         <div className="text-[10px] text-slate-400 font-normal mt-1">
@@ -418,7 +418,7 @@ export default function TreatmentBoardPage() {
                       <td className="py-4 px-4">
                         {cycle.partner_name ? (
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-md bg-indigo-50 border border-indigo-200 text-slate-800 flex items-center justify-center text-[10px] font-bold">
+                            <span className="w-5 h-5 rounded-md bg-primary/10 border border-primary/20 text-slate-800 flex items-center justify-center text-[10px] font-bold">
                               ♂
                             </span>
                             <div>
@@ -493,7 +493,7 @@ export default function TreatmentBoardPage() {
                               cycle.status === 'running'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : cycle.status === 'completed'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                ? 'bg-primary/10 text-primary border border-primary/20'
                                 : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}
                           >
@@ -515,7 +515,7 @@ export default function TreatmentBoardPage() {
                               {mNotes.slice(0, 1).map((n: string, i: number) => (
                                 <span
                                   key={i}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-slate-800 border border-indigo-200 truncate max-w-[130px]"
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-slate-800 border border-primary/20 truncate max-w-[130px]"
                                   title={n}
                                 >
                                   ♂ {n}
@@ -552,10 +552,10 @@ export default function TreatmentBoardPage() {
                           <button
                             type="button"
                             onClick={() => setActiveEmbryologyCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-md font-bold text-[11px] transition-colors border border-blue-200 flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary rounded-md font-bold text-[11px] transition-colors border border-primary/20 flex items-center gap-1"
                             title="Master Embryology & Insemination Form"
                           >
-                            <Microscope className="w-3.5 h-3.5 text-blue-600" />
+                            <Microscope className="w-3.5 h-3.5 text-primary" />
                             <span>Embryo</span>
                           </button>
 
@@ -572,7 +572,7 @@ export default function TreatmentBoardPage() {
                           <button
                             type="button"
                             onClick={() => setActiveCalendarCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-slate-800 rounded-md font-bold text-[11px] transition-colors border border-indigo-200 flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/15 text-slate-800 rounded-md font-bold text-[11px] transition-colors border border-primary/20 flex items-center gap-1"
                             title="Open Day-by-Day Medication Calendar Grid"
                           >
                             <Calendar className="w-3.5 h-3.5" />
@@ -636,7 +636,7 @@ export default function TreatmentBoardPage() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                   <span>Stimulation Matrix Grid</span>
-                  <span className="font-mono text-xs px-2.5 py-0.5 rounded-lg bg-indigo-50 text-slate-800 border border-indigo-200">
+                  <span className="font-mono text-xs px-2.5 py-0.5 rounded-lg bg-primary/10 text-slate-800 border border-primary/20">
                     {activeCalendarCycle.cycle_id}
                   </span>
                 </h2>

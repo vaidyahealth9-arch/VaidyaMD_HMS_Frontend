@@ -56,12 +56,12 @@ export function calculateBMI(weightKg: number, heightCm: number): string {
 
 /** Status color map for appointment statuses */
 export const statusColors: Record<string, string> = {
-  scheduled:   'bg-blue-50   text-blue-700   border-blue-200',
-  waiting:     'bg-amber-50  text-amber-700  border-amber-200',
-  in_progress: 'bg-teal-50   text-teal-700   border-teal-200',
-  completed:   'bg-slate-50  text-slate-500  border-slate-200',
-  cancelled:   'bg-red-50    text-red-600    border-red-200',
-  no_show:     'bg-red-50    text-red-600    border-red-200',
+  scheduled:   'bg-info-bg text-info border-info/20',
+  waiting:     'bg-warning-bg text-warning border-warning/20',
+  in_progress: 'bg-primary/10 text-primary border-primary/20',
+  completed:   'bg-success-bg text-success border-success/20',
+  cancelled:   'bg-danger-bg text-danger border-danger/20',
+  no_show:     'bg-danger-bg text-danger border-danger/20',
 };
 
 export const statusLabels: Record<string, string> = {
@@ -82,17 +82,21 @@ export const roleLabels: Record<string, string> = {
   embryologist: 'Embryologist',
   andrologist: 'Andrologist',
   pharma: 'Pharmacist',
+  counsellor: 'Counselor',
+  accounts: 'Accounts',
 };
 
 /** Role color classes */
 export const roleColors: Record<string, string> = {
-  admin:         'bg-purple-100  text-purple-700',
-  doctor:        'bg-teal-100    text-teal-800',
-  nurse:         'bg-pink-100    text-pink-700',
-  receptionist:  'bg-sky-100     text-sky-700',
-  embryologist:  'bg-emerald-100 text-emerald-700',
-  andrologist:   'bg-cyan-100    text-cyan-700',
-  pharma:        'bg-orange-100  text-orange-700',
+  admin:         'bg-accent/20 text-accent border border-accent/30 font-semibold',
+  doctor:        'bg-primary/10 text-primary border border-primary/20 font-semibold',
+  nurse:         'bg-rose-50 text-rose-700 border border-rose-200 font-semibold',
+  receptionist:  'bg-sky-50 text-sky-700 border border-sky-200 font-semibold',
+  embryologist:  'bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold',
+  andrologist:   'bg-cyan-50 text-cyan-700 border border-cyan-200 font-semibold',
+  pharma:        'bg-amber-50 text-amber-700 border border-amber-200 font-semibold',
+  counsellor:    'bg-purple-50 text-purple-700 border border-purple-200 font-semibold',
+  accounts:      'bg-slate-100 text-slate-700 border border-slate-200 font-semibold',
 };
 
 /** Check if a user role can access a field */

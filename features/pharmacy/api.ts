@@ -26,6 +26,18 @@ export const pharmacyApi = {
   parseOcrInvoice: (payload?: { base64_image?: string; invoice_hint?: string; file_name?: string; vendor_name?: string } | Record<string, any>) =>
     request<any>('/core/pharmacy/ocr/invoice', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
-  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; notes?: string }) =>
+  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; notes?: string; discount?: number; amount_paid?: number }) =>
     request<any>('/core/pharmacy/dispense', { method: 'POST', body: JSON.stringify(data) }),
+
+  listVendors: () =>
+    request<any[]>('/core/pharmacy/vendors'),
+
+  createVendor: (data: Record<string, unknown>) =>
+    request<any>('/core/pharmacy/vendors', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateVendor: (id: string, data: Record<string, unknown>) =>
+    request<any>(`/core/pharmacy/vendors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteVendor: (id: string) =>
+    request<any>(`/core/pharmacy/vendors/${id}`, { method: 'DELETE' }),
 };

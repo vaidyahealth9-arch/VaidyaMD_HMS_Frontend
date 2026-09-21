@@ -44,7 +44,7 @@ export default function RegisterPatientPage() {
     occupation: '',
     nationality: 'Indian',
     mother_tongue: '',
-    blood_group: 'B+ve',
+    blood_group: '',
     photo_url: '',
     identity_type: 'aadhaar',
     aadhaar_number: '',
@@ -62,15 +62,17 @@ export default function RegisterPatientPage() {
     // Donor specific
     donor_type: 'oocyte_donor',
     donor_bank_code: '',
-    serology_status: 'Non-Reactive (All Negative)',
-    karyotype_status: '46,XX Normal',
+    serology_status: '',
+    karyotype_status: '',
   });
 
-  const [documentFile, setDocumentFile] = useState<{ name: string; dataUrl: string; type: string; size: string } | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [documentFile, setDocumentFile] = useState<{ name: string; dataUrl: string; type: string; size: string; fileObj?: File } | null>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => update('photo_url', reader.result as string);
     reader.readAsDataURL(file);
@@ -86,6 +88,7 @@ export default function RegisterPatientPage() {
         dataUrl: reader.result as string,
         type: file.type || 'application/pdf',
         size: (file.size / 1024).toFixed(1) + ' KB',
+        fileObj: file,
       });
     };
     reader.readAsDataURL(file);
@@ -103,7 +106,7 @@ export default function RegisterPatientPage() {
     email: '',
     occupation: '',
     education_qualification: '',
-    blood_group: 'O+ve',
+    blood_group: '',
     identity_type: 'aadhaar',
     aadhaar_number: '',
     abha_number: '',
@@ -129,7 +132,7 @@ export default function RegisterPatientPage() {
       name: data.name?.trim(),
       registration_type: form.registration_type,
       gender: data.gender || (isPartner ? 'male' : 'female'),
-      phone: data.phone?.trim() || '+91-9999900000',
+      phone: data.phone?.trim() || '',
     };
 
     if (data.title) payload.title = data.title;
@@ -177,19 +180,52 @@ export default function RegisterPatientPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!form.phone?.trim()) {
+      setError('Contact phone number is required for patient registration.');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       const primaryPayload = buildPayload(form, false);
       const primaryPatient: any = await patientsApi.create(primaryPayload);
 
-      // If an identity document was selected during registration, attach it
+      // If photo was picked, upload to purpose-based profile path and update patient photo_url
+      if (photoFile && primaryPatient?.id) {
+        try {
+          const photoRes = await documentsApi.uploadFile(photoFile, {
+            category: 'profile',
+            document_type: 'patient_photo',
+            patient_id: primaryPatient.id,
+          });
+          await patientsApi.update(primaryPatient.id, { photo_url: photoRes.url }).catch(() => {});
+        } catch (photoErr) {
+          console.warn('Notice: Background photo upload fallback:', photoErr);
+        }
+      }
+
+      // If an identity document was selected during registration, attach it to identity folder
       if (documentFile) {
         try {
+          let storedFilePath = documentFile.dataUrl;
+          if (documentFile.fileObj && primaryPatient?.id) {
+            try {
+              const uploadRes = await documentsApi.uploadFile(documentFile.fileObj, {
+                category: 'identity_proof',
+                document_type: 'identity_proof',
+                patient_id: primaryPatient.id,
+              });
+              storedFilePath = uploadRes.url;
+            } catch (upErr) {
+              console.warn('Identity document upload fallback:', upErr);
+            }
+          }
           await documentsApi.create({
             patient_id: primaryPatient.id,
             file_name: documentFile.name,
-            file_path: documentFile.dataUrl,
+            file_path: storedFilePath,
             category: 'identity_proof',
             mime_type: documentFile.type,
           });
@@ -310,7 +346,7 @@ export default function RegisterPatientPage() {
                   onClick={() => setRegistrationMode('couple')}
                   className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                     registrationMode === 'couple'
-                      ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -321,7 +357,7 @@ export default function RegisterPatientPage() {
                   onClick={() => setRegistrationMode('individual')}
                   className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                     registrationMode === 'individual'
-                      ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -466,6 +502,7 @@ export default function RegisterPatientPage() {
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Blood Group</label>
               <select value={form.blood_group} onChange={(e) => update('blood_group', e.target.value)} className="vmd-input text-xs">
+                <option value="">— Select Blood Group —</option>
                 {bloodGroups.map((bg) => (
                   <option key={bg} value={bg}>{bg}</option>
                 ))}
@@ -596,7 +633,7 @@ export default function RegisterPatientPage() {
                     type="file"
                     accept="image/*"
                     onChange={handlePhotoUpload}
-                    className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                    className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/15 cursor-pointer"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">JPG, PNG format (Max 2MB)</p>
                 </div>
@@ -634,7 +671,7 @@ export default function RegisterPatientPage() {
                       type="file"
                       accept=".pdf,image/*"
                       onChange={handleDocumentUpload}
-                      className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                      className="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/15 cursor-pointer"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">PDF or image of Aadhaar / ID proof</p>
                   </div>
@@ -665,7 +702,7 @@ export default function RegisterPatientPage() {
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <User className="w-4 h-4 text-slate-500 inline mr-1" /> Male Partner / Husband Details
               </h2>
-              <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+              <span className="text-[10px] text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
                 Bidirectional Couple Link
               </span>
             </div>
@@ -734,6 +771,7 @@ export default function RegisterPatientPage() {
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Blood Group</label>
                 <select value={partnerForm.blood_group} onChange={(e) => updatePartner('blood_group', e.target.value)} className="vmd-input text-xs">
+                  <option value="">— Select Blood Group —</option>
                   {bloodGroups.map((bg) => (
                     <option key={bg} value={bg}>{bg}</option>
                   ))}
@@ -748,7 +786,7 @@ export default function RegisterPatientPage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="flex-1 py-3.5 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-md shadow-sm transition-colors"
+            className="flex-1 py-3.5 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-md shadow-sm transition-colors"
           >
             {isSaving ? 'Registering...' : 'Complete Registration'}
           </button>

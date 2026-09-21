@@ -24,6 +24,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { treatmentCyclesApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface HrtFetRowData {
   cycle_day: number;
@@ -62,6 +63,15 @@ export default function HrtFetProtocolSheet({
   readonly = false,
   onCalendarSaved,
 }: HrtFetProtocolSheetProps) {
+  const { currentBranch, user } = useAuth();
+  const hospitalName = user?.hospital_name || currentBranch?.receipt_header?.hospital_name || 'VaidyaMD Advanced Hospital';
+  const branchSubtitle = [
+    currentBranch?.name,
+    currentBranch?.address,
+    currentBranch?.phone ? `Tel: ${currentBranch.phone}` : '',
+    currentBranch?.gstin ? `GSTIN: ${currentBranch.gstin}` : '',
+  ].filter(Boolean).join(' · ') || 'Centre for Reproductive Medicine & Advanced IVF';
+
   // Setup Parameters (Sheet 2: Setup)
   const [bleedDate, setBleedDate] = useState<string>(
     sentinelDates?.lmp_day1 || startDate || new Date().toISOString().split('T')[0]
@@ -85,21 +95,21 @@ export default function HrtFetProtocolSheet({
     sentinelDates?.e2_freq || 'TDS'
   );
   const [p4Dose, setP4Dose] = useState<string>(
-    sentinelDates?.p4_dose || '400 mg PV BD + 100 mg IM OD'
+    sentinelDates?.p4_dose || ''
   );
   const [p4Route, setP4Route] = useState<string>(
-    sentinelDates?.p4_route || 'Vaginal / IM'
+    sentinelDates?.p4_route || ''
   );
   const [p4Freq, setP4Freq] = useState<string>(
-    sentinelDates?.p4_freq || 'BD / OD'
+    sentinelDates?.p4_freq || ''
   );
 
   // Endometrial Assessment Setup
   const [liningThickness, setLiningThickness] = useState<string>(
-    sentinelDates?.lining_thickness || '8.5 mm'
+    sentinelDates?.lining_thickness || ''
   );
   const [liningPattern, setLiningPattern] = useState<string>(
-    sentinelDates?.lining_pattern || 'Trilaminar'
+    sentinelDates?.lining_pattern || ''
   );
 
   // UI States
@@ -384,8 +394,8 @@ export default function HrtFetProtocolSheet({
 </head><body>
 <div class="clinic-header">
   <div>
-    <div class="clinic-name">VaidyaMD Fertility &amp; ART Hospital</div>
-    <div class="clinic-sub">Centre for Reproductive Medicine &amp; Advanced IVF · Reg No: TS/MED/2024/09812</div>
+    <div class="clinic-name">${hospitalName}</div>
+    <div class="clinic-sub">${branchSubtitle}</div>
   </div>
   <div>
     <div class="doc-title">${title}</div>
@@ -603,7 +613,7 @@ ${bodyHtml}
       return 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300 font-bold';
     }
     if (phase.includes('Post-transfer')) {
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      return 'bg-primary/10 text-primary border-primary/20';
     }
     return 'bg-slate-100 text-slate-700 border-slate-200';
   };
@@ -886,7 +896,7 @@ ${bodyHtml}
                                   )}
                                   {/* Result */}
                                   {row.result_value && (
-                                    <div className="text-[9px] text-indigo-700 font-semibold mb-1">
+                                    <div className="text-[9px] text-primary font-semibold mb-1">
                                       {row.result_value}
                                     </div>
                                   )}
@@ -1179,7 +1189,7 @@ ${bodyHtml}
             <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-2">
               <div>
                 <span className="text-[11px] font-bold text-slate-600 block">Serum β-hCG Test Date</span>
-                <strong className="text-xs text-indigo-900 block">
+                <strong className="text-xs text-text-main block">
                   {calculatedDates?.betaHcgDate || 'Day 23'}
                 </strong>
                 <span className="text-[10px] text-slate-400">Day 23 / 10-14 days post-ET</span>

@@ -9,14 +9,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:     '', // inline style applied below via className override
-        destructive: 'bg-[rgb(var(--clr-danger))]   text-white shadow-sm hover:opacity-90 active:opacity-100 focus-visible:ring-[rgb(var(--clr-danger))]',
-        outline:     'border border-[rgb(var(--clr-border))] bg-white shadow-sm hover:bg-[rgb(var(--clr-surface-muted))] text-[rgb(var(--clr-text))]',
-        secondary:   'bg-[rgb(var(--clr-surface-muted))] text-[rgb(var(--clr-text))] shadow-sm hover:bg-[rgb(var(--clr-border))]',
-        ghost:       'hover:bg-[rgb(var(--clr-surface-muted))] text-[rgb(var(--clr-text-muted))] hover:text-[rgb(var(--clr-text))]',
-        link:        'text-[rgb(var(--clr-primary))] underline-offset-4 hover:underline',
-        success:     'bg-[rgb(var(--clr-success))]   text-white shadow-sm hover:opacity-90',
-        accent:      '', // gold — inline style below
+        default:     'bg-primary hover:bg-primary-mid text-white shadow-xs focus-visible:ring-primary',
+        destructive: 'bg-danger text-white shadow-xs hover:opacity-90 active:opacity-100 focus-visible:ring-danger',
+        outline:     'border border-border bg-white shadow-xs hover:bg-surface-muted text-text-main focus-visible:ring-primary',
+        secondary:   'bg-surface-muted text-text-main shadow-xs hover:bg-border focus-visible:ring-primary',
+        ghost:       'hover:bg-surface-muted text-text-muted hover:text-text-main focus-visible:ring-primary',
+        link:        'text-primary underline-offset-4 hover:underline focus-visible:ring-primary',
+        success:     'bg-success text-white shadow-xs hover:opacity-90 focus-visible:ring-success',
+        accent:      'bg-accent hover:opacity-90 text-white shadow-xs focus-visible:ring-accent',
       },
       size: {
         default: 'h-9 px-4 py-2',
@@ -40,32 +40,13 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, style, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
-
-    // Apply primary/accent colours as inline style (CSS vars don't purge-proof in tw v4 cva)
-    let inlineStyle: React.CSSProperties = style || {};
-    if (variant === 'default' || !variant) {
-      inlineStyle = {
-        background: 'rgb(var(--clr-primary))',
-        color: 'white',
-        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.08)',
-        ...style,
-      };
-    } else if (variant === 'accent') {
-      inlineStyle = {
-        background: 'rgb(var(--clr-accent))',
-        color: 'white',
-        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.08)',
-        ...style,
-      };
-    }
 
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        style={inlineStyle}
         {...props}
       />
     );

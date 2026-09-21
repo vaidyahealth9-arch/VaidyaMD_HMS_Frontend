@@ -16,6 +16,7 @@ import {
   Eye,
   Microscope,
 } from 'lucide-react';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { andrologyApi } from '@/lib/api';
 
 export interface SpermPreparationModalProps {
@@ -43,61 +44,55 @@ export default function SpermPreparationModal({
   // Top Metadata
   const [reportType, setReportType] = useState('IUI');
   const [collectionDate, setCollectionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [timeOfCollection, setTimeOfCollection] = useState('08:30');
-  const [timeOfDispatch, setTimeOfDispatch] = useState('09:45');
+  const [timeOfCollection, setTimeOfCollection] = useState('');
+  const [timeOfDispatch, setTimeOfDispatch] = useState('');
   const [iuiDate, setIuiDate] = useState(new Date().toISOString().split('T')[0]);
-  const [abstinenceDays, setAbstinenceDays] = useState('3');
+  const [abstinenceDays, setAbstinenceDays] = useState('');
 
   // Pre-Process Fields
-  const [preVolume, setPreVolume] = useState('2.5');
-  const [preLiquefaction, setPreLiquefaction] = useState('Complete in 25 min');
-  const [prePh, setPrePh] = useState('7.6');
-  const [preViscosity, setPreViscosity] = useState('Normal');
+  const [preVolume, setPreVolume] = useState('');
+  const [preLiquefaction, setPreLiquefaction] = useState('');
+  const [prePh, setPrePh] = useState('');
+  const [preViscosity, setPreViscosity] = useState('');
   const [preSampleType, setPreSampleType] = useState('Fresh');
   const [preBalanceVial, setPreBalanceVial] = useState('');
-  const [preSpermConc, setPreSpermConc] = useState('35.0');
-  const [preTotalMotility, setPreTotalMotility] = useState('52');
-  const [preTotalSpermCount, setPreTotalSpermCount] = useState('87.5');
-  const [preSpermAbnormality, setPreSpermAbnormality] = useState('Head amorphous defects 22%');
-  const [preMorphology, setPreMorphology] = useState('6');
-  const [preProgression, setPreProgression] = useState('Moderate');
-  const [preGradeA, setPreGradeA] = useState('18');
-  const [preGradeB, setPreGradeB] = useState('22');
-  const [preGradeC, setPreGradeC] = useState('12');
-  const [preGradeD, setPreGradeD] = useState('48');
-  const [preAbnormalForms, setPreAbnormalForms] = useState('94');
-  const [preEpithelialCell, setPreEpithelialCell] = useState('1-2 / HPF');
-  const [prePusCells, setPrePusCells] = useState('0-1 / HPF');
-  const [preRoundCells, setPreRoundCells] = useState('0.4');
-  const [preAggregation, setPreAggregation] = useState('None');
-  const [preAgglutination, setPreAgglutination] = useState('Absent');
+  const [preSpermConc, setPreSpermConc] = useState('');
+  const [preTotalMotility, setPreTotalMotility] = useState('');
+  const [preTotalSpermCount, setPreTotalSpermCount] = useState('');
+  const [preSpermAbnormality, setPreSpermAbnormality] = useState('');
+  const [preMorphology, setPreMorphology] = useState('');
+  const [preProgression, setPreProgression] = useState('');
+  const [preGradeA, setPreGradeA] = useState('');
+  const [preGradeB, setPreGradeB] = useState('');
+  const [preGradeC, setPreGradeC] = useState('');
+  const [preGradeD, setPreGradeD] = useState('');
+  const [preAbnormalForms, setPreAbnormalForms] = useState('');
+  const [preEpithelialCell, setPreEpithelialCell] = useState('');
+  const [prePusCells, setPrePusCells] = useState('');
+  const [preRoundCells, setPreRoundCells] = useState('');
+  const [preAggregation, setPreAggregation] = useState('');
+  const [preAgglutination, setPreAgglutination] = useState('');
 
   // Post-Process Fields
-  const [postPrepMethod, setPostPrepMethod] = useState('Density Gradient Centrifugation (DGC 45%/90%)');
-  const [postVolumePrepared, setPostVolumePrepared] = useState('0.5');
-  const [postRecoveryWith, setPostRecoveryWith] = useState('SpermRinse / FertiCult Media');
+  const [postPrepMethod, setPostPrepMethod] = useState('');
+  const [postVolumePrepared, setPostVolumePrepared] = useState('');
+  const [postRecoveryWith, setPostRecoveryWith] = useState('');
   const [postExpDate, setPostExpDate] = useState('');
-  const [postSpermConc, setPostSpermConc] = useState('24.0');
-  const [postTotalMotility, setPostTotalMotility] = useState('88');
-  const [postTotalMotileSperm, setPostTotalMotileSperm] = useState('10.56'); // TMSI
-  const [postProgression, setPostProgression] = useState('Rapid forward directional');
-  const [postGradeA, setPostGradeA] = useState('65');
-  const [postGradeB, setPostGradeB] = useState('23');
-  const [postGradeC, setPostGradeC] = useState('6');
-  const [postGradeD, setPostGradeD] = useState('6');
-  const [postAbnormalForms, setPostAbnormalForms] = useState('88');
-  const [postEmbryologist1, setPostEmbryologist1] = useState('Senior Andrologist / Embryologist');
-  const [postIuiBp, setPostIuiBp] = useState('118/78 mmHg');
-  const [postIuiPulse, setPostIuiPulse] = useState('74 bpm');
-  const [postImpression, setPostImpression] = useState(
-    'Excellent post-wash recovery. High concentration of rapid progressive spermatozoa suitable for immediate homologous intrauterine insemination (IUI).'
-  );
-  const [interpretation, setInterpretation] = useState(
-    'Post-wash TMSI of > 10 Million achieved with 88% overall motility and grade A progression.'
-  );
-  const [adviceAfterIui, setAdviceAfterIui] = useState(
-    'Rest in supine position for 15-20 minutes. Continue prescribed luteal support (Progesterone). Avoid strenuous physical activity for 24 hours. Pregnancy test scheduled at 14 days.'
-  );
+  const [postSpermConc, setPostSpermConc] = useState('');
+  const [postTotalMotility, setPostTotalMotility] = useState('');
+  const [postTotalMotileSperm, setPostTotalMotileSperm] = useState(''); // TMSI
+  const [postProgression, setPostProgression] = useState('');
+  const [postGradeA, setPostGradeA] = useState('');
+  const [postGradeB, setPostGradeB] = useState('');
+  const [postGradeC, setPostGradeC] = useState('');
+  const [postGradeD, setPostGradeD] = useState('');
+  const [postAbnormalForms, setPostAbnormalForms] = useState('');
+  const [postEmbryologist1, setPostEmbryologist1] = useState('');
+  const [postIuiBp, setPostIuiBp] = useState('');
+  const [postIuiPulse, setPostIuiPulse] = useState('');
+  const [postImpression, setPostImpression] = useState('');
+  const [interpretation, setInterpretation] = useState('');
+  const [adviceAfterIui, setAdviceAfterIui] = useState('');
 
   // Auto calculate Total Motile Sperm Inseminated (TMSI)
   const calculateTMSI = (vol: string, conc: string, mot: string) => {
@@ -188,10 +183,10 @@ export default function SpermPreparationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rail-bg/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:static print:bg-transparent print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-transparent print:m-0 print:p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[rgb(var(--clr-primary)/0.1)] border border-[rgb(var(--clr-primary)/0.2)] flex items-center justify-center text-[rgb(var(--clr-primary))]">
               <FlaskConical className="w-4 h-4" />
@@ -330,6 +325,7 @@ export default function SpermPreparationModal({
                         onChange={(e) => setPreViscosity(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select Viscosity...</option>
                         <option value="Normal">Normal</option>
                         <option value="Slightly Viscous">Slightly Viscous</option>
                         <option value="Hyperviscous (>2cm thread)">Hyperviscous</option>
@@ -397,7 +393,7 @@ export default function SpermPreparationModal({
                         type="number"
                         value={preGradeB}
                         onChange={(e) => setPreGradeB(e.target.value)}
-                        className="vmd-input text-xs text-blue-700"
+                        className="vmd-input text-xs text-primary"
                       />
                     </div>
                     <div>
@@ -485,6 +481,7 @@ export default function SpermPreparationModal({
                         onChange={(e) => setPostPrepMethod(e.target.value)}
                         className="vmd-input text-xs font-semibold"
                       >
+                        <option value="">Select Preparation Method...</option>
                         <option value="Density Gradient Centrifugation (DGC 45%/90%)">Density Gradient Centrifugation (DGC 45%/90%)</option>
                         <option value="Direct Swim-Up from Pellet">Direct Swim-Up from Pellet</option>
                         <option value="Double Wash & Centrifugation">Double Wash &amp; Centrifugation</option>
@@ -572,7 +569,7 @@ export default function SpermPreparationModal({
                         type="number"
                         value={postGradeB}
                         onChange={(e) => setPostGradeB(e.target.value)}
-                        className="vmd-input text-xs text-blue-700"
+                        className="vmd-input text-xs text-primary"
                       />
                     </div>
                     <div>
@@ -650,18 +647,24 @@ export default function SpermPreparationModal({
             </div>
           ) : (
             /* Print Preview */
-            <div className="max-w-3xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800">
-              <div className="text-center border-b-2 border-slate-800 pb-4">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase">
-                  Semen Analysis &amp; Sperm Preparation Report
-                </h1>
-                <p className="text-xs text-slate-500 italic mt-0.5">
-                  VaidyaMD Fertility &amp; Andrology Laboratory · Sparta Clinical Suite
-                </p>
-              </div>
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+              <PrintableReportHeader
+                title="Semen Analysis & Sperm Preparation Report"
+                subtitle="VaidyaMD Fertility & Andrology Laboratory · Sparta Clinical Suite"
+                badge="SPERM PREP REPORT"
+                patient={{
+                  name: patient?.name || 'Male Patient',
+                  vid: patient?.vid,
+                }}
+                partner={partner?.name ? { name: partner.name } : undefined}
+                metaFields={[
+                  { label: 'Report Type', value: reportType },
+                  { label: 'Date of Collection', value: `${collectionDate} ${timeOfCollection}` },
+                ]}
+              />
 
               {/* Patient header table */}
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200">
+              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
                 <div className="p-2.5 bg-slate-50 font-bold">Patient Name: <span className="font-normal">{patient?.name}</span></div>
                 <div className="p-2.5 bg-slate-50 font-bold">Patient VID: <span className="font-normal font-mono">{patient?.vid}</span></div>
                 <div className="p-2.5">Date of Collection: <span className="font-semibold">{collectionDate} {timeOfCollection}</span></div>
@@ -772,7 +775,7 @@ export default function SpermPreparationModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="text-xs text-slate-500">
             {saveSuccess && (
               <span className="text-emerald-700 font-bold flex items-center gap-1.5">

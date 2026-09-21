@@ -18,6 +18,7 @@ import {
   FileText,
   AlertTriangle,
 } from 'lucide-react';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { embryologyApi, andrologyApi } from '@/lib/api';
 
 export interface MasterEmbryologyRecordModalProps {
@@ -178,12 +179,12 @@ export default function MasterEmbryologyRecordModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-rail-bg/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:p-0 print:static print:bg-transparent print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-transparent print:m-0 print:p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <Dna className="w-4 h-4" />
             </div>
             <div>
@@ -373,7 +374,7 @@ export default function MasterEmbryologyRecordModal({
                       type="number"
                       value={oocytesInjected}
                       onChange={(e) => setOocytesInjected(e.target.value)}
-                      className="vmd-input text-xs font-bold text-blue-700"
+                      className="vmd-input text-xs font-bold text-primary"
                     />
                   </div>
                   <div>
@@ -444,7 +445,7 @@ export default function MasterEmbryologyRecordModal({
                       type="number"
                       value={embryosFrozen}
                       onChange={(e) => setEmbryosFrozen(e.target.value)}
-                      className="vmd-input text-xs font-bold text-blue-700"
+                      className="vmd-input text-xs font-bold text-primary"
                     />
                   </div>
                   <div>
@@ -527,12 +528,12 @@ export default function MasterEmbryologyRecordModal({
               <div className="border border-slate-200 rounded-lg p-4 bg-white space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-blue-600" /> 5. Microscopic Image Documentation
+                    <Camera className="w-4 h-4 text-primary" /> 5. Microscopic Image Documentation
                   </h3>
                   <button
                     type="button"
                     onClick={addImageRow}
-                    className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-semibold flex items-center gap-1"
+                    className="px-2.5 py-1 bg-primary/10 text-primary hover:bg-primary/15 rounded text-xs font-semibold flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Image
                   </button>
@@ -552,7 +553,7 @@ export default function MasterEmbryologyRecordModal({
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleImageFile(img.id, e)}
-                        className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700"
+                        className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary"
                       />
                       <input
                         type="text"
@@ -576,17 +577,26 @@ export default function MasterEmbryologyRecordModal({
             </div>
           ) : (
             /* Print Preview */
-            <div className="max-w-3xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800">
-              <div className="text-center border-b-2 border-indigo-700 pb-4">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase">
-                  Embryology Laboratory Master Record
-                </h1>
-                <p className="text-xs text-slate-500 italic mt-0.5">
-                  VaidyaMD Embryology Suite · Complete Treatment Cycle Documentation
-                </p>
-              </div>
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+              <PrintableReportHeader
+                title="Embryology Laboratory Master Record"
+                subtitle="VaidyaMD Embryology Suite · Complete Treatment Cycle Documentation"
+                badge="EMBRYOLOGY RECORD"
+                patient={{
+                  name: patient?.name || 'Female Patient',
+                  vid: patient?.vid,
+                }}
+                partner={partner?.name ? { name: partner.name } : undefined}
+                doctor={{
+                  name: consultantDoctor,
+                }}
+                metaFields={[
+                  { label: 'Treatment Cycle ID', value: cycle?.cycle_id || '—' },
+                  { label: 'Egg Collection Date', value: `${eggCollectionDate} ${eggCollectionTime}` },
+                ]}
+              />
 
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200">
+              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
                 <div className="p-2.5 bg-slate-50 font-bold">Female Patient: <span className="font-normal">{patient?.name}</span></div>
                 <div className="p-2.5 bg-slate-50 font-bold">VID: <span className="font-normal font-mono">{patient?.vid}</span></div>
                 <div className="p-2.5">Male Partner: <span className="font-semibold">{partner?.name || 'Partner'}</span></div>
@@ -595,14 +605,14 @@ export default function MasterEmbryologyRecordModal({
                 <div className="p-2.5">Egg Collection: <span className="font-semibold">{eggCollectionDate} {eggCollectionTime}</span></div>
               </div>
 
-              <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100 grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 grid grid-cols-4 gap-2 text-center text-xs">
                 <div>
                   <span className="text-slate-500 block text-[10px]">Oocytes Retrieved</span>
                   <strong className="text-xl text-pink-700">{noOfOocytes}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px]">Oocytes Injected</span>
-                  <strong className="text-xl text-blue-700">{oocytesInjected}</strong>
+                  <strong className="text-xl text-primary">{oocytesInjected}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px]">Fertilized (2PN)</span>
@@ -638,8 +648,8 @@ export default function MasterEmbryologyRecordModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        {/* Footer Actions */}
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 print:hidden">
           <div className="text-xs text-slate-500">
             {saveSuccess && (
               <span className="text-emerald-700 font-bold flex items-center gap-1.5">
@@ -670,7 +680,7 @@ export default function MasterEmbryologyRecordModal({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-5 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+              className="px-5 py-2 bg-primary hover:bg-primary-mid text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               {isSaving ? 'Saving...' : 'Save Embryology Record'}

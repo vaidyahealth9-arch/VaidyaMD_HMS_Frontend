@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { billingApi, patientsApi, walletApi } from '@/lib/api';
+import { billingApi, patientsApi, walletApi, patientPackagesApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
-import { Printer, X, Building2, FileText, Package, Receipt, Zap, Search, Plus } from 'lucide-react';
+import { Printer, X, Building2, FileText, Package, Receipt, Zap, Search, Plus, PackageCheck, Sparkles } from 'lucide-react';
 import PrintableInvoice from '@/components/common/PrintableInvoice';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   pending: 'bg-rose-100 text-rose-800 border-rose-200',
-  partially_paid: 'bg-blue-100 text-blue-800 border-blue-200',
+  partially_paid: 'bg-accent-light text-accent border-accent/30',
   draft: 'bg-slate-100 text-slate-700 border-slate-200',
   cancelled: 'bg-slate-100 text-slate-400 border-slate-200',
 };
@@ -20,36 +20,6 @@ const statusColors: Record<string, string> = {
 const appointmentSources = [
   'Andrology/Embryology', 'Counselling', 'GYN-Theatre', 'IUI',
   'IVF-Theatre', 'Lab', 'Nurse', 'OP', 'Package', 'Scan', 'Yoga'
-];
-
-export const TARIFF_CATALOG = [
-  // Consultations & OPD
-  { category: 'Consultation', code: 'OPD-001', description: 'Senior Infertility Specialist Consultation', price: 1500 },
-  { category: 'Consultation', code: 'OPD-002', description: 'Routine Gynec Consultation / Follow-up', price: 800 },
-  { category: 'Consultation', code: 'OPD-003', description: 'Andrology / Male Fertility Consultation', price: 1200 },
-  { category: 'Consultation', code: 'OPD-004', description: 'Clinical Diet & Nutrition Counseling', price: 600 },
-  // Diagnostics & Scans
-  { category: 'Scans', code: 'USG-001', description: 'Pelvic Ultrasound TVS (Baseline)', price: 1500 },
-  { category: 'Scans', code: 'USG-002', description: 'Follicular Monitoring Scan (Single Sitting)', price: 800 },
-  { category: 'Scans', code: 'USG-003', description: 'Complete Follicular Tracking Package (6 Scans)', price: 4000 },
-  { category: 'Scans', code: 'USG-004', description: 'Early Pregnancy Viability / Dating Scan', price: 1800 },
-  { category: 'Scans', code: 'USG-005', description: 'Color Doppler Pelvis / Uterine Artery', price: 2500 },
-  // Laboratory & Andrology
-  { category: 'Lab', code: 'AND-001', description: 'CASA Semen Analysis (WHO 6th Edition)', price: 1200 },
-  { category: 'Lab', code: 'AND-002', description: 'Sperm DNA Fragmentation Index (DFI)', price: 3500 },
-  { category: 'Lab', code: 'AND-003', description: 'Semen Freezing & Vitrification (1 Year)', price: 8000 },
-  { category: 'Lab', code: 'LAB-001', description: 'Serum AMH (Anti-Mullerian Hormone)', price: 2200 },
-  { category: 'Lab', code: 'LAB-002', description: 'Day 2 Ovarian Reserve Profile (FSH, LH, E2, TSH, PRL)', price: 3500 },
-  { category: 'Lab', code: 'LAB-003', description: 'Couple Viral Markers (HIV, HBsAg, HCV, VDRL)', price: 2800 },
-  { category: 'Lab', code: 'LAB-004', description: 'Complete Blood Count (CBC) with ESR', price: 450 },
-  // Daycare & Procedures
-  { category: 'Procedure', code: 'PRC-001', description: 'Intrauterine Insemination (IUI) Procedure & Prep', price: 8500 },
-  { category: 'Procedure', code: 'PRC-002', description: 'Diagnostic Hysteroscopy (Daycare)', price: 18000 },
-  { category: 'Procedure', code: 'PRC-003', description: 'Operative Laparoscopy / Ovarian Drilling', price: 45000 },
-  { category: 'Procedure', code: 'PRC-004', description: 'Cervical Pap Smear & Liquid Based Cytology', price: 1200 },
-  // Pharmacy & Administration
-  { category: 'Pharmacy', code: 'PHR-001', description: 'Injection Administration & Nursing Charge', price: 200 },
-  { category: 'Daycare', code: 'DAY-001', description: 'Daycare Recovery Bed Charge (Up to 4 Hours)', price: 1500 },
 ];
 
 export default function BillingPage() {
@@ -86,6 +56,8 @@ export default function BillingPage() {
   // New invoice form state
   const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const [patientActivePackages, setPatientActivePackages] = useState<any[]>([]);
   const [invoicePatientSearch, setInvoicePatientSearch] = useState('');
   const [isInvoicePatientDropdownOpen, setIsInvoicePatientDropdownOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState('OP');
@@ -100,16 +72,11 @@ export default function BillingPage() {
   const [selectedPatientWallet, setSelectedPatientWallet] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Service catalog autocomplete
-  const DEFAULT_SERVICES = TARIFF_CATALOG.map((t) => ({
-    name: t.description,
-    type: t.category,
-    cost: t.price,
-    code: t.code,
-  }));
-  const [serviceCatalog, setServiceCatalog] = useState<any[]>(DEFAULT_SERVICES);
+  // Service catalog autocomplete (driven purely from database)
+  const [serviceCatalog, setServiceCatalog] = useState<any[]>([]);
   const [itemSearches, setItemSearches] = useState<string[]>(['']);
   const [itemDropdowns, setItemDropdowns] = useState<boolean[]>([false]);
+
 
   // Quick Payment Modal
   const [paymentModalInv, setPaymentModalInv] = useState<any>(null);
@@ -126,9 +93,7 @@ export default function BillingPage() {
       }),
       billingApi.listPackages(),
       patientsApi.list({ per_page: 500 }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/core'}/billing/service-catalog`, {
-        headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}` },
-      }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      billingApi.getServiceCatalog().catch(() => []),
     ]).then(([invResult, pkgResult, patResult, catalogResult]) => {
       if (invResult.status === 'fulfilled') setInvoices((invResult.value as any) || []);
       if (pkgResult.status === 'fulfilled') setPackages((pkgResult.value as any) || []);
@@ -165,12 +130,22 @@ export default function BillingPage() {
     return true;
   });
 
-  // When selected patient changes in new invoice modal, fetch wallet balance
+  // When selected patient changes in new invoice modal, fetch wallet balance and active package allocations
   useEffect(() => {
     if (selectedPatient) {
       walletApi.getWallet(selectedPatient)
         .then((w: any) => setSelectedPatientWallet(w))
         .catch(() => setSelectedPatientWallet(null));
+
+      patientPackagesApi.listByPatient(selectedPatient)
+        .then((pkgs: any) => {
+          const active = (Array.isArray(pkgs) ? pkgs : []).filter((p: any) => p.status === 'active');
+          setPatientActivePackages(active);
+        })
+        .catch(() => setPatientActivePackages([]));
+    } else {
+      setSelectedPatientWallet(null);
+      setPatientActivePackages([]);
     }
   }, [selectedPatient]);
 
@@ -197,22 +172,25 @@ export default function BillingPage() {
   };
 
   const handleSelectTariff = (idx: number, tariffCode: string) => {
-    const tariff = TARIFF_CATALOG.find((t) => t.code === tariffCode);
+    const tariff: any = serviceCatalog.find((t: any) => (t.code || t.name) === tariffCode);
     if (!tariff) return;
+    const desc = tariff.name || tariff.description;
+    const price = Number(tariff.cost ?? tariff.price ?? tariff.base_price ?? 0);
+
     setItems((prev) => {
       const updated = [...prev];
       const qty = updated[idx]?.quantity || 1;
       updated[idx] = {
         ...updated[idx],
-        description: tariff.description,
-        unit_price: tariff.price,
-        total: tariff.price * qty,
+        description: desc,
+        unit_price: price,
+        total: price * qty,
       };
       return updated;
     });
     setItemSearches((prev) => {
       const s = [...prev];
-      s[idx] = tariff.description;
+      s[idx] = desc;
       return s;
     });
     setItemDropdowns((prev) => {
@@ -271,9 +249,18 @@ export default function BillingPage() {
     try {
       const inv: any = await billingApi.createInvoice({
         patient_id: selectedPatient,
+        package_id: selectedPackageId || undefined,
         appointment_source: selectedSource,
         reason_for_attendance: reasonForAttendance,
-        items: validItems.map((i) => ({ ...i, total: (Number(i.unit_price) || 0) * (Number(i.quantity) || 1) })),
+        items: validItems.map((i: any) => ({
+          description: i.description,
+          quantity: Number(i.quantity) || 1,
+          unit_price: Number(i.unit_price) || 0,
+          total: (Number(i.unit_price) || 0) * (Number(i.quantity) || 1),
+          service_code: i.service_code || undefined,
+          patient_package_id: i.patient_package_id || undefined,
+          package_item_id: i.package_item_id || undefined,
+        })),
         discount: calculatedDiscount,
         tax: 0,
         paid_amount: immediatePaid,
@@ -284,6 +271,7 @@ export default function BillingPage() {
       });
       setInvoices((prev) => [inv, ...prev]);
       setShowNewInvoice(false);
+      setSelectedPackageId(null);
       toast.success('Invoice Created Successfully', `Invoice ${inv.invoice_number} has been generated.`);
       loadData();
     } catch (err: any) {
@@ -445,7 +433,7 @@ export default function BillingPage() {
           <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
             {isLoading ? (
               <div className="p-12 flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filteredInvoices.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs">
@@ -470,7 +458,7 @@ export default function BillingPage() {
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {filteredInvoices.map((inv) => (
                       <tr key={inv.id} className="hover:bg-slate-50">
-                        <td className="p-3.5 font-mono font-bold text-indigo-700">{inv.invoice_number}</td>
+                        <td className="p-3.5 font-mono font-bold text-primary">{inv.invoice_number}</td>
                         <td className="p-3.5">
                           <p className="font-bold text-slate-900">{inv.patient_name || 'Patient'}</p>
                           <p className="font-mono text-[10px] text-slate-400">{inv.patient_vid || '—'}</p>
@@ -506,7 +494,7 @@ export default function BillingPage() {
                             )}
                             <button
                               onClick={() => setReceiptModalInv(inv)}
-                              className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-bold text-[10px] transition-colors"
+                              className="px-2.5 py-1 bg-primary/10 hover:bg-primary/15 text-primary rounded font-bold text-[10px] transition-colors"
                               title="View & Print Invoice Receipt"
                             >
                               Receipt
@@ -525,49 +513,99 @@ export default function BillingPage() {
 
       {/* Packages Tab */}
       {activeTab === 'packages' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {packages.map((pkg) => (
-            <div key={pkg.id} className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between space-y-4">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                  {pkg.plugin_id} Package
-                </span>
-                <h3 className="text-base font-bold text-slate-900">{pkg.name}</h3>
-                <p className="text-xs text-slate-500">{pkg.description}</p>
-                <div className="pt-2 border-t space-y-1">
-                  {pkg.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between text-xs text-slate-700">
-                      <span>• {item.name || item.description}</span>
-                      <span className="font-bold">₹{item.cost?.toLocaleString() || '—'}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {packages.map((pkg) => {
+            const pkgItems = Array.isArray(pkg.items) ? pkg.items : [];
+            const standardTotal = pkgItems.reduce(
+              (acc: number, it: any) => acc + (Number(it.price ?? it.cost ?? 0) * Number(it.quantity || 1)),
+              0
+            );
+            const packagePrice = parseFloat(pkg.base_price ?? pkg.price ?? 0) || 0;
+            const savings = Math.max(0, standardTotal - packagePrice);
 
-              <div className="pt-3 border-t flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Package Price</span>
-                  <span className="text-xl font-bold text-slate-900">₹{parseFloat(pkg.base_price).toLocaleString()}</span>
+            return (
+              <div key={pkg.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+                      {pkg.plugin_id || 'Clinical'} Package
+                    </span>
+                    {savings > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
+                        Save ₹{savings.toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{pkg.name}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{pkg.description || 'Comprehensive clinical procedure bundle.'}</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 pb-0.5 border-b border-slate-100">
+                      <span>Included Components ({pkgItems.length})</span>
+                      <span>Tariff Value</span>
+                    </div>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {pkgItems.map((item: any, idx: number) => {
+                        const price = Number(item.price ?? item.cost ?? 0);
+                        const qty = Number(item.quantity || 1);
+                        return (
+                          <div key={idx} className="flex justify-between text-xs text-slate-700 py-0.5 border-b border-slate-50 last:border-0">
+                            <span className="truncate pr-2">• {item.name || item.description} <span className="text-slate-400 font-mono text-[10px]">({qty}x)</span></span>
+                            <span className="font-bold font-mono text-slate-900 shrink-0">₹{(price * qty).toLocaleString('en-IN')}</span>
+                          </div>
+                        );
+                      })}
+                      {pkgItems.length === 0 && (
+                        <p className="text-slate-400 text-xs italic">No individual components specified</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedSource('Package');
-                    setReasonForAttendance(`${pkg.name} Purchase`);
-                    setItems(pkg.items?.map((it: any) => ({
-                      description: it.name || it.description,
-                      quantity: 1,
-                      unit_price: it.cost || 0,
-                      total: it.cost || 0,
-                    })) || [{ description: pkg.name, quantity: 1, unit_price: parseFloat(pkg.base_price), total: parseFloat(pkg.base_price) }]);
-                    setShowNewInvoice(true);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
-                >
-                  Bill Package
-                </button>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Package Net Price</span>
+                    <span className="text-xl font-extrabold text-primary font-mono">₹{packagePrice.toLocaleString('en-IN')}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedSource('Package');
+                      setSelectedPackageId(pkg.id);
+                      setReasonForAttendance(`${pkg.name} Package Purchase`);
+                      const mappedItems = pkgItems.length > 0
+                        ? pkgItems.map((it: any) => {
+                            const uPrice = Number(it.price ?? it.cost ?? 0);
+                            const uQty = Number(it.quantity || 1);
+                            return {
+                              description: it.name || it.description || 'Service',
+                              quantity: uQty,
+                              unit_price: uPrice,
+                              total: uPrice * uQty,
+                              service_code: it.code || it.service_code || '',
+                            };
+                          })
+                        : [{ description: pkg.name, quantity: 1, unit_price: packagePrice, total: packagePrice }];
+
+                      const sumTariff = mappedItems.reduce((acc: number, it: any) => acc + (it.total || 0), 0);
+                      const bundleDiscount = Math.max(0, sumTariff - packagePrice);
+
+                      setItems(mappedItems);
+                      setItemSearches(mappedItems.map((it: any) => it.description));
+                      setItemDropdowns(mappedItems.map(() => false));
+                      setDiscountType('amount');
+                      setDiscountValue(bundleDiscount);
+                      setShowNewInvoice(true);
+                    }}
+                    className="px-4 py-2 bg-primary hover:bg-primary-mid text-white font-bold text-xs rounded-xl shadow-sm transition-colors"
+                  >
+                    Bill Package
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -620,7 +658,7 @@ export default function BillingPage() {
                               setInvoicePatientSearch('');
                               setIsInvoicePatientDropdownOpen(true);
                             }}
-                            className="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline px-2.5 py-1 bg-white border border-slate-200 rounded shadow-xs"
+                            className="shrink-0 text-xs font-bold text-primary hover:text-primary-mid hover:underline px-2.5 py-1 bg-white border border-slate-200 rounded shadow-xs"
                           >
                             Change
                           </button>
@@ -720,6 +758,62 @@ export default function BillingPage() {
                 />
               </div>
 
+              {/* Active Package Quotas Banner */}
+              {patientActivePackages.length > 0 && (
+                <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PackageCheck className="w-4 h-4 text-emerald-700" />
+                      <span className="text-xs font-bold text-emerald-900">
+                        Patient has Active Package Quotas ({patientActivePackages.length})
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                      Click to apply at ₹0 (Covered)
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {patientActivePackages.flatMap((pp: any) =>
+                      (pp.items || [])
+                        .filter((it: any) => it.remaining_qty > 0)
+                        .map((it: any, itIdx: number) => (
+                          <button
+                            key={`${pp.id}-${itIdx}`}
+                            type="button"
+                            onClick={() => {
+                              setItems((prev) => {
+                                const filtered = prev.filter((x) => x.description?.trim());
+                                return [
+                                  ...filtered,
+                                  {
+                                    description: `${it.name} [Package: ${pp.package_name}]`,
+                                    quantity: 1,
+                                    unit_price: 0,
+                                    total: 0,
+                                    patient_package_id: pp.id,
+                                    package_item_id: it.id,
+                                    service_code: it.service_code,
+                                    is_package_covered: true,
+                                  },
+                                ];
+                              });
+                              setItemSearches((prev) => [...prev, `${it.name} [Package: ${pp.package_name}]`]);
+                              setItemDropdowns((prev) => [...prev, false]);
+                              toast.success('Quota Applied', `Added ${it.name} covered under package (${it.remaining_qty} remaining).`);
+                            }}
+                            className="px-2.5 py-1.5 bg-white hover:bg-emerald-100/60 border border-emerald-300 rounded-lg text-xs font-medium text-emerald-900 flex items-center gap-2 shadow-xs transition-colors"
+                          >
+                            <span className="font-semibold">{it.name}</span>
+                            <span className="bg-emerald-600 text-white font-mono text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                              {it.remaining_qty} left
+                            </span>
+                          </button>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Line Items */}
               <div className="space-y-3 pt-2 border-t">
                 <div className="flex items-center justify-between">
@@ -744,9 +838,16 @@ export default function BillingPage() {
                   return (
                     <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                       <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/80">
-                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                          Service Item #{idx + 1}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                            Service Item #{idx + 1}
+                          </span>
+                          {Boolean((item as any).is_package_covered || (item as any).patient_package_id) && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              Covered under Package
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <select
                             onChange={(e) => {
@@ -755,34 +856,25 @@ export default function BillingPage() {
                               }
                             }}
                             defaultValue=""
-                            className="text-[11px] font-medium bg-white border border-slate-300 rounded px-2.5 py-1 text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                            className="text-[11px] font-medium bg-white border border-slate-300 rounded px-2.5 py-1 text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
                           >
                             <option value="">⚡ Quick Pick from Standard Tariffs...</option>
-                            <optgroup label="Consultation &amp; OPD">
-                              {TARIFF_CATALOG.filter((t) => t.category === 'Consultation').map((t) => (
-                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Diagnostics &amp; Scans">
-                              {TARIFF_CATALOG.filter((t) => t.category === 'Scans').map((t) => (
-                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Laboratory &amp; Andrology">
-                              {TARIFF_CATALOG.filter((t) => t.category === 'Lab').map((t) => (
-                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Daycare &amp; Procedures">
-                              {TARIFF_CATALOG.filter((t) => t.category === 'Procedure' || t.category === 'Daycare').map((t) => (
-                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Pharmacy &amp; Nursing">
-                              {TARIFF_CATALOG.filter((t) => t.category === 'Pharmacy').map((t) => (
-                                <option key={t.code} value={t.code}>{t.description} — ₹{t.price}</option>
-                              ))}
-                            </optgroup>
+                            {Array.from(new Set(serviceCatalog.map((s) => s.type || s.category || 'General'))).map((cat: string) => (
+                              <optgroup key={cat} label={cat}>
+                                {serviceCatalog
+                                  .filter((s) => (s.type || s.category || 'General') === cat)
+                                  .map((s) => {
+                                    const codeVal = s.code || s.name;
+                                    const label = s.name || s.description;
+                                    const price = s.cost ?? s.price ?? s.base_price ?? 0;
+                                    return (
+                                      <option key={codeVal} value={codeVal}>
+                                        {label} — ₹{price}
+                                      </option>
+                                    );
+                                  })}
+                              </optgroup>
+                            ))}
                           </select>
 
                           {items.length > 1 && (
@@ -826,11 +918,11 @@ export default function BillingPage() {
                                   key={si}
                                   type="button"
                                   onMouseDown={() => handleSelectService(idx, svc)}
-                                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-indigo-50/50 border-b border-slate-100 last:border-0 transition-colors"
+                                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-primary/10 border-b border-slate-100 last:border-0 transition-colors"
                                 >
                                   <div>
                                     <span className="text-xs font-semibold text-slate-800">{svc.name}</span>
-                                    {svc.code && <span className="text-[10px] text-indigo-600 font-mono ml-2">[{svc.code}]</span>}
+                                    {svc.code && <span className="text-[10px] text-primary font-mono ml-2">[{svc.code}]</span>}
                                     <span className="text-[10px] text-slate-400 ml-2 uppercase">({svc.type})</span>
                                   </div>
                                   <span className="text-xs font-bold text-emerald-700 ml-2 flex-shrink-0">₹{(svc.cost || 0).toLocaleString()}</span>
@@ -879,7 +971,7 @@ export default function BillingPage() {
                 <button
                   type="button"
                   onClick={addItemRow}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-mid bg-primary/10 hover:bg-primary/15 px-3 py-1.5 rounded-md transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Another Service
                 </button>
@@ -900,14 +992,14 @@ export default function BillingPage() {
                         <button
                           type="button"
                           onClick={() => setDiscountType('amount')}
-                          className={`px-2 py-0.5 ${discountType === 'amount' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600'}`}
+                          className={`px-2 py-0.5 ${discountType === 'amount' ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
                         >
                           ₹ Flat
                         </button>
                         <button
                           type="button"
                           onClick={() => setDiscountType('percentage')}
-                          className={`px-2 py-0.5 ${discountType === 'percentage' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600'}`}
+                          className={`px-2 py-0.5 ${discountType === 'percentage' ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
                         >
                           % Pct
                         </button>

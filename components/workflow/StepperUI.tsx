@@ -33,7 +33,7 @@ export default function StepperUI({ steps, onStepClick }: StepperUIProps) {
             {/* Connecting line to next step */}
             {idx < steps.length - 1 && (
               <div className={`step-line absolute left-1/2 top-6 h-0.5 w-full -z-10 rounded ${
-                step.status === 'completed' ? 'bg-indigo-500' : 'bg-slate-100'
+                step.status === 'completed' ? 'bg-primary' : 'bg-slate-100'
               }`} />
             )}
 
@@ -53,7 +53,7 @@ export default function StepperUI({ steps, onStepClick }: StepperUIProps) {
 
             {/* Step Label */}
             <span className={`text-xs font-semibold text-center leading-tight ${
-              step.status === 'active' ? 'text-indigo-700 font-bold' :
+              step.status === 'active' ? 'text-primary font-bold' :
               step.status === 'completed' ? 'text-slate-700' : 'text-slate-400'
             }`}>
               {step.label}

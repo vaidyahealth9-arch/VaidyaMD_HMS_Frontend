@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { walletApi, billingApi } from '@/lib/api';
+import PrintableWalletStatementModal from '@/components/common/PrintableWalletStatementModal';
 
 export interface FertilityWalletCardProps {
   patientId: string;
@@ -40,6 +41,7 @@ export default function FertilityWalletCard({
   const [isLoading, setIsLoading] = useState(true);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showPayInvoiceModal, setShowPayInvoiceModal] = useState(false);
+  const [showStatementModal, setShowStatementModal] = useState(false);
 
   // Top-Up Form State
   const [amount, setAmount] = useState('25000');
@@ -192,8 +194,8 @@ export default function FertilityWalletCard({
               <span className="p-1.5 bg-slate-800 rounded-md text-slate-300">
                 <Wallet className="w-4 h-4" />
               </span>
-              <span className="text-xs font-mono font-semibold tracking-wider uppercase text-slate-400">
-                Patient Advance Deposit Wallet
+              <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-300">
+                Fertility Advance Deposit Wallet &amp; Financial Ledger
               </span>
               {patientVid && (
                 <span className="font-mono text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-300">
@@ -287,12 +289,12 @@ export default function FertilityWalletCard({
 
             <button
               type="button"
-              onClick={() => window.print()}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-md transition-colors flex items-center justify-center gap-1.5 border border-slate-700"
-              title="Print Statement"
+              onClick={() => setShowStatementModal(true)}
+              className="px-3.5 py-2 bg-primary hover:bg-primary-mid text-white font-bold text-xs rounded-md transition-colors flex items-center justify-center gap-1.5 border border-primary-mid shadow-sm"
+              title="View / Print Wallet Statement"
             >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Statement</span>
+              <Printer className="w-4 h-4 text-white" />
+              <span>View / Print Statement</span>
             </button>
           </div>
         </div>
@@ -415,7 +417,7 @@ export default function FertilityWalletCard({
 
       {/* MODAL 1: Top-Up Advance Deposit */}
       {showTopUpModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full space-y-4 shadow-lg animate-fadeIn relative border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -558,7 +560,7 @@ export default function FertilityWalletCard({
 
       {/* MODAL 2: Pay Invoice from Wallet */}
       {showPayInvoiceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full space-y-4 shadow-lg animate-fadeIn relative border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -661,6 +663,21 @@ export default function FertilityWalletCard({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Printable Statement Modal */}
+      {showStatementModal && (
+        <PrintableWalletStatementModal
+          patient={{
+            name: patientName,
+            vid: patientVid,
+          }}
+          walletBalance={Number(wallet?.balance) || 0}
+          totalDeposited={Number(wallet?.total_deposited) || 0}
+          totalUtilized={Number(wallet?.total_utilized) || 0}
+          transactions={wallet?.transactions || []}
+          onClose={() => setShowStatementModal(false)}
+        />
       )}
     </div>
   );

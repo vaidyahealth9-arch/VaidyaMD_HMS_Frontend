@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote } from '@/lib/api';
+import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Stethoscope,
@@ -30,6 +30,7 @@ import {
   SlidersHorizontal,
   HeartHandshake,
   Eye,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -39,125 +40,13 @@ import { Badge } from '@/shared/ui/badge';
 import SmartOrderDialog from './SmartOrderDialog';
 import TemplateManagementDialog, { ClinicalTemplateItem, RxTemplateItem } from './TemplateManagementDialog';
 import PrintablePrescription from '@/components/common/PrintablePrescription';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import ClinicalHistoryProformaModal from './ClinicalHistoryProformaModal';
 import EditAlertsModal from '@/components/patients/EditAlertsModal';
 import { toast } from '@/contexts/ToastContext';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
 
-const CLINICAL_TEMPLATES = [
-  {
-    id: 'infertility_comprehensive_history',
-    name: '★ Infertility Couple Comprehensive History (Male & Female Proforma)',
-    complaint: 'Duration of Infertility: ___ yrs (Primary / Secondary). Marriage duration: ___ yrs. Coital frequency: ___/week.',
-    hopi: `[FEMALE PARTNER HISTORY]
-- Menstrual: Menarche at ___ yrs, Cycle: ___ days (Regular/Irregular), Duration: ___ days, Flow: (Normal/Scanty/Heavy), Dysmenorrhea: (None/Mild/Moderate/Severe), LMP: ___, PMP: ___
-- Obstetric: Gravida ___, Para ___, Living ___, Abortions ___, Ectopic ___
-- Sexual: Dyspareunia: (None/Superficial/Deep), Coital difficulty: ___
-- Medical: PID / STIs: (No/Yes), Genital TB: (No/Yes), Thyroid: ___, Diabetes: ___, PCOS/Hirsutism: ___
-- Surgical: Pelvic/Abdominal: ___, Tubal surgery: ___, Cystectomy: ___, Myomectomy: ___
-- Family: Infertility: ___, Early Menopause: ___, Consanguinity: ___
-- Lifestyle: Smoking: ___, Alcohol: ___, Stress level: ___, Weight changes: ___
-- Previous Workup & Treatment: Prior OI: ___, IUI: ___, IVF/ICSI: ___, Outcomes: ___
-
-[MALE PARTNER HISTORY]
-- Sexual: Libido: (Normal/Reduced), Erectile function: ___, Ejaculatory function: (Normal/PE/Delayed/Retrograde)
-- Medical: Mumps/Orchitis: ___, Cryptorchidism: ___, Testicular trauma: ___, Recent high fever (last 3 mos): ___
-- Surgical: Orchidopexy: ___, Hernia: ___, Varicocele surgery: ___, Vasectomy: ___
-- Occupational/Lifestyle: Heat exposure: ___, Sitting > 6hrs: ___, Smoking: ___, Alcohol: ___, Steroids: ___
-- Previous Semen Analysis: Volume: ___ ml, Count: ___ M/ml, Motility: ___ %, Morphology: ___ %
-
-[CLINICAL EXAMINATION]
-- Female: General/BMI: ___, Thyroid: ___, Breast: ___. P/A: Soft, non-tender, no mass. P/S: Cervix (Healthy/Erosion/Discharge), Os closed. P/V: Uterus (AV/RV, Normal size/Bulky, Mobile, Non-tender), Adnexa: Free bilaterally.
-- Male: General/BMI: ___, Secondary sexual characteristics: Normal. Local Genital: Both testes descended, volume R: ___ ml, L: ___ ml, consistency: Normal, Vas deferens palpable bilaterally, Varicocele: (None / Grade I-III).`,
-    diagnosis: 'Primary / Secondary Subfertility - Combined Couple Factor Evaluation',
-    investigations: `1. Transvaginal Ultrasound (Baseline Pelvic TVS - AFC, Endometrial Pattern)
-2. Female Hormonal Profile: Serum AMH, Day 2/3 FSH, LH, Estradiol (E2), TSH, Serum Prolactin
-3. Male Partner: Semen Analysis (WHO 6th Edition) + CASA Semen Analysis + Sperm DFI
-4. Couple Viral Screening: HIV I & II, HBsAg, HCV, VDRL
-5. Tubal Patency: HSG / HyCoSy / Diagnostic Hysterolaparoscopy`,
-    plan: `1. Tab Folic Acid + L-Methylfolate 5mg OD
-2. Male partner antioxidant supplementation: CoQ10 100mg BD + Zinc/L-Carnitine OD
-3. Schedule Day 2 Pelvic TVS for AFC evaluation
-4. Male partner semen analysis after 3 days of abstinence
-5. Review with all reports for individualized treatment protocol (OI / IUI / IVF-ICSI)`,
-  },
-  {
-    id: 'general_gynaecology_history',
-    name: '★ General Gynaecology Clinical History & Examination',
-    complaint: 'Chief Complaint: ____________ (Duration: ____). Associated Symptoms: ________________',
-    hopi: `[MENSTRUAL HISTORY]
-- Menarche: ___ yrs | Cycle length & regularity: ___ days (Regular/Irregular) | Duration: ___ days | Amount: ___ pads/day (clots: +/-)
-- Dysmenorrhea: (None / Mild / Moderate / Severe) | LMP: _________ | PMP: _________
-- Abnormal Bleeding: Intermenstrual / Postcoital / Postmenopausal bleeding: (None / Present)
-
-[OBSTETRIC & CONTRACEPTION]
-- Obstetric: G__ P__ L__ A__ | Mode of deliveries: Normal / LSCS | Complications: None
-- Contraception: Current method: _________ (Duration: ____) | Past methods: _________
-
-[PAST MEDICAL & SURGICAL]
-- Medical: Diabetes / Hypertension / Thyroid / Asthma / Cardiac disease: None
-- Surgical: Previous pelvic or abdominal surgeries: None | Drug Allergies: NKDA
-
-[CLINICAL EXAMINATION]
-- General: Vitals stable, Pallor (-), Edema (-), Thyroid: Normal, Breast exam: Normal
-- Abdomen: Soft, non-tender, no palpable organomegaly or mass
-- Per Speculum (P/S): Vulva/vagina healthy, Cervix: (Healthy / Erosion / Hypertrophied / Discharge), Pap smear taken: (Yes/No)
-- Per Vaginal (P/V): Uterus (AV/RV, Normal size / Enlarged, Mobile, Non-tender), Fornices: Free & non-tender, Adnexa: Clear bilaterally`,
-    diagnosis: 'Gynaecological Clinical Review under evaluation',
-    investigations: `1. Pelvic Ultrasound (USG Abdomen & Pelvis / TVS)
-2. Complete Blood Picture (CBP) + Hemoglobin
-3. Pap Smear / Cervical Cytology
-4. Urine Routine & Microscopy
-5. Thyroid Stimulating Hormone (TSH)`,
-    plan: `1. Symptomatic medical management
-2. Lifestyle, diet, and menstrual hygiene counseling
-3. Review in OPD with ultrasound and lab reports`,
-  },
-  {
-    id: 'infertility_workup',
-    name: 'Fertility Evaluation & Workup',
-    complaint: 'Trying to conceive for > 1 year. Regular/irregular menstrual cycles.',
-    hopi: 'Couple presenting for comprehensive fertility evaluation. Menstrual history, coital frequency, and previous treatments assessed.',
-    diagnosis: 'Primary / Secondary Subfertility under evaluation',
-    investigations: '1. Transvaginal Ultrasound (Pelvic TVS)\n2. Serum AMH, Day 2/3 FSH, LH, Estradiol, TSH, Prolactin\n3. Semen Analysis (WHO 6th Ed) for male partner\n4. Viral Markers (HBsAg, HCV, HIV)',
-    plan: '1. Tab Folic Acid 5mg OD\n2. Schedule baseline TVS scan on Day 2 of next cycle\n3. Male partner semen analysis after 3 days abstinence\n4. Review in OPD with reports',
-  },
-  {
-    id: 'follicular_monitoring',
-    name: 'Ovulation Induction & Follicular Scan',
-    complaint: 'Follow-up for follicle tracking / stimulation cycle.',
-    hopi: 'Patient on ovarian stimulation. Monitoring endometrial lining and dominant follicular response.',
-    diagnosis: 'Stimulated Ovulatory Cycle / Folliculometry',
-    investigations: 'Serial Follicular Ultrasound (TVS)',
-    plan: '1. Continue ongoing stimulation protocol as directed\n2. Next follicular tracking scan scheduled on day after tomorrow\n3. Timed intercourse instructions explained',
-  },
-  {
-    id: 'pcos_metabolic',
-    name: 'PCOS Metabolic & Lifestyle Review',
-    complaint: 'Oligomenorrhea, weight gain, hirsutism.',
-    hopi: 'Irregular cycles with delayed periods. History of acne and difficulty managing weight.',
-    diagnosis: 'Polycystic Ovarian Syndrome (PCOS Phenotype)',
-    investigations: 'Fasting Insulin, Fasting Glucose (HOMA-IR), Lipid Profile, Serum Total Testosterone, Pelvic USG',
-    plan: '1. Low glycemic index diet, regular aerobic exercise 45 mins/day\n2. Tab Myo-inositol + D-Chiro-Inositol 2g BD\n3. Tab Metformin 500mg OD post-dinner if insulin resistance confirmed\n4. Review after 6 weeks',
-  },
-  {
-    id: 'anc_first_trimester',
-    name: 'Antenatal Checkup (ANC) - 1st Trimester',
-    complaint: 'Confirmed pregnancy (Urine Pregnancy Test +ve). Routine first trimester antenatal care.',
-    hopi: 'Spontaneous / ART conception. Mild nausea, no spotting or abdominal cramps.',
-    diagnosis: 'Intrauterine Gestation - 1st Trimester (Antenatal Care)',
-    investigations: 'Dating / Viability USG, Complete Blood Count, Blood Group & Rh, Thyroid Profile, HbA1c, Rubella IgG, Double Marker (11-13 weeks)',
-    plan: '1. Tab Folic Acid 5mg OD\n2. Tab Doxylamine + Pyridoxine SOS for morning sickness\n3. Avoid heavy lifting and long travel\n4. Viability scan report review',
-  },
-  {
-    id: 'general_opd',
-    name: 'General OPD / Medical Review',
-    complaint: 'General health checkup / non-specific symptoms.',
-    hopi: 'Patient presenting for evaluation and supportive clinical care.',
-    diagnosis: 'General Clinical Review',
-    investigations: 'Complete Blood Count (CBC), Urine Routine',
-    plan: '1. Symptomatic medical management\n2. Adequate hydration and balanced nutrition\n3. Follow up SOS or in 1 week',
-  },
-];
+const CLINICAL_TEMPLATES: ClinicalTemplateItem[] = [];
 
 interface RxTemplate {
   id: string;
@@ -193,125 +82,7 @@ const COMMON_INVESTIGATION_OPTIONS = [
   'Karyotyping (Couple)',
 ];
 
-const RX_TEMPLATES: RxTemplate[] = [
-  {
-    id: 'antagonist_stimulation_rx',
-    name: 'Antagonist Protocol Daily Stimulation Rx',
-    category: 'IVF Stimulation',
-    medications: [
-      { drug_name: 'Inj Recombinant FSH (Follisurge / Gonal-F) 225 IU', dose: '225 IU', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous injection daily at 8:00 PM (Days 2 to 6)' },
-      { drug_name: 'Inj HMG (Menopur) 75 IU', dose: '75 IU', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous / IM injection daily at 8:00 PM (From Day 6 onward)' },
-      { drug_name: 'Inj GnRH Antagonist (Cetrotide / Orgalutran) 0.25mg', dose: '0.25mg', frequency: 'OD', duration: '5 days', instructions: 'Subcutaneous injection daily at 8:00 AM (From Day 6 until trigger)' },
-      { drug_name: 'Tab Folic Acid + L-Methylfolate 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
-    ],
-    advice: 'Report on Day 6 for TVS follicular tracking scan and Serum E2/P4 levels. Maintain adequate hydration (>2.5 L/day).',
-  },
-  {
-    id: 'ppos_protocol_rx',
-    name: 'PPOS Protocol (Progestin-Primed Ovarian Stimulation)',
-    category: 'IVF Stimulation',
-    medications: [
-      { drug_name: 'Inj Recombinant FSH (Follisurge) 225 IU', dose: '225 IU', frequency: 'OD', duration: '9-10 days', instructions: 'SC daily at 8:00 PM from Day 2 until trigger' },
-      { drug_name: 'Tab Medroxyprogesterone Acetate (MPA) 10mg', dose: '10mg', frequency: 'OD', duration: '9-10 days', instructions: 'Oral once daily with meals starting Day 2 until trigger day' },
-      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
-    ],
-    advice: 'Serial follicular scans starting Day 6. Freeze-all cycle planned; embryo transfer in subsequent HRT cycle.',
-  },
-  {
-    id: 'agonist_downreg_rx',
-    name: 'Agonist Downregulation Protocol (Long / Flare)',
-    category: 'IVF Stimulation',
-    medications: [
-      { drug_name: 'Inj Leuprolide Acetate (Lupride) 0.5mg', dose: '0.5mg', frequency: 'OD', duration: '14 days', instructions: 'SC daily from Day 21 of previous cycle until menses' },
-      { drug_name: 'Inj Recombinant FSH (Follisurge) 225 IU', dose: '225 IU', frequency: 'OD', duration: '10 days', instructions: 'SC daily after pituitary downregulation confirmed (Lupride reduced to 0.25mg)' },
-      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast' },
-    ],
-    advice: 'Baseline scan on Day 2 to confirm endometrial thinning (< 4mm) and absence of ovarian cysts before starting gonadotropins.',
-  },
-  {
-    id: 'post_fet_luteal_support',
-    name: 'Post-FET Comprehensive Luteal Phase Support',
-    category: 'FET Luteal Support',
-    medications: [
-      { drug_name: 'Cap Micronized Progesterone (Susten) 400mg', dose: '400mg', frequency: 'BD', duration: '15 days', instructions: 'Vaginal insertion twice daily (morning & bedtime)' },
-      { drug_name: 'Tab Dydrogesterone (Duphaston) 10mg', dose: '1 tab', frequency: 'BD', duration: '15 days', instructions: 'Oral twice daily after meals' },
-      { drug_name: 'Tab Estradiol Valerate (Progynova) 2mg', dose: '2mg', frequency: 'BD', duration: '15 days', instructions: 'Oral twice daily after meals' },
-      { drug_name: 'Inj Enoxaparin (Clexane) 40mg', dose: '40mg', frequency: 'OD', duration: '15 days', instructions: 'Subcutaneous injection once daily post-dinner' },
-      { drug_name: 'Tab Aspirin (Ecosprin) 75mg', dose: '1 tab', frequency: 'OD', duration: '15 days', instructions: 'Oral once daily after lunch' },
-      { drug_name: 'Tab Methylfolate + B-Complex', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Oral once daily morning' },
-    ],
-    advice: 'Strict adherence to medications. Serum Beta-hCG blood test on Day 14 post-embryo transfer. Contact clinic immediately if vaginal bleeding occurs.',
-  },
-  {
-    id: 'ovulation_induction',
-    name: 'Ovulation Induction (Letrozole + Folic Acid)',
-    category: 'Stimulation / OI',
-    medications: [
-      { drug_name: 'Tab Letrozole 2.5mg', dose: '1 tab', frequency: 'OD', duration: '5 days', instructions: 'Day 2 to Day 6 of cycle at bedtime (5 days)' },
-      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast for 30 days' },
-      { drug_name: 'Inj HMG / Menopur 75 IU', dose: '75 IU', frequency: 'OD', duration: '3 doses', instructions: 'IM/SC on Day 6, Day 8, and Day 10 (as advised)' },
-    ],
-    advice: 'Report on Day 9/10 of cycle for TVS follicular monitoring scan. Maintain adequate hydration.',
-  },
-  {
-    id: 'pcos_metabolic',
-    name: 'PCOS Metabolic & Insulin Sensitization',
-    category: 'PCOS Protocol',
-    medications: [
-      { drug_name: 'Tab Myo-Inositol + D-Chiro-Inositol 2000mg', dose: '1 tab', frequency: 'BD', duration: '60 days', instructions: 'Twice daily with water for 60 days' },
-      { drug_name: 'Tab Metformin 500mg SR', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Post-dinner at night for 30 days' },
-      { drug_name: 'Tab Folic Acid 5mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning post-breakfast for 30 days' },
-      { drug_name: 'Cap Vitamin D3 60,000 IU', dose: '1 cap', frequency: 'OD', duration: '8 weeks', instructions: 'Once weekly on Sundays for 8 weeks' },
-    ],
-    advice: 'Low carbohydrate, low-GI diet with 45 minutes of brisk walking daily. Avoid refined sugars and dairy excess.',
-  },
-  {
-    id: 'luteal_support',
-    name: 'Luteal Phase Support (IUI / Natural)',
-    category: 'Luteal Support',
-    medications: [
-      { drug_name: 'Tab Dydrogesterone 10mg', dose: '1 tab', frequency: 'BD', duration: '14 days', instructions: 'Twice daily after meals for 14 days' },
-      { drug_name: 'Cap Micronized Progesterone 400mg', dose: '400mg', frequency: 'OD', duration: '14 days', instructions: 'Vaginal insertion at bedtime for 14 days' },
-      { drug_name: 'Tab Aspirin (Ecosprin) 75mg', dose: '1 tab', frequency: 'OD', duration: '14 days', instructions: 'Once daily after lunch for 14 days' },
-    ],
-    advice: 'Avoid strenuous physical activity. Take Serum Beta-hCG blood test on Day 14 post-IUI/ovulation.',
-  },
-  {
-    id: 'opu_recovery',
-    name: 'OPU Post-Egg Retrieval Recovery',
-    category: 'Post-OPU / Daycare',
-    medications: [
-      { drug_name: 'Tab Cabergoline 0.5mg', dose: '1 tab', frequency: 'OD', duration: '8 days', instructions: 'At bedtime for 8 days to prevent OHSS' },
-      { drug_name: 'Tab Cefuroxime 500mg', dose: '1 tab', frequency: 'BD', duration: '5 days', instructions: 'Twice daily after food for 5 days' },
-      { drug_name: 'Tab Paracetamol 650mg', dose: '1 tab', frequency: 'SOS', duration: '3 days', instructions: 'As needed for lower abdominal cramping (max 3/day)' },
-      { drug_name: 'Syp Lactulose 15ml', dose: '15 ml', frequency: 'OD', duration: '3 days', instructions: 'At bedtime for bowel regulation (3 days)' },
-    ],
-    advice: 'High-protein diet (egg whites, paneer, protein shake) and electrolyte-rich fluids (coconut water, ORS) > 3L/day.',
-  },
-  {
-    id: 'fet_prep',
-    name: 'FET Endometrial Preparation (HRT Protocol)',
-    category: 'FET Protocol',
-    medications: [
-      { drug_name: 'Tab Estradiol Valerate 2mg (Progynova)', dose: '2mg', frequency: 'BD', duration: '14 days', instructions: 'Day 2 to Day 7: 2mg BD; Day 8 onward: 2mg TDS' },
-      { drug_name: 'Tab Aspirin 75mg', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Once daily post-lunch for 30 days' },
-      { drug_name: 'Tab Folic Acid + L-Methylfolate', dose: '1 tab', frequency: 'OD', duration: '30 days', instructions: 'Morning after breakfast for 30 days' },
-      { drug_name: 'Inj Enoxaparin / Clexane 40mg', dose: '40mg', frequency: 'OD', duration: '14 days', instructions: 'Subcutaneous injection as advised by physician' },
-    ],
-    advice: 'TVS scan on Day 10 to evaluate endometrial thickness (> 8mm trilaminar pattern required before progesterone start).',
-  },
-  {
-    id: 'male_factor',
-    name: 'Male Subfertility & Antioxidant Booster',
-    category: 'Andrology / Male',
-    medications: [
-      { drug_name: 'Tab Coenzyme Q10 + L-Carnitine 100mg', dose: '1 tab', frequency: 'BD', duration: '90 days', instructions: 'Twice daily after meals for 90 days' },
-      { drug_name: 'Tab Zinc + Vitamin C + Selenium + Lycopene', dose: '1 tab', frequency: 'OD', duration: '90 days', instructions: 'Once daily post-lunch for 90 days' },
-      { drug_name: 'Tab Clomiphene Citrate 25mg', dose: '25mg', frequency: 'OD', duration: '60 days', instructions: 'Alternate days on Mon/Wed/Fri for 60 days' },
-    ],
-    advice: 'Avoid tight clothing, hot tubs, and laptop on lap. Repeat Semen Analysis (WHO 6th Ed) with CASA after 90 days.',
-  },
-];
+const RX_TEMPLATES: RxTemplate[] = [];
 
 export default function OPDWorkbench({ patientId, triageData, appointment, onBack }: { patientId?: string; triageData?: any; appointment?: any; onBack?: () => void }) {
   const { user } = useAuth();
@@ -328,6 +99,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   const [localAlerts, setLocalAlerts] = useState<string[] | null>(null);
   const [sidebarTab, setSidebarTab] = useState<'consultations' | 'counseling'>('consultations');
   const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
+  const [historyProformaOpen, setHistoryProformaOpen] = useState(false);
 
   // Fetch Counselor Notes for selected patient
   const { data: counselingNotes = [] } = useQuery<CounselingNote[]>({
@@ -411,8 +183,24 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   }, [customClinicalData]);
 
   const allRxTemplates: RxTemplateItem[] = useMemo(() => {
-    return [...RX_TEMPLATES, ...customRxData];
+    return customRxData.length > 0 ? customRxData : RX_TEMPLATES;
   }, [customRxData]);
+
+  // Dynamic Service Catalog for Investigations
+  const { data: serviceCatalog = [] } = useQuery({
+    queryKey: ['service-catalog'],
+    queryFn: () => billingApi.getServiceCatalog().catch(() => []),
+  });
+
+  const dynamicInvestigations = useMemo(() => {
+    if (Array.isArray(serviceCatalog) && serviceCatalog.length > 0) {
+      const invs = serviceCatalog
+        .filter((s: any) => ['investigation', 'lab', 'diagnostics', 'radiology'].includes(s.service_category?.toLowerCase()))
+        .map((s: any) => s.service_name);
+      if (invs.length > 0) return Array.from(new Set(invs));
+    }
+    return COMMON_INVESTIGATION_OPTIONS;
+  }, [serviceCatalog]);
 
   // Fetch Patient OPD History
   const { data: consultationHistory } = useQuery({
@@ -931,8 +719,18 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     }
 
     // Append medications to the new structured table
-    medItems.forEach((medStr: string) => {
-      appendMed({ drug_name: medStr, dose: '', frequency: '', duration: '', instructions: '' });
+    medItems.forEach((medItem: any) => {
+      if (typeof medItem === 'string') {
+        appendMed({ drug_name: medItem, dose: '', frequency: '', duration: '', instructions: '' });
+      } else {
+        appendMed({
+          drug_name: medItem.drug_name || '',
+          dose: medItem.dose || '',
+          frequency: medItem.frequency || '',
+          duration: medItem.duration || '',
+          instructions: medItem.instructions || ''
+        });
+      }
     });
   };
 
@@ -1007,7 +805,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+              <Stethoscope className="w-3.5 h-3.5 text-primary" />
               <span>Doctor View</span>
             </button>
             <button
@@ -1065,7 +863,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     setTemplateDialogTab('clinical');
                     setTemplateDialogOpen(true);
                   }}
-                  className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors"
+                  className="p-1 text-slate-400 hover:text-primary rounded hover:bg-slate-200 transition-colors"
                   title="Manage & Edit Clinical Templates"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1082,8 +880,20 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 }}
                 className="gap-1.5 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50 rounded-md h-8"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
                 <span className="hidden sm:inline">Templates Studio</span>
+              </Button>
+
+              {/* Clinical History Proforma Modal Trigger */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryProformaOpen(true)}
+                className="gap-1.5 text-xs font-bold bg-[#2878a8]/10 text-[#2878a8] border-[#2878a8]/30 hover:bg-[#2878a8]/20 rounded-md h-8 shadow-2xs"
+                title="Open Comprehensive History Proforma (Fertility, Gynaecology, Obstetric)"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">History Proformas</span>
               </Button>
 
               <Button
@@ -1234,7 +1044,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                                 : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
                                 ? 'bg-rose-50 text-rose-700 border-rose-300'
-                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                : 'bg-primary/10 text-primary border-primary/20'
                             }`}
                           >
                             {rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
@@ -1347,7 +1157,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                       setValue('cns_findings', 'Conscious, oriented, afebrile');
                       setValue('rs_findings', 'Bilateral vesicular breath sounds, clear');
                     }}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md transition-colors"
+                    className="text-[11px] font-bold text-primary hover:text-primary-mid bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-md transition-colors"
                   >
                     + Autofill Normal Vitals
                   </button>
@@ -1394,7 +1204,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-md text-xs">
                       <span className="font-semibold text-slate-600">Calculated Body Mass Index (BMI):</span>
                       <strong className="text-slate-900">{watch('bmi')} kg/m²</strong>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                         {Number(watch('bmi')) < 18.5
                           ? 'Underweight'
                           : Number(watch('bmi')) < 25
@@ -1557,7 +1367,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                         Wt: <strong className="text-slate-900">{watch('weight') || '—'}</strong> kg
                       </span>
                       {watch('bmi') && (
-                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded font-bold text-indigo-700">
+                        <span className="px-2 py-0.5 bg-primary/10 border border-primary/20 rounded font-bold text-primary">
                           BMI: {watch('bmi')}
                         </span>
                       )}
@@ -1572,7 +1382,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                   <button
                     type="button"
                     onClick={() => setIsDoctorVitalsExpanded(!isDoctorVitalsExpanded)}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 px-2.5 py-1 rounded hover:bg-indigo-50 transition-colors self-end sm:self-center"
+                    className="text-xs font-bold text-primary hover:text-primary-mid flex items-center gap-1 px-2.5 py-1 rounded hover:bg-primary/10 transition-colors self-end sm:self-center"
                   >
                     {isDoctorVitalsExpanded ? (
                       <>
@@ -1591,7 +1401,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 {/* Nurse Observation Notes Banner (if provided) */}
                 {watch('nurse_notes') && (
                   <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-start gap-2 text-xs bg-slate-50/80 p-2 rounded-md">
-                    <FileText className="w-3.5 h-3.5 text-indigo-600 mt-0.5 flex-shrink-0" />
+                    <FileText className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
                     <div>
                       <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">Nurse Triage Notes: </span>
                       <span className="text-slate-700 text-xs">{watch('nurse_notes')}</span>
@@ -1672,12 +1482,12 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1">Present History</label>
                         <textarea
                           {...register('present_history')}
-                          rows={3}
+                          rows={20}
                           placeholder="Detailed chronological history of present illness..."
                           className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                         />
@@ -1687,7 +1497,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                         <label className="text-xs font-bold text-slate-700 block mb-1">Previous History</label>
                         <textarea
                           {...register('previous_history')}
-                          rows={3}
+                          rows={6}
                           placeholder="Previous hospitalizations, surgeries, drug allergies..."
                           className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                         />
@@ -1750,7 +1560,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
                       {/* Quick Selectable Investigation Options */}
                       <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-slate-50/80 rounded-md border border-slate-200">
-                        {COMMON_INVESTIGATION_OPTIONS.map((opt) => {
+                        {dynamicInvestigations.map((opt) => {
                           const currentVal = watch('investigations_to_be_advised') || '';
                           const isSelected = currentVal.toLowerCase().includes(opt.toLowerCase());
                           return (
@@ -1804,7 +1614,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                               }
                             }}
                             defaultValue=""
-                            className="h-7 px-2 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs max-w-[220px] truncate"
+                            className="h-7 px-2 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md hover:bg-primary/15 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer shadow-2xs max-w-[220px] truncate"
                           >
                             <option value="" disabled>⚡ Apply Rx Template...</option>
                             {allRxTemplates.map((t) => (
@@ -1824,7 +1634,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                             className="h-7 px-2 text-[11px] font-bold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1 shadow-2xs"
                             title="Manage & Edit Prescription Templates"
                           >
-                            <SlidersHorizontal className="w-3 h-3 text-indigo-600" />
+                            <SlidersHorizontal className="w-3 h-3 text-primary" />
                             <span>Manage</span>
                           </Button>
                         </div>
@@ -1940,42 +1750,51 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
                     <div className="w-48">
                       <label className="text-[11px] font-bold text-slate-600 block mb-1">Follow-Up Schedule</label>
-                      <select
+                      <input
+                        list="followup-options"
                         {...register('follow_up')}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      >
-                        <option value="1_week">1 Week</option>
-                        <option value="2_weeks">2 Weeks</option>
-                        <option value="1_month">1 Month</option>
-                        <option value="3_months">3 Months</option>
-                        <option value="sos">SOS (As needed)</option>
-                        <option value="no_followup">No Follow-up required</option>
-                      </select>
+                        placeholder="Select or type custom (e.g. 10 days)"
+                        className="w-full h-8 px-2 text-xs bg-slate-50 border border-slate-200 rounded-md focus:bg-white"
+                      />
+                      <datalist id="followup-options">
+                        <option value="SOS (As Needed)" />
+                        <option value="2 days" />
+                        <option value="3 days" />
+                        <option value="5 days" />
+                        <option value="1 week" />
+                        <option value="10 days" />
+                        <option value="2 weeks" />
+                        <option value="1 month" />
+                        <option value="PCOS Metabolic Review (3 mo)" />
+                        <option value="No Follow-up required" />
+                      </datalist>
                     </div>
                   </CardContent>
                 )}
               </Card>
 
-              {/* Bottom Form Actions - Left-aligned to keep bottom-right pinned Scribe button unobstructed */}
-              <div className="flex items-center justify-start gap-3 pt-4 border-t border-slate-200">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={saveMutation.isPending}
-                  onClick={handleSubmit((data) => onSubmit(data, true))}
-                  className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-10 rounded-md shadow-xs gap-2"
-                >
-                  <Printer className="w-4 h-4 text-emerald-600" />
-                  <span>Save &amp; Print Rx</span>
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={saveMutation.isPending}
-                  className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{saveMutation.isPending ? 'Saving to EMR...' : 'Save Consultation Record'}</span>
-                </Button>
+              {/* Bottom Form Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saveMutation.isPending}
+                    onClick={handleSubmit((data) => onSubmit(data, true))}
+                    className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-10 rounded-md shadow-xs gap-2"
+                  >
+                    <Printer className="w-4 h-4 text-emerald-600" />
+                    <span>Save &amp; Print Rx</span>
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saveMutation.isPending}
+                    className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{saveMutation.isPending ? 'Saving to EMR...' : 'Save Consultation Record'}</span>
+                  </Button>
+                </div>
               </div>
             </form>
           )}
@@ -1991,7 +1810,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
       {/* History Full View Modal */}
       {viewingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-rail-bg/50 p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
@@ -1999,7 +1818,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                   <h3 className="font-bold text-slate-900 text-lg">Consultation Record</h3>
                   <Badge
                     variant="outline"
-                    className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200"
+                    className="text-[10px] bg-primary/10 text-primary border-primary/20"
                   >
                     {viewingRecord.record_type || 'OPD Consultation'}
                   </Badge>
@@ -2139,20 +1958,20 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
               {/* Section 3: Assessment & Diagnostics */}
               <div className="pt-4 space-y-3">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Stethoscope className="w-3.5 h-3.5 text-indigo-600" />
+                  <Stethoscope className="w-3.5 h-3.5 text-primary" />
                   <span>Assessment &amp; Diagnosis</span>
                 </h4>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/70 space-y-3">
                   <div>
                     <span className="font-semibold text-slate-700 text-xs">Provisional / Final Diagnosis:</span>
-                    <p className="text-sm font-bold text-indigo-950 mt-0.5">
+                    <p className="text-sm font-bold text-text-main mt-0.5">
                       {viewingRecord.data?.provisional_diagnosis || viewingRecord.data?.diagnosis || 'Clinical Review'}
                     </p>
                   </div>
                   {(viewingRecord.data?.investigations_to_be_advised || viewingRecord.data?.investigations_ordered || viewingRecord.data?.previous_investigations) && (
                     <div className="pt-2 border-t border-slate-200/60">
                       <span className="font-semibold text-slate-700 text-xs flex items-center gap-1">
-                        <FlaskConical className="w-3.5 h-3.5 text-indigo-600" />
+                        <FlaskConical className="w-3.5 h-3.5 text-primary" />
                         <span>Investigations:</span>
                       </span>
                       <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">
@@ -2191,7 +2010,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                             <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
                             <td className="p-2.5 font-semibold text-slate-700">{m.dose || '—'}</td>
                             <td className="p-2.5">
-                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 text-[11px] font-bold">
+                              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 text-[11px] font-bold">
                                 {m.frequency || m.freq || 'OD'}
                               </span>
                             </td>
@@ -2231,7 +2050,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 {viewingRecord.data?.follow_up && (
                   <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
                     <span className="font-bold text-slate-500">Next Follow-Up:</span>
-                    <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
                       {viewingRecord.data.follow_up.replace('_', ' ').toUpperCase()}
                     </span>
                   </div>
@@ -2263,7 +2082,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                   <span>Print Prescription (Rx)</span>
                 </Button>
               </div>
-              <Button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white rounded-md font-bold px-6">
+              <Button onClick={() => setViewingRecord(null)} className="bg-primary hover:bg-primary-mid text-white rounded-md font-bold px-6">
                 Close
               </Button>
             </div>
@@ -2311,11 +2130,12 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       />
 
       {/* 8-Point Counselor Notes Case Sheet Modal */}
+      {/* 8-Point Counselor Notes Case Sheet Modal */}
       {viewingCounselingNote && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 bg-rail-bg/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs print:p-0 print:static print:bg-white print:overflow-visible">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 print:border-none print:shadow-none print:max-w-none print:w-full print:p-0 print:m-0 print:max-h-none print:overflow-visible">
             {/* Modal Header */}
-            <div className="p-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between print:hidden">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-md bg-violet-600 text-white flex items-center justify-center">
                   <HeartHandshake className="w-4 h-4" />
@@ -2342,7 +2162,25 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             </div>
 
             {/* Modal Body: The 8 Clinical Columns */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+            <div className="printable-document p-4 sm:p-6 overflow-y-auto space-y-4 text-xs print:overflow-visible print:p-0">
+              <PrintableReportHeader
+                title="PRE-ART CLINICAL COUNSELING RECORD"
+                subtitle="VaidyaMD Reproductive Medicine • Patient Counseling & Informed Dialogue"
+                patient={{
+                  name: patient?.name || viewingCounselingNote.patient_name,
+                  vid: patient?.vid || viewingCounselingNote.patient_vid,
+                  age: patient?.age,
+                  gender: patient?.gender || 'Female',
+                  partner_name: patient?.partner_name,
+                }}
+                metaFields={[
+                  { label: 'Procedure', value: viewingCounselingNote.procedure || '—' },
+                  { label: 'Date', value: formatDateTime(viewingCounselingNote.created_at) },
+                  { label: 'Source', value: viewingCounselingNote.source || 'OPD' },
+                  { label: 'Counselor', value: viewingCounselingNote.counselor_name || 'Counselor Specialist' },
+                ]}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source</span>
@@ -2405,7 +2243,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             </div>
 
             {/* Modal Footer */}
-            <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
               <Button
                 type="button"
                 variant="outline"
@@ -2420,13 +2258,26 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 type="button"
                 size="sm"
                 onClick={() => setViewingCounselingNote(null)}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5"
+                className="bg-primary hover:bg-primary-mid text-white text-xs font-bold px-5"
               >
                 Close
               </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interactive Clinical History Proforma Modal */}
+      {historyProformaOpen && (
+        <ClinicalHistoryProformaModal
+          patient={patient}
+          partner={patient?.partner}
+          onClose={() => setHistoryProformaOpen(false)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
+            queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
+          }}
+        />
       )}
     </div>
   );

@@ -2,9 +2,16 @@
 
 import React from 'react';
 import { formatDate } from '@/lib/utils';
-import { Printer, X } from 'lucide-react';
+import PrintableModal from './PrintableModal';
+import PrintableReportHeader from './PrintableReportHeader';
+import PrintableReportFooter from './PrintableReportFooter';
 
-interface InvoiceItem { description: string; quantity: number; unit_price: string | number; total: string | number; }
+interface InvoiceItem {
+  description: string;
+  quantity: number;
+  unit_price: string | number;
+  total: string | number;
+}
 
 interface PrintableInvoiceProps {
   invoice: {
@@ -38,58 +45,22 @@ export default function PrintableInvoice({ invoice, onClose }: PrintableInvoiceP
   const paid = n(invoice.paid_amount);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible"
-      style={{ background: 'rgba(0,0,0,0.55)' }}>
-
-      <div className="bg-white max-w-2xl w-full shadow-xl rounded-lg overflow-hidden flex flex-col my-6 print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent">
-
-        {/* Preview toolbar */}
-        <div className="flex items-center justify-between px-5 py-3 print:hidden"
-          style={{ background: 'rgb(var(--clr-rail-bg))', color: 'white' }}>
-          <div>
-            <p className="text-sm font-semibold">Invoice Preview — {invoice.invoice_number}</p>
-            <p className="text-xs opacity-50 mt-0.5">Review before printing or sending to patient</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium hover:opacity-80 transition-opacity"
-              style={{ background: 'rgb(var(--clr-primary))', color: 'white' }}
-            >
-              <Printer className="w-3.5 h-3.5" /> Print (A4)
-            </button>
-            <button onClick={onClose} className="p-1 opacity-50 hover:opacity-100 transition-opacity">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* ── Printable Document ── */}
-        <div className="p-8 space-y-5 printable-document print:p-6" style={{ fontFamily: 'Inter, Arial, sans-serif', fontSize: '11px', color: '#111827' }}>
-
-          {/* Hospital Header */}
-          <div className="flex items-start justify-between pb-3" style={{ borderBottom: '1.5px solid #0B4F6C' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center rounded-md flex-shrink-0" style={{ background: '#0B4F6C' }}>
-                <img src="/logo.svg" alt="VaidyaMD" className="w-8 h-8" />
-              </div>
-              <div>
-                <h1 className="font-bold text-base leading-tight" style={{ color: '#0B4F6C' }}>
-                  VaidyaMD Advanced Hospital & Fertility Centre
-                </h1>
-                <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>
-                  Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033 · +91 40 4888 9999
-                </p>
-                <p className="text-[9px] mt-0.5 font-mono" style={{ color: '#9ca3af' }}>
-                  GSTIN: 36AAAAA0000A1Z5 · Reg No: TS/MED/2024/9876
-                </p>
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>Hospital Tax Invoice</p>
-              <PayBadge due={due} paid={paid} />
-            </div>
-          </div>
+    <PrintableModal
+      isOpen={true}
+      onClose={onClose}
+      title={`Invoice Preview — ${invoice.invoice_number}`}
+      subtitle="Review before printing or sending to patient"
+      maxWidth="max-w-2xl"
+    >
+      {({ hideHeader }: { hideHeader: boolean }) => (
+        <div className="space-y-5">
+          {/* Dynamic Branch Header */}
+          <PrintableReportHeader
+            title="HOSPITAL TAX INVOICE"
+            subtitle={`Invoice No: ${invoice.invoice_number}`}
+            hideHospitalHeader={hideHeader}
+            extraHeaderRight={<PayBadge due={due} paid={paid} />}
+          />
 
           {/* Patient + Invoice meta grid */}
           <div className="grid grid-cols-2 gap-4 p-3 rounded-md" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
@@ -171,25 +142,22 @@ export default function PrintableInvoice({ invoice, onClose }: PrintableInvoiceP
             </div>
           </div>
 
-          {/* Terms + Signature */}
-          <div className="pt-5 grid grid-cols-2 gap-4 items-end page-break-avoid" style={{ borderTop: '1px solid #d1d5db', fontSize: '10px', color: '#9ca3af' }}>
-            <div>
-              <p className="font-semibold mb-1" style={{ color: '#374151' }}>Terms & Conditions:</p>
-              <p>1. Payments received are non-refundable.</p>
-              <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
-              <p className="mt-2 text-[9px]">This is a computer-generated invoice and requires no physical stamp or signature.</p>
-            </div>
-            <div className="text-right">
-              <div className="h-9" />
-              <div className="pt-1" style={{ borderTop: '0.5px solid #9ca3af' }}>
-                <p className="font-semibold uppercase tracking-wider text-[9px]" style={{ color: '#374151' }}>Authorized Signatory</p>
-                <p className="text-[9px]">VaidyaMD Accounts Billing Desk</p>
-              </div>
-            </div>
+          {/* Terms & Notes */}
+          <div className="pt-3 pb-1 text-[10px] text-gray-500 border-t border-gray-200">
+            <p className="font-semibold text-gray-700 mb-0.5">Terms & Conditions:</p>
+            <p>1. Payments received are non-refundable.</p>
+            <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
           </div>
 
+          {/* Dynamic Branch Footer with Signatory */}
+          <PrintableReportFooter
+            signatoryTitle="Authorized Accounts Desk"
+            signatorySubtitle="Hospital Billing & Accounts"
+            showSignatory={true}
+            showComputerGeneratedNotice={true}
+          />
         </div>
-      </div>
-    </div>
+      )}
+    </PrintableModal>
   );
 }

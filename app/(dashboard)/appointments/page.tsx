@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { appointmentsApi, patientsApi, authApi } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { appointmentsApi, patientsApi, authApi, templatesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { statusColors, statusLabels, formatDateTime, isUserDoctor } from '@/lib/utils';
 import { toast } from '@/contexts/ToastContext';
@@ -141,6 +142,28 @@ export default function AppointmentsPage() {
   const [genderFilter, setGenderFilter] = useState<'all' | 'female' | 'male' | 'other'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Dynamic Visit Types from Database Templates
+  const { data: dbVisitTypesData } = useQuery({
+    queryKey: ['appointment-visit-types'],
+    queryFn: () => templatesApi.list('appointment_visit_type').catch(() => []),
+  });
+
+  const dynamicVisitTypes: FertilityVisitType[] = useMemo(() => {
+    if (Array.isArray(dbVisitTypesData) && dbVisitTypesData.length > 0) {
+      return dbVisitTypesData.map((t: any) => ({
+        id: t.record_type.replace('visit_', ''),
+        label: t.title,
+        badge: t.schema_json?.badge || 'Procedure',
+        color: t.schema_json?.color || 'border-primary/20 bg-primary/10 text-primary font-bold',
+        desc: t.description || t.schema_json?.desc || '',
+        prepTip: t.schema_json?.prepTip || '',
+        defaultNotes: t.schema_json?.defaultNotes || t.title,
+        duration: t.schema_json?.duration || '30m',
+      }));
+    }
+    return fertilityVisitTypes;
+  }, [dbVisitTypesData]);
+
   // Triage Modal State
   const [triageApt, setTriageApt] = useState<any>(null);
   const [triageForm, setTriageForm] = useState({
@@ -187,7 +210,7 @@ export default function AppointmentsPage() {
       scheduled_at: defaultTime,
       visit_type: 'consultation',
       status: 'scheduled',
-      consultation_fee: 500,
+      consultation_fee: 0,
       notes: '',
     };
   };
@@ -285,8 +308,12 @@ export default function AppointmentsPage() {
   const loadData = async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
+      const aptParams: any = {};
+      if (selectedDate) {
+        aptParams.date_filter = selectedDate;
+      }
       const [aptRes, patRes, userRes] = await Promise.allSettled([
-        appointmentsApi.list({ date_filter: selectedDate }),
+        appointmentsApi.list(aptParams),
         patientsApi.list({ per_page: 100 }),
         authApi.listUsers(),
       ]);
@@ -296,6 +323,9 @@ export default function AppointmentsPage() {
           statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status)
         );
         setAppointments(sorted);
+      } else if (aptRes.status === 'rejected') {
+        console.error('Failed to fetch appointments:', aptRes.reason);
+        toast.error('Could not fetch appointments', aptRes.reason?.message || 'Server error');
       }
 
       if (patRes.status === 'fulfilled' && patRes.value) {
@@ -419,8 +449,8 @@ export default function AppointmentsPage() {
 
   // Selected visit type object
   const currentVisitType = useMemo(() => {
-    return fertilityVisitTypes.find((v) => v.id === bookForm.visit_type) || fertilityVisitTypes[0];
-  }, [bookForm.visit_type]);
+    return dynamicVisitTypes.find((v) => v.id === bookForm.visit_type) || dynamicVisitTypes[0];
+  }, [bookForm.visit_type, dynamicVisitTypes]);
 
   // Dynamic slot duration and end-time calculation
   const slotTimeDisplay = useMemo(() => {
@@ -506,17 +536,45 @@ export default function AppointmentsPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Appointment Queue</h1>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
               Fertility Clinic Roster
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <input 
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="vmd-input text-xs w-auto font-bold text-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.08)] border-[rgb(var(--clr-primary)/0.2)]"
             />
+            <button
+              type="button"
+              onClick={() => {
+                const d = new Date();
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                setSelectedDate(d.toISOString().split('T')[0]);
+              }}
+              className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate('')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
+                !selectedDate ? 'bg-primary text-white font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              All Dates
+            </button>
+            <button
+              type="button"
+              onClick={() => loadData()}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
+              title="Refresh Appointments"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -574,7 +632,7 @@ export default function AppointmentsPage() {
               setBookForm(getInitialBookForm());
               setShowBookModal(true);
             }}
-            className="px-4 py-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-md transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-md transition-colors shadow-xs flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Book Appointment</span>
@@ -683,7 +741,7 @@ export default function AppointmentsPage() {
                     <p className="text-slate-400 font-bold uppercase text-[9px] tracking-wider">Time</p>
                     <p className="text-slate-800 font-bold flex items-center gap-1 mt-0.5">
                       <Clock className="w-3 h-3 text-slate-400" />
-                      {new Date(apt.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      {parseUtc(apt.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div>
@@ -763,7 +821,7 @@ export default function AppointmentsPage() {
                   {apt.status === 'waiting' && can('action:start_consultation') && (
                     <button
                       onClick={() => handleStartConsultation(apt)}
-                      className="flex-1 text-xs font-bold px-3 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
+                      className="flex-1 text-xs font-bold px-3 py-2 bg-primary text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
                     >
                       <Activity className="w-3.5 h-3.5" />
                       <span>Start Consultation →</span>
@@ -775,7 +833,7 @@ export default function AppointmentsPage() {
                       {can('action:start_consultation') && (
                         <button
                           onClick={() => handleStartConsultation(apt)}
-                          className="flex-1 text-xs font-bold px-3 py-2 bg-[rgb(var(--clr-primary))] text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
+                          className="flex-1 text-xs font-bold px-3 py-2 bg-primary text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
                         >
                           <Activity className="w-3.5 h-3.5" />
                           <span>Open Workbench →</span>
@@ -802,7 +860,7 @@ export default function AppointmentsPage() {
                   {apt.status === 'scheduled' && (
                     <button
                       onClick={() => openReschedule(apt)}
-                      className="text-xs font-bold px-2.5 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                      className="text-xs font-bold px-2.5 py-2 bg-primary/10 text-primary border border-primary/20 rounded-md hover:bg-primary/15 transition-colors"
                     >
                       Reschedule
                     </button>
@@ -838,7 +896,7 @@ export default function AppointmentsPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b pb-3 flex-shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                   <CalendarDays className="w-5 h-5" />
                 </div>
                 <div>
@@ -869,7 +927,7 @@ export default function AppointmentsPage() {
                     <Link
                       href="/patients/register"
                       target="_blank"
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                      className="text-[11px] font-bold text-primary hover:text-primary-mid flex items-center gap-1"
                     >
                       <UserPlus className="w-3 h-3" />
                       <span>+ New Patient</span>
@@ -922,7 +980,7 @@ export default function AppointmentsPage() {
                                 setPatientSearchFocus(false);
                                 setPatientSearchTerm('');
                               }}
-                              className="w-full text-left p-2.5 hover:bg-indigo-50/60 transition-colors flex items-center justify-between text-xs"
+                              className="w-full text-left p-2.5 hover:bg-primary/10 transition-colors flex items-center justify-between text-xs"
                             >
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -954,9 +1012,9 @@ export default function AppointmentsPage() {
                   </div>
                 ) : (
                   /* Compact Selected Patient Chip */
-                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
+                  <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-md bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-md bg-primary text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                         {selectedPatientObj.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex items-center gap-2 truncate">
@@ -970,7 +1028,7 @@ export default function AppointmentsPage() {
                             ♂
                           </span>
                         ) : null}
-                        <span className="text-[10px] font-mono text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
+                        <span className="text-[10px] font-mono text-primary bg-white px-1.5 py-0.5 rounded border border-primary/20">
                           {selectedPatientObj.vid}
                         </span>
                         {selectedPatientObj.partner_name && (
@@ -987,7 +1045,7 @@ export default function AppointmentsPage() {
                         setPatientSearchTerm('');
                         setPatientSearchFocus(true);
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold px-2 py-0.5 rounded hover:bg-indigo-100 transition-colors flex-shrink-0 ml-2"
+                      className="text-xs text-primary hover:text-primary-mid font-bold px-2 py-0.5 rounded hover:bg-primary/15 transition-colors flex-shrink-0 ml-2"
                     >
                       Change
                     </button>
@@ -1110,7 +1168,7 @@ export default function AppointmentsPage() {
                   Procedure / Visit Type <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {fertilityVisitTypes.slice(0, 6).map((vt) => {
+                  {dynamicVisitTypes.slice(0, 6).map((vt) => {
                     const isSelected = bookForm.visit_type === vt.id;
                     return (
                       <button
@@ -1120,12 +1178,12 @@ export default function AppointmentsPage() {
                           setBookForm((prev) => ({
                             ...prev,
                             visit_type: vt.id,
-                            notes: prev.notes || vt.defaultNotes,
+                            notes: prev.notes,
                           }));
                         }}
                         className={`p-2 rounded-lg text-left border transition-all text-xs flex items-center justify-between ${
                           isSelected
-                            ? 'border-indigo-500 bg-indigo-50/80 text-indigo-900 font-bold ring-1 ring-indigo-400'
+                            ? 'border-primary bg-primary/10 text-text-main font-bold ring-1 ring-primary/40'
                             : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                         }`}
                       >
@@ -1156,9 +1214,9 @@ export default function AppointmentsPage() {
                     type="number"
                     min="0"
                     step="50"
-                    value={bookForm.consultation_fee ?? 500}
+                    value={bookForm.consultation_fee ?? 0}
                     onChange={(e) => setBookForm({ ...bookForm, consultation_fee: Number(e.target.value) })}
-                    placeholder="500"
+                    placeholder="0"
                     className="vmd-input text-xs py-2 pl-7 font-bold text-slate-800"
                   />
                 </div>
@@ -1185,7 +1243,7 @@ export default function AppointmentsPage() {
                     type="checkbox"
                     checked={notifyPatientSms}
                     onChange={(e) => setNotifyPatientSms(e.target.checked)}
-                    className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                    className="rounded text-primary focus:ring-primary w-3.5 h-3.5"
                   />
                   <span>Send appointment & preparation SMS reminder to patient</span>
                 </label>
@@ -1196,7 +1254,7 @@ export default function AppointmentsPage() {
                 <button
                   type="submit"
                   disabled={isBooking}
-                  className="flex-1 py-2.5 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
                 >
                   {isBooking ? (
                     <>
@@ -1232,7 +1290,7 @@ export default function AppointmentsPage() {
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-blue-600" />
+                <RefreshCw className="w-4 h-4 text-primary" />
                 <h3 className="font-bold text-base text-slate-900">Reschedule Appointment</h3>
               </div>
               <button 
@@ -1286,7 +1344,7 @@ export default function AppointmentsPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                  className="flex-1 py-3 bg-primary hover:bg-primary-mid text-white font-bold text-xs rounded-xl shadow-md transition-colors"
                 >
                   Confirm Reschedule
                 </button>
@@ -1379,7 +1437,7 @@ export default function AppointmentsPage() {
                 <button
                   type="submit"
                   disabled={isSavingTriage}
-                  className="flex-1 py-3 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-xl shadow-sm transition-colors"
+                  className="flex-1 py-3 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold text-xs rounded-xl shadow-sm transition-colors"
                 >
                   {isSavingTriage ? 'Saving...' : 'Save Triage Vitals'}
                 </button>

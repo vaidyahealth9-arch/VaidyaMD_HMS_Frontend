@@ -39,14 +39,15 @@ export default function ManualDiagnosticEntry({ patients, onClose, onSuccess, in
   useEffect(() => {
     if (initialPatientId) {
       setManualForm(prev => ({ ...prev, patient_id: initialPatientId }));
-    } else if (patients.length > 0 && !manualForm.patient_id) {
-      setManualForm(prev => ({ ...prev, patient_id: patients[0].id }));
     }
-  }, [initialPatientId, patients]);
+  }, [initialPatientId]);
 
   const manualReportMutation = useMutation({
-    mutationFn: () =>
-      limsApi.createManualReport({
+    mutationFn: () => {
+      if (!manualForm.patient_id) {
+        throw new Error('Please select a patient before submitting diagnostic report.');
+      }
+      return limsApi.createManualReport({
         patient_id: manualForm.patient_id,
         test_name: manualForm.test_name,
         category: manualForm.category,
@@ -57,7 +58,8 @@ export default function ManualDiagnosticEntry({ patients, onClose, onSuccess, in
           ...(manualForm.param2_name ? { [manualForm.param2_name]: { value: manualForm.param2_val, unit: manualForm.param2_unit, ref_range: manualForm.param2_ref } } : {}),
           ...(manualForm.param3_name ? { [manualForm.param3_name]: { value: manualForm.param3_val, unit: manualForm.param3_unit, ref_range: manualForm.param3_ref } } : {}),
         },
-      }),
+      });
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['lims-worklist'] });
       onSuccess(data.message || 'Manual diagnostic report queued into LIMS worklist!');

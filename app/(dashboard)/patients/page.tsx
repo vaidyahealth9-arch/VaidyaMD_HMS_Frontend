@@ -213,7 +213,7 @@ export default function PatientsPage() {
                               {p.vid}
                             </span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              p.gender === 'female' ? 'bg-pink-50 text-pink-700 border border-pink-100' : 'bg-blue-50 text-blue-700 border border-blue-100'
+                              p.gender === 'female' ? 'bg-pink-50 text-pink-700 border border-pink-100' : 'bg-primary/10 text-primary border border-primary/20'
                             }`}>
                               {p.gender} · {p.age}y
                             </span>

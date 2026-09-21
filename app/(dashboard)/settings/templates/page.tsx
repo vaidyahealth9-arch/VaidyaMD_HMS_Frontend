@@ -55,8 +55,8 @@ export default function TemplateManagerPage() {
     setJsonText(text);
     try {
       const parsed = JSON.parse(text);
-      if (!parsed.sections || !Array.isArray(parsed.sections)) {
-        setJsonError('Schema validation error: Root object must contain a "sections" array.');
+      if (!parsed || typeof parsed !== 'object') {
+        setJsonError('Schema validation error: Schema must be a valid JSON object or array.');
         return;
       }
       setParsedSchema(parsed);

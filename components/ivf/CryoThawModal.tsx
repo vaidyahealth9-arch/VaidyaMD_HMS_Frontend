@@ -12,12 +12,12 @@ interface CryoThawModalProps {
 
 export default function CryoThawModal({ selectedThawSample, staffUsers, onClose, onSaved }: CryoThawModalProps) {
   const [thawForm, setThawForm] = useState({
-    embryos_warmed: 2,
-    embryos_survived: 2,
+    embryos_warmed: selectedThawSample?.no_of_embryos || 1,
+    embryos_survived: selectedThawSample?.no_of_embryos || 1,
     survival_rate_pct: 100,
     disposition: 'Transferred',
-    witness_id: staffUsers.length > 1 ? staffUsers[1].id : '',
-    notes: 'Thawed for FET cycle.',
+    witness_id: '',
+    notes: '',
   });
 
   const handleConfirmThaw = async (e: React.FormEvent) => {

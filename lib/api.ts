@@ -57,9 +57,18 @@ export function toQueryString(params?: Record<string, any>): string {
 }
 
 // ==========================================
+// Domain Types Re-Exports
+// ==========================================
+export * from '@/features/auth/types';
+export * from '@/features/patients/types';
+export * from '@/features/billing/types';
+export * from '@/features/fertility/types';
+
+// ==========================================
 // 1. Core Auth, Branches, Users, Permissions, Templates
 // ==========================================
 export { authApi } from '@/features/auth/api';
+export { adminApi } from '@/features/admin/api';
 export { templatesApi } from '@/features/templates/api';
 export { notificationsApi } from '@/features/notifications/api';
 
@@ -73,6 +82,8 @@ export const branchesApi = {
 export const permissionProfilesApi = {
   list: () => request<any[]>('/core/permission-profiles/'),
   get: (id: string) => request<any>(`/core/permission-profiles/${id}`),
+  create: (data: Record<string, unknown>) =>
+    request('/core/permission-profiles/', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, unknown>) =>
     request(`/core/permission-profiles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
@@ -90,7 +101,7 @@ export { appointmentsApi } from '@/features/appointments/api';
 // ==========================================
 // 4. Billing, Packages, Wallet
 // ==========================================
-export { walletApi, billingApi } from '@/features/billing/api';
+export { walletApi, billingApi, patientPackagesApi } from '@/features/billing/api';
 
 // ==========================================
 // 5. OPD Plugin & Ambient AI Scribe
