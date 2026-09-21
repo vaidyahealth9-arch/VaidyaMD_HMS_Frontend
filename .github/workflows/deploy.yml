@@ -56,20 +56,20 @@ jobs:
       - name: Configure Target Environment
         id: config
         run: |
-          TARGET_ENV="${{ github.event.inputs.environment }}"
+          TARGET_ENV=$(echo "${{ github.event.inputs.environment }}" | tr -d '\r')
           if [ "$TARGET_ENV" = "prod" ]; then
-            echo "PROJECT_ID=vaidya-hms-prod" >> $GITHUB_ENV
-            echo "MIN_INSTANCES=1" >> $GITHUB_ENV
-            echo "MAX_INSTANCES=10" >> $GITHUB_ENV
-            echo "MEMORY=1Gi" >> $GITHUB_ENV
+            printf "PROJECT_ID=vaidya-hms-prod\n" >> $GITHUB_ENV
+            printf "MIN_INSTANCES=1\n" >> $GITHUB_ENV
+            printf "MAX_INSTANCES=10\n" >> $GITHUB_ENV
+            printf "MEMORY=1Gi\n" >> $GITHUB_ENV
           else
-            echo "PROJECT_ID=vaidya-hms-dev" >> $GITHUB_ENV
-            echo "MIN_INSTANCES=0" >> $GITHUB_ENV
-            echo "MAX_INSTANCES=3" >> $GITHUB_ENV
-            echo "MEMORY=512Mi" >> $GITHUB_ENV
+            printf "PROJECT_ID=vaidya-hms-dev\n" >> $GITHUB_ENV
+            printf "MIN_INSTANCES=0\n" >> $GITHUB_ENV
+            printf "MAX_INSTANCES=3\n" >> $GITHUB_ENV
+            printf "MEMORY=512Mi\n" >> $GITHUB_ENV
           fi
-          echo "REGION=asia-south1" >> $GITHUB_ENV
-          echo "SERVICE_NAME=hms-web" >> $GITHUB_ENV
+          printf "REGION=asia-south1\n" >> $GITHUB_ENV
+          printf "SERVICE_NAME=hms-web\n" >> $GITHUB_ENV
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -131,7 +131,7 @@ jobs:
             --memory ${{ env.MEMORY }} \
             --min-instances ${{ env.MIN_INSTANCES }} \
             --max-instances ${{ env.MAX_INSTANCES }} \
-            --set-env-vars "NODE_ENV=production,PORT=3000" \
+            --set-env-vars "NODE_ENV=production" \
             --timeout 300
 
       - name: Verify Web Frontend Health
@@ -142,5 +142,5 @@ jobs:
             --format 'value(status.url)')
           echo "Deployed Web URL: $SERVICE_URL"
           echo "Probing Web Frontend..."
-          curl -f -m 30 "$SERVICE_URL" || (echo "Frontend probe failed!" && exit 1)
+          curl -f -L -m 30 "$SERVICE_URL" || (echo "Frontend probe failed!" && exit 1)
           echo "✅ Frontend Cloud Run service is active and responding!"
