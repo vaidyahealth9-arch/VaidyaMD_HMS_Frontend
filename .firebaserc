@@ -1,0 +1,28 @@
+{
+  "projects": {
+    "dev": "vaidya-hms-dev",
+    "prod": "vaidya-hms-prod"
+  },
+  "targets": {
+    "vaidya-hms-dev": {
+      "hosting": {
+        "web": [
+          "vaidya-hms-dev"
+        ],
+        "api": [
+          "vaidya-hms-dev-api"
+        ]
+      }
+    },
+    "vaidya-hms-prod": {
+      "hosting": {
+        "web": [
+          "vaidya-hms-prod"
+        ],
+        "api": [
+          "vaidya-hms-prod-api"
+        ]
+      }
+    }
+  }
+}

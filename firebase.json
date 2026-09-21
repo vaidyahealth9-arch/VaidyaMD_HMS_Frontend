@@ -1,0 +1,47 @@
+{
+  "hosting": [
+    {
+      "target": "web",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/api/**",
+          "run": {
+            "serviceId": "hms-backend",
+            "region": "asia-south1"
+          }
+        },
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "hms-web",
+            "region": "asia-south1"
+          }
+        }
+      ]
+    },
+    {
+      "target": "api",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "hms-backend",
+            "region": "asia-south1"
+          }
+        }
+      ]
+    }
+  ]
+}
