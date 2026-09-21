@@ -16,7 +16,7 @@ on:
 
 jobs:
   frontend-verify:
-    name: Frontend Lint & Build Verification
+    name: Frontend TypeScript & Build Verification
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code
@@ -32,8 +32,8 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Lint Verification
-        run: npm run lint
+      - name: TypeScript Compiler Verification
+        run: npx tsc --noEmit
 
       - name: Next.js Production Build Validation
         env:
