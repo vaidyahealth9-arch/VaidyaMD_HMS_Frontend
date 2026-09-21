@@ -94,9 +94,9 @@ jobs:
           if [ -n "${{ secrets.NEXT_PUBLIC_API_URL }}" ]; then
             API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}"
           elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-            API_URL="https://api.vaidyamd.vaidyahealth.com"
+            API_URL="https://api.vaidyamd.vaidyahealth.com/api"
           else
-            API_URL="https://dev-api.vaidyamd.vaidyahealth.com"
+            API_URL="https://dev-api.vaidyamd.vaidyahealth.com/api"
           fi
 
           if [ -n "${{ secrets.NEXT_PUBLIC_WS_URL }}" ]; then

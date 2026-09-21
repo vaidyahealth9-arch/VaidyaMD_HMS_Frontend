@@ -12,6 +12,13 @@ export function getApiBase(): string {
       base = 'http://localhost:8000/api';
     } else if (currentOrigin.includes('-3000.')) {
       base = currentOrigin.replace('-3000.', '-8000.') + '/api';
+    } else if (
+      currentOrigin.includes('vaidyamd.vaidyahealth.com') ||
+      currentOrigin.includes('web.app') ||
+      currentOrigin.includes('firebaseapp.com')
+    ) {
+      // On Firebase Hosting, /api/** routes directly to hms-backend on the same origin
+      base = `${currentOrigin}/api`;
     }
   }
   return base;
