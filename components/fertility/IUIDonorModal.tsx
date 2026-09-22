@@ -601,7 +601,7 @@ export default function IUIDonorModal({
             /* ======================================================== */
             /* PRINT PREVIEW VIEW                                       */
             /* ======================================================== */
-            <div className="space-y-6 printable-document print:p-6 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
+            <div className="space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
               <div className="flex items-center justify-between print:hidden pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-600">Letterhead pad spacing:</span>

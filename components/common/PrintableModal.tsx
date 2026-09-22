@@ -50,6 +50,12 @@ export default function PrintableModal({
     if (onPrint) {
       onPrint();
     } else {
+      document.body.classList.add('is-printing-modal');
+      const cleanup = () => {
+        document.body.classList.remove('is-printing-modal');
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
       window.print();
     }
   };
@@ -126,7 +132,7 @@ export default function PrintableModal({
 
         {/* Printable Document Body */}
         <div
-          className="p-6 sm:p-8 space-y-6 printable-document print:p-6 text-slate-900 text-xs"
+          className="p-6 sm:p-8 space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs"
           style={{ fontFamily: 'Inter, Arial, sans-serif' }}
         >
           {headerProps && (

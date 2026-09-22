@@ -8,6 +8,7 @@ export interface CounselingNote {
   patient_name?: string;
   patient_vid?: string;
   source?: string;
+  comments?: string;
   procedure?: string;
   egg_pick_up?: string;
   discussion?: string;

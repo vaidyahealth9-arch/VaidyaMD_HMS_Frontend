@@ -101,7 +101,7 @@ export default function PregnancyOutcomePage() {
   const selectCls = `${inputCls} cursor-pointer`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50/40 via-pink-50/20 to-white print:bg-white">
+    <div className="min-h-screen print:min-h-0 bg-gradient-to-br from-rose-50/40 via-pink-50/20 to-white print:bg-white">
       {/* Top bar */}
       <div className="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 print:hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -336,15 +336,6 @@ export default function PregnancyOutcomePage() {
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        @media print {
-          .print\\:hidden { display: none !important; }
-          body { background: white; }
-          .rounded-2xl { border-radius: 0; }
-          .shadow-lg, .shadow-sm, .shadow { box-shadow: none; }
-        }
-      `}</style>
     </div>
   );
 }

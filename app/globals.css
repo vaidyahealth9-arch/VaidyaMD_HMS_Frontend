@@ -206,7 +206,7 @@
 }
 
 /* ────────────────────────────────────────────
-   Print styles — professional document output
+   Print styles — professional document output (A4 Standardization)
 ──────────────────────────────────────────── */
 @media print {
   * {
@@ -216,12 +216,12 @@
 
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 8mm 10mm;
   }
 
   @page landscape {
     size: A4 landscape;
-    margin: 8mm;
+    margin: 8mm 10mm;
   }
 
   .print-landscape {
@@ -230,68 +230,91 @@
 
   html, body {
     background: white !important;
-    color: #111827 !important;
-    font-family: 'Inter', Arial, sans-serif;
-    font-size: 11pt;
+    color: #0f172a !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.35;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
     height: auto !important;
-    min-height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
   }
 
   /* Completely remove navigation, sidebar, header, toolbars, and no-print wrappers from print */
-  header, nav, aside, [data-sidebar], .no-print, .print\:hidden {
+  header, nav, aside, [data-sidebar], .no-print, .print\:hidden,
+  [role="dialog"] > div.fixed.inset-0:not(:has(.printable-document)):not(:has(.barcode-sticker-print)) {
     display: none !important;
-    visibility: hidden !important;
   }
 
-  /* Strict print isolation: hide all background UI components */
-  body * {
-    visibility: hidden !important;
+  /* ─────────────────────────────────────────────────────────────
+     Tree Pruning for Printable Documents & Barcode Labels:
+     When a .printable-document or .barcode-sticker-print is in DOM,
+     completely collapse (display: none) all sibling branches to guarantee
+     0 leading and trailing blank sheets!
+  ───────────────────────────────────────────────────────────── */
+  body:has(.printable-document) *:not(:has(.printable-document)):not(.printable-document):not(.printable-document *) {
+    display: none !important;
   }
 
-  /* Unconstrain parents containing printable documents */
-  body > *:has(.printable-document),
-  div:has(> .printable-document),
-  div:has(.printable-document),
-  main:has(.printable-document),
-  section:has(.printable-document),
-  article:has(.printable-document) {
+  body:has(.barcode-sticker-print) *:not(:has(.barcode-sticker-print)):not(.barcode-sticker-print):not(.barcode-sticker-print *) {
+    display: none !important;
+  }
+
+  /* Completely unconstrain and neutralize all ancestors of .printable-document and .barcode-sticker-print */
+  body:has(.printable-document) *:has(.printable-document),
+  body:has(.barcode-sticker-print) *:has(.barcode-sticker-print) {
+    display: block !important;
     position: static !important;
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
-    min-height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
-    overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
     transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    inset: auto !important;
+    flex: none !important;
+    grid: none !important;
   }
 
-  /* Make only the designated printable document visible in standard flow */
-  .printable-document,
-  .printable-document * {
-    visibility: visible !important;
-  }
-
+  /* Explicit isolation rule for .printable-document */
   .printable-document {
+    display: block !important;
     position: static !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 16px !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     background: white !important;
     border-radius: 0 !important;
-    display: block !important;
     overflow: visible !important;
     height: auto !important;
-    min-height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     page-break-inside: auto !important;
+  }
+
+  .printable-document * {
+    visibility: visible !important;
+  }
+
+  /* Remove trailing margins from last child to avoid 1px blank page spill */
+  .printable-document > *:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
   }
 
   /* Print-specific table borders & layout */
@@ -301,6 +324,14 @@
     width: 100% !important;
   }
 
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
   .print-table th,
   .print-table td {
     border: 0.5pt solid #cbd5e1 !important;
@@ -308,11 +339,73 @@
   }
 
   /* Page break controls */
-  .page-break-before { page-break-before: always !important; break-before: page !important; }
-  .page-break-avoid  { page-break-inside: avoid !important; break-inside: avoid !important; }
-  tr, .print-card, .avoid-break {
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .page-break-avoid,
+  .avoid-break,
+  tr,
+  .print-card {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* ─────────────────────────────────────────────────────────────
+     Thermal Sticker Label Continuous Roll Rules (Zebra / TSC / TVS / Dymo)
+  ───────────────────────────────────────────────────────────── */
+  body.is-printing-barcode-roll {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  @page barcode-roll {
+    margin: 0mm !important;
+    size: auto;
+  }
+
+  body.is-printing-barcode-roll .barcode-sticker-print {
+    page: barcode-roll;
+  }
+
+  .barcode-sticker-print {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: auto !important;
+  }
+
+  .barcode-sticker-page-wrapper {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    width: fit-content !important;
+    height: fit-content !important;
+  }
+
+  .barcode-sticker-page-wrapper:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .barcode-sticker-item {
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
 }
+
 

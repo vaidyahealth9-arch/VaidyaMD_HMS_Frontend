@@ -73,6 +73,7 @@ export default function CounselingPage() {
 
   const [formData, setFormData] = useState({
     source: 'OP Consultation',
+    comments: '',
     procedure: '',
     egg_pick_up: '',
     discussion: '',
@@ -187,6 +188,7 @@ export default function CounselingPage() {
     setPatientSearch('');
     setFormData({
       source: 'OP Consultation',
+      comments: '',
       procedure: '',
       egg_pick_up: '',
       discussion: '',
@@ -202,6 +204,7 @@ export default function CounselingPage() {
     setSelectedPatientId(note.patient_id);
     setFormData({
       source: note.source || 'OP Consultation',
+      comments: note.comments || '',
       procedure: note.procedure || '',
       egg_pick_up: note.egg_pick_up || '',
       discussion: note.discussion || '',
@@ -365,6 +368,11 @@ export default function CounselingPage() {
                     <Badge variant="outline" className="text-[10px] bg-slate-50 font-semibold border-slate-300">
                       {note.source || 'OP Consultation'}
                     </Badge>
+                    {note.comments && (
+                      <p className="text-[10px] text-slate-500 line-clamp-1 italic mt-0.5" title={note.comments}>
+                        {note.comments}
+                      </p>
+                    )}
                   </td>
                   <td className="p-3.5">
                     <span className="font-bold text-text-main text-xs">{note.procedure || 'General Counseling'}</span>
@@ -565,21 +573,35 @@ export default function CounselingPage() {
                     </select>
                   </div>
 
-                  {/* Column 2: Procedure */}
+                  {/* Comments Box beside Source */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      2. Procedure (Planned ART Treatment) <span className="text-rose-500">*</span>
+                      Source Comments / Referral Notes
                     </label>
-                    <select
-                      value={formData.procedure}
-                      onChange={(e) => setFormData({ ...formData, procedure: e.target.value })}
-                      className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-pink-500 focus:outline-none shadow-sm"
-                    >
-                      {dynamicProcedures.map((p: string) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      value={formData.comments}
+                      onChange={(e) => setFormData({ ...formData, comments: e.target.value })}
+                      placeholder="e.g. Referred by Dr. Rao / Camp patient / Relative / Channel notes..."
+                      className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-pink-500 focus:outline-none shadow-sm"
+                    />
                   </div>
+                </div>
+
+                {/* Column 2: Procedure */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    2. Procedure (Planned ART Treatment) <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formData.procedure}
+                    onChange={(e) => setFormData({ ...formData, procedure: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-pink-500 focus:outline-none shadow-sm"
+                  >
+                    {dynamicProcedures.map((p: string) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Column 3: Egg pick up */}
@@ -748,10 +770,15 @@ export default function CounselingPage() {
             <div className="p-5 space-y-4 text-xs overflow-y-auto max-h-[65vh]">
               <div className="grid grid-cols-2 gap-4 pb-3 border-b border-slate-100">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">1. Source</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">1. Source &amp; Comments</span>
                   <Badge variant="outline" className="text-xs font-semibold bg-slate-50 mt-1 border-slate-300">
                     {viewingNote.source || 'OP Consultation'}
                   </Badge>
+                  {viewingNote.comments && (
+                    <p className="text-xs text-slate-700 mt-1.5 italic bg-slate-50 p-2 rounded border border-slate-200/70">
+                      {viewingNote.comments}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">2. Procedure</span>
@@ -880,7 +907,12 @@ export default function CounselingPage() {
                 <tbody>
                   <tr className="border-b border-slate-200">
                     <td className="p-2.5 font-bold text-slate-600 bg-slate-50 w-1/3">1. Source</td>
-                    <td className="p-2.5 text-slate-900">{printingNote.source || 'OP Consultation'}</td>
+                    <td className="p-2.5 text-slate-900">
+                      <span className="font-semibold">{printingNote.source || 'OP Consultation'}</span>
+                      {printingNote.comments && (
+                        <p className="text-slate-600 text-[11px] mt-0.5 italic">Comments: {printingNote.comments}</p>
+                      )}
+                    </td>
                   </tr>
                   <tr className="border-b border-slate-200">
                     <td className="p-2.5 font-bold text-slate-600 bg-slate-50">2. Procedure</td>

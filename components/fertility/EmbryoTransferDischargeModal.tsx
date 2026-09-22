@@ -631,7 +631,7 @@ export default function EmbryoTransferDischargeModal({
             </div>
           ) : (
             /* PREVIEW MODE: Printable Patient Takeaway Letterhead */
-            <div className="bg-white border border-slate-300 rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-sm printable-document print:p-6 print:border-none">
+            <div className="bg-white border border-slate-300 rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-sm printable-document print:p-0 print:m-0 print:border-none print:shadow-none">
               <PrintableReportHeader
                 title="Embryo Transfer Discharge Summary & Luteal Care Protocol"
                 subtitle="Department of Embryology & Assisted Conception · ART Act 2021 Accredited"

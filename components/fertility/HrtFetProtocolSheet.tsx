@@ -358,35 +358,40 @@ export default function HrtFetProtocolSheet({
 <meta charset="utf-8"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #111827; background: white; padding: 12mm; }
-  @page { size: A4 landscape; margin: 10mm; }
-  .clinic-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0B4F6C; padding-bottom: 8px; margin-bottom: 12px; }
-  .clinic-name { font-size: 15pt; font-weight: 800; color: #0B4F6C; }
-  .clinic-sub { font-size: 8pt; color: #6b7280; margin-top: 2px; }
-  .doc-title { font-size: 11pt; font-weight: 700; color: #1a6e8e; text-align: right; }
-  .doc-sub { font-size: 8pt; color: #6b7280; text-align: right; }
-  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-  th { background: #0B4F6C; color: white; padding: 4pt 5pt; text-align: left; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
-  td { padding: 3pt 5pt; border-bottom: 0.5pt solid #e2e8f0; vertical-align: top; }
+  @page { size: A4 landscape; margin: 8mm 10mm; }
+  @media print {
+    body { padding: 0 !important; margin: 0 !important; }
+  }
+  body { font-family: 'Arial', sans-serif; font-size: 8.5pt; color: #111827; background: white; padding: 6mm 8mm; }
+  .clinic-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0B4F6C; padding-bottom: 6px; margin-bottom: 10px; }
+  .clinic-name { font-size: 13pt; font-weight: 800; color: #0B4F6C; }
+  .clinic-sub { font-size: 7.5pt; color: #6b7280; margin-top: 1px; }
+  .doc-title { font-size: 10pt; font-weight: 700; color: #1a6e8e; text-align: right; }
+  .doc-sub { font-size: 7.5pt; color: #6b7280; text-align: right; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  thead { display: table-header-group; }
+  th { background: #0B4F6C; color: white; padding: 3pt 4pt; text-align: left; font-weight: 700; font-size: 6.8pt; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }
+  td { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #e2e8f0; vertical-align: top; }
+  tr { page-break-inside: avoid; }
   tr:nth-child(even) td { background: #f8fafc; }
   .phase-badge { display: inline-block; padding: 1pt 4pt; border-radius: 3pt; font-size: 7pt; font-weight: 700; }
   .et-row td { background: #fff0f0 !important; font-weight: 700; }
   .p0-row td { background: #fffbeb !important; }
   .e-day { display: inline-block; background: #ccfbf1; color: #065f46; padding: 1pt 4pt; border-radius: 3pt; font-size: 7pt; font-weight: 700; }
-  .footer { margin-top: 16px; padding-top: 8px; border-top: 1pt solid #d1d5db; display: flex; justify-content: space-between; font-size: 7.5pt; color: #6b7280; }
+  .footer { margin-top: 12px; padding-top: 6px; border-top: 1pt solid #d1d5db; display: flex; justify-content: space-between; font-size: 7pt; color: #6b7280; page-break-inside: avoid; }
   /* Calendar grid */
-  .week-block { margin-bottom: 10px; page-break-inside: avoid; }
-  .week-label { background: #0B4F6C; color: white; padding: 3pt 6pt; font-size: 8pt; font-weight: 800; border-radius: 3pt 3pt 0 0; }
+  .week-block { margin-bottom: 8px; page-break-inside: avoid; }
+  .week-label { background: #0B4F6C; color: white; padding: 2.5pt 5pt; font-size: 7.5pt; font-weight: 800; border-radius: 3pt 3pt 0 0; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 0.5pt solid #d1d5db; }
-  .cal-day-header { background: #1a6e8e; color: white; text-align: center; padding: 4pt; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; border-right: 0.5pt solid #d1d5db; }
+  .cal-day-header { background: #1a6e8e; color: white; text-align: center; padding: 3pt; font-size: 7pt; font-weight: 800; text-transform: uppercase; border-right: 0.5pt solid #d1d5db; }
   .cal-day-header:last-child { border-right: none; }
-  .cal-cell { min-height: 90pt; padding: 4pt; border-right: 0.5pt solid #e2e8f0; border-top: 0.5pt solid #e2e8f0; vertical-align: top; }
+  .cal-cell { min-height: 52pt; padding: 3pt; border-right: 0.5pt solid #e2e8f0; border-top: 0.5pt solid #e2e8f0; vertical-align: top; }
   .cal-cell:last-child { border-right: none; }
-  .cal-date { font-weight: 800; font-size: 8pt; margin-bottom: 2pt; }
-  .cal-phase { font-size: 6.5pt; color: #6b7280; font-style: italic; margin-bottom: 2pt; }
-  .cal-scan { background: #ecfeff; border: 0.5pt solid #a5f3fc; padding: 1.5pt 3pt; border-radius: 2pt; font-size: 6.5pt; font-weight: 700; color: #0e7490; margin-bottom: 2pt; }
-  .cal-med { background: #e0f2fe; border: 0.5pt solid #bae6fd; padding: 1.5pt 3pt; border-radius: 2pt; font-size: 6.5pt; font-weight: 600; color: #0369a1; margin-bottom: 1.5pt; }
-  .cal-et { font-size: 7pt; font-weight: 800; color: #be123c; margin-top: 2pt; }
+  .cal-date { font-weight: 800; font-size: 7.5pt; margin-bottom: 1.5pt; }
+  .cal-phase { font-size: 6pt; color: #6b7280; font-style: italic; margin-bottom: 1.5pt; }
+  .cal-scan { background: #ecfeff; border: 0.5pt solid #a5f3fc; padding: 1pt 2.5pt; border-radius: 2pt; font-size: 6pt; font-weight: 700; color: #0e7490; margin-bottom: 1.5pt; }
+  .cal-med { background: #e0f2fe; border: 0.5pt solid #bae6fd; padding: 1pt 2.5pt; border-radius: 2pt; font-size: 6pt; font-weight: 600; color: #0369a1; margin-bottom: 1.5pt; }
+  .cal-et { font-size: 6.5pt; font-weight: 800; color: #be123c; margin-top: 1.5pt; }
   .cal-empty { background: #f9fafb; }
   .cal-p0 { background: #fffbeb; }
   .cal-transfer { background: #fff0f0; }
@@ -411,6 +416,7 @@ ${bodyHtml}
 </body></html>`);
     win.document.close();
     win.focus();
+    win.onafterprint = () => { win.close(); };
     setTimeout(() => { win.print(); }, 400);
   };
 
@@ -772,9 +778,9 @@ ${bodyHtml}
 
       {/* ── Weekly Calendar Print View ──────────────────────── */}
       {showCalendarPrint && (
-        <div className="fixed inset-0 z-40 bg-white overflow-y-auto print:static print:overflow-visible print:z-auto printable-document">
-          <div className="p-6 print:p-0 min-h-screen">
-            <div className="max-w-[297mm] mx-auto">
+        <div className="fixed inset-0 z-40 bg-white overflow-y-auto print:static print:overflow-visible print:z-auto printable-document print-landscape">
+          <div className="p-6 print:p-0 min-h-screen print:min-h-0">
+            <div className="max-w-[277mm] mx-auto print:max-w-none">
               {/* Print Toolbar */}
               <div className="flex items-center justify-between mb-4 print:hidden">
                 <h2 className="text-base font-bold text-slate-800">Weekly Treatment Calendar — Print Preview</h2>

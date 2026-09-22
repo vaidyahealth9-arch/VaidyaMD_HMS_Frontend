@@ -28,6 +28,7 @@ interface PrintableInvoiceProps {
     wallet_amount_used?: string | number;
     paid_amount: string | number;
     pending_due: string | number;
+    payment_method?: string;
   };
   onClose: () => void;
 }
@@ -81,6 +82,11 @@ export default function PrintableInvoice({ invoice, onClose }: PrintableInvoiceP
               <p className="text-[10px]" style={{ color: '#4b5563' }}>
                 Dept / Source: <strong style={{ color: '#111827' }}>{invoice.appointment_source || 'OPD'}</strong>
               </p>
+              {invoice.payment_method && (
+                <p className="text-[10px]" style={{ color: '#4b5563' }}>
+                  Payment Mode: <strong style={{ color: '#0B4F6C' }} className="uppercase">{invoice.payment_method}</strong>
+                </p>
+              )}
             </div>
           </div>
 
@@ -133,7 +139,7 @@ export default function PrintableInvoice({ invoice, onClose }: PrintableInvoiceP
               <span className="font-mono" style={{ color: '#0B4F6C' }}>₹{n(invoice.total_amount).toLocaleString()}</span>
             </div>
             <div className="flex justify-between font-semibold" style={{ color: '#0D7A55' }}>
-              <span>Total Amount Paid:</span>
+              <span>Total Amount Paid {invoice.payment_method ? `(${invoice.payment_method})` : ''}:</span>
               <span className="font-mono">₹{paid.toLocaleString()}</span>
             </div>
             <div className="flex justify-between font-bold text-sm" style={{ color: due > 0 ? '#B91C1C' : '#0D7A55' }}>

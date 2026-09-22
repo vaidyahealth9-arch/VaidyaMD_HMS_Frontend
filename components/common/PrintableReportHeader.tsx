@@ -194,8 +194,8 @@ export default function PrintableReportHeader({
         </div>
       ) : (
         /* Top spacing for pre-printed letterhead pads */
-        <div className="h-20 print:h-24 flex items-end justify-between border-b border-slate-300 pb-2">
-          <span className="text-[10px] text-slate-400 italic">
+        <div className="h-20 print:h-24 flex items-end justify-between border-b border-slate-300 print:border-none pb-2">
+          <span className="text-[10px] text-slate-400 italic print:hidden">
             [Pre-printed Letterhead Pad Space]
           </span>
           <span className="text-[10px] font-mono text-slate-500 font-bold">

@@ -35,10 +35,10 @@ import AndrologyDataEntry from '@/components/fertility/AndrologyDataEntry';
 import MultiDocumentUploader from '@/components/common/MultiDocumentUploader';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import PrintableReportFooter from '@/components/common/PrintableReportFooter';
-import ClinicalHistoryProformaModal from '@/components/opd/ClinicalHistoryProformaModal';
 import AddToOPDModal from '@/components/opd/AddToOPDModal';
 import EditAlertsModal from '@/components/patients/EditAlertsModal';
 import EditPatientDetailsModal from '@/components/patients/EditPatientDetailsModal';
+import PatientBarcodeModal from '@/components/common/PatientBarcodeModal';
 import {
   Users,
   User,
@@ -76,6 +76,7 @@ import {
   Phone,
   HeartHandshake,
   Eye,
+  Barcode,
 } from 'lucide-react';
 
 const tabs = [
@@ -117,6 +118,7 @@ export default function PatientProfilePage() {
   const [showAddToOPDModal, setShowAddToOPDModal] = useState(false);
   const [showEditAlertsModal, setShowEditAlertsModal] = useState(false);
   const [showEditPatientModal, setShowEditPatientModal] = useState(false);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [partnerSearchQuery, setPartnerSearchQuery] = useState('');
   const [partnerSearchResults, setPartnerSearchResults] = useState<any[]>([]);
   const [isSearchingPartner, setIsSearchingPartner] = useState(false);
@@ -156,7 +158,6 @@ export default function PatientProfilePage() {
   const [showEtDischargeModal, setShowEtDischargeModal] = useState(false);
   const [showSpermPrepModal, setShowSpermPrepModal] = useState(false);
   const [showSpermFreezingModal, setShowSpermFreezingModal] = useState(false);
-  const [showHistoryProforma, setShowHistoryProforma] = useState(false);
   const [counselingNotes, setCounselingNotes] = useState<CounselingNote[]>([]);
   const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
 
@@ -696,15 +697,6 @@ export default function PatientProfilePage() {
               Add to Queue
             </button>
             <button
-              type="button"
-              onClick={() => setShowHistoryProforma(true)}
-              className="px-2.5 py-1.5 bg-[#2878a8]/10 hover:bg-[#2878a8]/20 border border-[#2878a8]/30 text-[#2878a8] font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1.5"
-              title="Open Clinical History Proforma (Fertility / Gynaecology / Obstetric)"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span>History Proforma</span>
-            </button>
-            <button
               onClick={() => {
                 setActiveTab('workbench');
                 router.replace(`/patients/${patientId}?tab=workbench`);
@@ -728,6 +720,17 @@ export default function PatientProfilePage() {
             >
               <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
               <span>Wallet &amp; Billing</span>
+            </button>
+
+            {/* Barcode & Thermal Sticker Print Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowBarcodeModal(true)}
+              className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-amber-300 hover:text-amber-200 border border-slate-700 font-bold text-xs rounded-md transition-colors shadow-2xs flex items-center gap-1.5"
+              title="Print Patient Barcode & Thermal Sticker Labels (Specimen Tubes, Wristband, Case File)"
+            >
+              <Barcode className="w-3.5 h-3.5" />
+              <span>Barcode Sticker</span>
             </button>
 
             {/* Expand / Collapse Header Details Toggle */}
@@ -2087,8 +2090,11 @@ export default function PatientProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source &amp; Comments</span>
                   <p className="font-bold text-slate-800 text-sm">{viewingCounselingNote.source || '—'}</p>
+                  {viewingCounselingNote.comments && (
+                    <p className="text-xs text-slate-600 mt-1 italic">{viewingCounselingNote.comments}</p>
+                  )}
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">2. Procedure</span>
@@ -2173,16 +2179,6 @@ export default function PatientProfilePage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Clinical History Proforma Modal */}
-      {showHistoryProforma && (
-        <ClinicalHistoryProformaModal
-          patient={patient}
-          partner={partner}
-          onClose={() => setShowHistoryProforma(false)}
-          onSaved={loadData}
-        />
       )}
 
       {/* Update Patient Details Modal */}
@@ -2280,6 +2276,18 @@ export default function PatientProfilePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Patient Barcode & Thermal Sticker Label Modal */}
+      {showBarcodeModal && (
+        <PatientBarcodeModal
+          isOpen={showBarcodeModal}
+          onClose={() => setShowBarcodeModal(false)}
+          patient={viewMode === 'couple' ? (femalePartner || patient) : patient}
+          partner={viewMode === 'couple' ? (malePartner || partner) : null}
+          hospitalName="VAIDYAMD HMS"
+          branchName="Reproductive Medicine Centre"
+        />
       )}
     </div>
   );

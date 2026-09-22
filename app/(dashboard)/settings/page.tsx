@@ -14,6 +14,7 @@ import {
   pharmacyApi,
   limsApi,
   cryoApi,
+  cosgynApi,
   getApiBase,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,7 @@ import {
   Building2,
   Users,
   IndianRupee,
+  Sparkles,
   Activity,
   ClipboardList,
   Calendar,
@@ -346,7 +348,7 @@ export default function SettingsMasterPage() {
   // ==========================================
   // 3. TARIFFS & PACKAGES STATE
   // ==========================================
-  const [tariffSubTab, setTariffSubTab] = useState<'catalog' | 'packages'>('catalog');
+  const [tariffSubTab, setTariffSubTab] = useState<'catalog' | 'packages' | 'cosgyn'>('catalog');
   const [serviceCatalog, setServiceCatalog] = useState<any[]>([]);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogCatFilter, setCatalogCatFilter] = useState('all');
@@ -373,6 +375,29 @@ export default function SettingsMasterPage() {
     base_price: 0,
     items_json: '[]',
   });
+
+  // CosGyn Packages State
+  const [cosgynTreatments, setCosgynTreatments] = useState<any[]>([]);
+  const [cosgynSearch, setCosgynSearch] = useState('');
+  const [showCosgynModal, setShowCosgynModal] = useState(false);
+  const [editingCosgynTreatment, setEditingCosgynTreatment] = useState<any>(null);
+  const [cosgynForm, setCosgynForm] = useState({
+    name: '',
+    package_combo: '',
+    jet_plasma_sessions: 0,
+    jet_plasma_duration_mins: 30,
+    tesla_chair_sessions: 0,
+    tesla_chair_duration_mins: 30,
+    prp_sessions: 0,
+    price: 25000,
+  });
+
+  const refreshCosgynTreatments = () => {
+    cosgynApi
+      .getTreatments()
+      .then((res: any) => setCosgynTreatments(Array.isArray(res) ? res : []))
+      .catch(() => {});
+  };
 
   // ==========================================
   // 4. IPD WARDS & BEDS STATE
@@ -686,6 +711,10 @@ export default function SettingsMasterPage() {
     billingApi
       .listPackages()
       .then((res: any) => setTreatmentPackages(Array.isArray(res) ? res : []))
+      .catch(() => {});
+    cosgynApi
+      .getTreatments()
+      .then((res: any) => setCosgynTreatments(Array.isArray(res) ? res : []))
       .catch(() => {});
 
     // 4. IPD Wards & Beds
@@ -1420,6 +1449,49 @@ export default function SettingsMasterPage() {
       billingApi.listPackages().then((res: any) => setTreatmentPackages(Array.isArray(res) ? res : []));
     } catch (e: any) {
       alert(e.message || 'Failed to save package');
+    }
+  };
+
+  const handleSaveCosgynTreatment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!cosgynForm.name.trim()) {
+        alert('Package name is required.');
+        return;
+      }
+      const payload = {
+        name: cosgynForm.name.trim(),
+        package_combo: cosgynForm.package_combo.trim() || undefined,
+        jet_plasma_sessions: Number(cosgynForm.jet_plasma_sessions) || 0,
+        jet_plasma_duration_mins: Number(cosgynForm.jet_plasma_duration_mins) || 30,
+        tesla_chair_sessions: Number(cosgynForm.tesla_chair_sessions) || 0,
+        tesla_chair_duration_mins: Number(cosgynForm.tesla_chair_duration_mins) || 30,
+        prp_sessions: Number(cosgynForm.prp_sessions) || 0,
+        price: Number(cosgynForm.price) || 0,
+      };
+
+      if (editingCosgynTreatment) {
+        await cosgynApi.updateTreatment(editingCosgynTreatment.id, payload);
+        alert('CosGyn package updated successfully!');
+      } else {
+        await cosgynApi.createTreatment(payload);
+        alert('CosGyn specialty package created successfully!');
+      }
+      setShowCosgynModal(false);
+      refreshCosgynTreatments();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save CosGyn package');
+    }
+  };
+
+  const handleDeleteCosgynTreatment = async (treatmentId: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete CosGyn package "${name}"?`)) return;
+    try {
+      await cosgynApi.deleteTreatment(treatmentId);
+      alert('Package deleted successfully.');
+      refreshCosgynTreatments();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete package');
     }
   };
 
@@ -2417,25 +2489,34 @@ export default function SettingsMasterPage() {
       {activeTab === 'tariffs' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setTariffSubTab('catalog')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg ${
-                  tariffSubTab === 'catalog' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  tariffSubTab === 'catalog' ? 'bg-primary text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 Master Service Catalog ({serviceCatalog.length})
               </button>
               <button
                 onClick={() => setTariffSubTab('packages')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg ${
-                  tariffSubTab === 'packages' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  tariffSubTab === 'packages' ? 'bg-primary text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 Bundled Treatment Packages ({treatmentPackages.length})
               </button>
+              <button
+                onClick={() => setTariffSubTab('cosgyn')}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all ${
+                  tariffSubTab === 'cosgyn' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                CosGyn Specialty Packages ({cosgynTreatments.length})
+              </button>
             </div>
-            {tariffSubTab === 'catalog' ? (
+            {tariffSubTab === 'catalog' && (
               <button
                 onClick={() => {
                   setEditingServiceItem(null);
@@ -2455,7 +2536,8 @@ export default function SettingsMasterPage() {
                 <Plus className="w-3.5 h-3.5" />
                 Add Service Item
               </button>
-            ) : (
+            )}
+            {tariffSubTab === 'packages' && (
               <button
                 onClick={() => {
                   setEditingPackage(null);
@@ -2476,9 +2558,31 @@ export default function SettingsMasterPage() {
                 Add Treatment Package
               </button>
             )}
+            {tariffSubTab === 'cosgyn' && (
+              <button
+                onClick={() => {
+                  setEditingCosgynTreatment(null);
+                  setCosgynForm({
+                    name: '',
+                    package_combo: '',
+                    jet_plasma_sessions: 0,
+                    jet_plasma_duration_mins: 30,
+                    tesla_chair_sessions: 0,
+                    tesla_chair_duration_mins: 30,
+                    prp_sessions: 0,
+                    price: 25000,
+                  });
+                  setShowCosgynModal(true);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add CosGyn Package
+              </button>
+            )}
           </div>
 
-          {tariffSubTab === 'catalog' ? (
+          {tariffSubTab === 'catalog' && (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
@@ -2532,7 +2636,9 @@ export default function SettingsMasterPage() {
                 </tbody>
               </table>
             </div>
-          ) : (
+          )}
+
+          {tariffSubTab === 'packages' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {treatmentPackages.map((pkg) => (
                 <div key={pkg.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
@@ -2598,6 +2704,175 @@ export default function SettingsMasterPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {tariffSubTab === 'cosgyn' && (
+            <div className="space-y-4">
+              {/* CosGyn Packages Header Banner */}
+              <div className="bg-gradient-to-r from-pink-50 via-rose-50 to-purple-50 border border-pink-100 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-400 text-white flex items-center justify-center shadow-xs">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Cosmetic Gynecology &amp; Aesthetics Protocol Tariffs</h4>
+                    <p className="text-xs text-slate-500">
+                      Jet Plasma mucosal regeneration, Tesla Chair (HIFEM) pelvic floor therapy, autologous PRP revitalization, and contouring packages.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 text-xs font-mono font-bold bg-white border border-pink-200 text-pink-700 rounded-lg">
+                    {cosgynTreatments.length} Active Protocols
+                  </span>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={cosgynSearch}
+                    onChange={(e) => setCosgynSearch(e.target.value)}
+                    placeholder="Search CosGyn package name or protocol..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-pink-500"
+                  />
+                </div>
+              </div>
+
+              {/* Treatments Cards Grid */}
+              {cosgynTreatments.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl p-12 text-center space-y-3">
+                  <Sparkles className="w-8 h-8 text-pink-400 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">No CosGyn Specialty Packages Configured</p>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Add Jet Plasma, Tesla Chair, PRP or surgical rejuvenation protocols with custom session counts and pricing.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEditingCosgynTreatment(null);
+                      setCosgynForm({
+                        name: '',
+                        package_combo: '',
+                        jet_plasma_sessions: 0,
+                        jet_plasma_duration_mins: 30,
+                        tesla_chair_sessions: 0,
+                        tesla_chair_duration_mins: 30,
+                        prp_sessions: 0,
+                        price: 25000,
+                      });
+                      setShowCosgynModal(true);
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white font-semibold text-xs rounded-lg shadow-xs"
+                  >
+                    Add First Package
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {cosgynTreatments
+                    .filter((t: any) => {
+                      if (!cosgynSearch) return true;
+                      const q = cosgynSearch.toLowerCase();
+                      return (
+                        (t.name || '').toLowerCase().includes(q) ||
+                        (t.package_combo || '').toLowerCase().includes(q)
+                      );
+                    })
+                    .map((t: any) => (
+                      <div key={t.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3 flex flex-col justify-between hover:border-pink-200 transition-all">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <h3 className="font-bold text-slate-900 text-sm leading-snug">{t.name}</h3>
+                              {t.package_combo && (
+                                <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-pink-50 text-pink-700 border border-pink-100">
+                                  {t.package_combo}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-sm text-pink-600 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200 shrink-0">
+                              {formatCurrency(t.price || 0)}
+                            </span>
+                          </div>
+
+                          {/* Session breakdown pill list */}
+                          <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-[11px] text-slate-600 space-y-1.5">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Protocol Sessions:</div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-600 flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                                  Jet Plasma:
+                                </span>
+                                <span className="font-mono font-bold text-slate-800">
+                                  {t.jet_plasma_sessions > 0
+                                    ? `${t.jet_plasma_sessions} sessions (${t.jet_plasma_duration_mins || 30}m)`
+                                    : 'None'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-600 flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                  Tesla Chair (HIFEM):
+                                </span>
+                                <span className="font-mono font-bold text-slate-800">
+                                  {t.tesla_chair_sessions > 0
+                                    ? `${t.tesla_chair_sessions} sessions (${t.tesla_chair_duration_mins || 30}m)`
+                                    : 'None'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-600 flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                  PRP Revitalization:
+                                </span>
+                                <span className="font-mono font-bold text-slate-800">
+                                  {t.prp_sessions > 0 ? `${t.prp_sessions} sessions` : 'None'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCosgynTreatment(t);
+                              setCosgynForm({
+                                name: t.name,
+                                package_combo: t.package_combo || '',
+                                jet_plasma_sessions: t.jet_plasma_sessions || 0,
+                                jet_plasma_duration_mins: t.jet_plasma_duration_mins || 30,
+                                tesla_chair_sessions: t.tesla_chair_sessions || 0,
+                                tesla_chair_duration_mins: t.tesla_chair_duration_mins || 30,
+                                prp_sessions: t.prp_sessions || 0,
+                                price: t.price || 0,
+                              });
+                              setShowCosgynModal(true);
+                            }}
+                            className="px-2.5 py-1 text-xs text-primary hover:text-primary-mid font-semibold flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCosgynTreatment(t.id, t.name)}
+                            className="px-2.5 py-1 text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -5301,6 +5576,190 @@ export default function SettingsMasterPage() {
                   className="px-4 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm"
                 >
                   Save Package
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CREATE / EDIT COSGYN SPECIALTY PACKAGE                              */}
+      {/* ========================================================================= */}
+      {showCosgynModal && (
+        <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {editingCosgynTreatment ? 'Edit CosGyn Specialty Package' : 'Create CosGyn Specialty Package'}
+                  </h3>
+                  <p className="text-xs text-slate-500">Configure regenerative aesthetic gynecology protocol, modalities & tariff</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCosgynModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCosgynTreatment} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Package Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Postpartum Pelvic Rejuvenation - Gold"
+                  value={cosgynForm.name}
+                  onChange={(e) => setCosgynForm({ ...cosgynForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Protocol / Combo Tag
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Jet Plasma + Tesla Chair HIFEM"
+                    value={cosgynForm.package_combo}
+                    onChange={(e) => setCosgynForm({ ...cosgynForm, package_combo: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                  />
+                  <span className="text-[10px] text-slate-400">Optional descriptive sub-label</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Total Package Tariff (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs text-slate-400 font-semibold">₹</span>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                      value={cosgynForm.price}
+                      onChange={(e) => setCosgynForm({ ...cosgynForm, price: parseFloat(e.target.value) || 0 })}
+                      className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400">Inclusive price billed on prescription</span>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+                    Clinical Modality Sessions
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">Session quotas for patient passbook</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <div className="text-xs font-semibold text-sky-800 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                      Jet Plasma
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500">Sessions</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cosgynForm.jet_plasma_sessions}
+                        onChange={(e) => setCosgynForm({ ...cosgynForm, jet_plasma_sessions: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500">Duration (mins)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cosgynForm.jet_plasma_duration_mins}
+                        onChange={(e) => setCosgynForm({ ...cosgynForm, jet_plasma_duration_mins: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <div className="text-xs font-semibold text-purple-800 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                      Tesla Chair HIFEM
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500">Sessions</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cosgynForm.tesla_chair_sessions}
+                        onChange={(e) => setCosgynForm({ ...cosgynForm, tesla_chair_sessions: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500">Duration (mins)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cosgynForm.tesla_chair_duration_mins}
+                        onChange={(e) => setCosgynForm({ ...cosgynForm, tesla_chair_duration_mins: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <div className="text-xs font-semibold text-rose-800 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                      PRP Revitalization
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500">Sessions</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cosgynForm.prp_sessions}
+                        onChange={(e) => setCosgynForm({ ...cosgynForm, prp_sessions: parseInt(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 pt-2">
+                      Autologous concentrate therapy
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCosgynModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg text-xs hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg shadow-xs text-xs flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {editingCosgynTreatment ? 'Update CosGyn Package' : 'Save CosGyn Package'}
                 </button>
               </div>
             </form>

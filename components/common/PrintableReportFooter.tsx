@@ -58,7 +58,7 @@ export default function PrintableReportFooter({
   const defaultDisclaimer = `This is a certified clinical record generated electronically from ${hospitalName} (${branchName}). In case of acute clinical symptoms, report immediately to the hospital emergency desk.`;
 
   return (
-    <div className={`pt-6 mt-4 border-t border-slate-300 text-xs text-slate-700 page-break-avoid avoid-break space-y-4 ${className}`}>
+    <div className={`pt-4 mt-3 print:pt-2 print:mt-2 border-t border-slate-300 text-xs text-slate-700 page-break-avoid avoid-break space-y-3 print:space-y-1.5 ${className}`}>
       {/* Optional Custom Notes / Instructions */}
       {notes && (
         <div className="text-[11px] text-slate-700 bg-slate-50 p-2.5 rounded border border-slate-200">

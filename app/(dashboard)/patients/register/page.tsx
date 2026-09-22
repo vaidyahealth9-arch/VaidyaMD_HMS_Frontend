@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { toast } from '@/contexts/ToastContext';
-import { Building2, Building, User, Users, AlertTriangle, X, Check, Camera, FileText, UploadCloud, Trash2 } from 'lucide-react';
+import { Building2, Building, User, Users, AlertTriangle, X, Check, Camera, FileText, UploadCloud, Trash2, Barcode } from 'lucide-react';
+import PatientBarcodeModal from '@/components/common/PatientBarcodeModal';
 
 import { isUserDoctor, getUserRoleDisplay } from '@/lib/utils';
 
@@ -17,6 +18,8 @@ export default function RegisterPatientPage() {
   const [error, setError] = useState('');
   const [registrationMode, setRegistrationMode] = useState<'couple' | 'individual'>('couple');
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [registeredSuccessData, setRegisteredSuccessData] = useState<{ primary: any; partner?: any } | null>(null);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
 
   useEffect(() => {
     authApi.listUsers().then((u: any) => {
@@ -235,6 +238,7 @@ export default function RegisterPatientPage() {
       }
 
       // If registered as couple and partner details are entered
+      let partnerRes: any = null;
       if (form.registration_type === 'patient' && registrationMode === 'couple' && partnerForm.name.trim()) {
         const partnerPayload = {
           ...buildPayload(partnerForm, true),
@@ -248,13 +252,13 @@ export default function RegisterPatientPage() {
           marketing_person_name: form.marketing_person_name?.trim() || undefined,
         };
 
-        const partner: any = await patientsApi.create(partnerPayload);
+        partnerRes = await patientsApi.create(partnerPayload);
         // Bidirectional linking
-        await patientsApi.linkPartner(primaryPatient.id, partner.id).catch(() => {});
+        await patientsApi.linkPartner(primaryPatient.id, partnerRes.id).catch(() => {});
       }
 
-      toast.success('Patient Registered', 'Registration successful. Redirecting to EMR profile...');
-      router.push(`/patients/${primaryPatient.id}`);
+      toast.success('Patient Registered', 'Registration completed successfully!');
+      setRegisteredSuccessData({ primary: primaryPatient, partner: partnerRes });
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please review the input fields.');
     } finally {
@@ -798,6 +802,74 @@ export default function RegisterPatientPage() {
           </Link>
         </div>
       </form>
+
+      {/* Registration Success & Quick Barcode Sticker Dialog */}
+      {registeredSuccessData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 text-center">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-inner">
+              <Check className="w-8 h-8 stroke-[2.5]" />
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Registration Complete!</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Patient record successfully created in VaidyaMD HMS
+              </p>
+              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full font-mono text-xs font-bold text-primary">
+                VID: {registeredSuccessData.primary?.vid}
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Patient:</span>
+                <strong className="text-slate-900 uppercase">{registeredSuccessData.primary?.name}</strong>
+              </div>
+              {registeredSuccessData.partner?.name && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Partner / Spouse:</span>
+                  <strong className="text-slate-900 uppercase">{registeredSuccessData.partner.name}</strong>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-500">Phone:</span>
+                <span className="font-mono text-slate-700">{registeredSuccessData.primary?.phone || '—'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBarcodeModal(true)}
+                className="py-2.5 px-4 bg-slate-900 hover:bg-black text-amber-300 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+              >
+                <Barcode className="w-4 h-4" />
+                <span>Print Barcode Stickers</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/patients/${registeredSuccessData.primary.id}`)}
+                className="py-2.5 px-4 bg-primary hover:bg-primary-mid text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+              >
+                Go to EMR Profile →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBarcodeModal && registeredSuccessData && (
+        <PatientBarcodeModal
+          isOpen={showBarcodeModal}
+          onClose={() => setShowBarcodeModal(false)}
+          patient={registeredSuccessData.primary}
+          partner={registeredSuccessData.partner}
+          initialPreset="50x38"
+          initialSampleType="Case File"
+        />
+      )}
     </div>
   );
 }

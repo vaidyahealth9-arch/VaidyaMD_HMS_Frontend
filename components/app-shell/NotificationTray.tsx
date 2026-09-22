@@ -32,10 +32,10 @@ export default function NotificationTray() {
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setIsOpen(false)} />
+      <div className="fixed inset-0 z-40 bg-black/20 print:hidden" onClick={() => setIsOpen(false)} />
 
       {/* Tray Panel */}
-      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-xl z-50 flex flex-col slide-in-right">
+      <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-xl z-50 flex flex-col slide-in-right print:hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-2">

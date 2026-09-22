@@ -62,6 +62,143 @@ export function AmbientScribeProvider({ children }: { children: React.ReactNode 
 
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef<string>('');
+  const lastTargetRef = useRef<{
+    element: HTMLInputElement | HTMLTextAreaElement;
+    selectionStart: number;
+    selectionEnd: number;
+  } | null>(null);
+
+  // Global listener: Record the currently active input/textarea and exact cursor coordinates
+  useEffect(() => {
+    const handleTargetActivity = () => {
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+        const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
+        lastTargetRef.current = {
+          element: inputEl,
+          selectionStart: inputEl.selectionStart ?? inputEl.value.length,
+          selectionEnd: inputEl.selectionEnd ?? inputEl.value.length,
+        };
+      }
+    };
+
+    document.addEventListener('focusin', handleTargetActivity);
+    document.addEventListener('input', handleTargetActivity);
+    document.addEventListener('keyup', handleTargetActivity);
+    document.addEventListener('mouseup', handleTargetActivity);
+    document.addEventListener('selectionchange', handleTargetActivity);
+
+    return () => {
+      document.removeEventListener('focusin', handleTargetActivity);
+      document.removeEventListener('input', handleTargetActivity);
+      document.removeEventListener('keyup', handleTargetActivity);
+      document.removeEventListener('mouseup', handleTargetActivity);
+      document.removeEventListener('selectionchange', handleTargetActivity);
+    };
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setErrorMessage(null);
+    setLastStatus(null);
+  }, []);
+
+  const injectText = useCallback((transcriptText: string) => {
+    if (!transcriptText.trim()) {
+      setErrorMessage('No speech detected.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      // 1. Identify destination input element (active or recently active before mic click)
+      let activeElement: HTMLInputElement | HTMLTextAreaElement | null = null;
+      const currentActive = document.activeElement;
+
+      if (currentActive && (currentActive.tagName === 'INPUT' || currentActive.tagName === 'TEXTAREA')) {
+        activeElement = currentActive as HTMLInputElement | HTMLTextAreaElement;
+      } else if (lastTargetRef.current?.element && document.body.contains(lastTargetRef.current.element)) {
+        activeElement = lastTargetRef.current.element;
+      } else {
+        // Fallback: Primary clinical history textarea on the page
+        activeElement =
+          (document.querySelector('textarea[name="present_history"]') as HTMLTextAreaElement) ||
+          (document.querySelector('textarea[name="chief_complaints"]') as HTMLTextAreaElement) ||
+          (document.querySelector('textarea') as HTMLTextAreaElement) ||
+          (document.querySelector('input[type="text"]') as HTMLInputElement) ||
+          null;
+      }
+
+      if (activeElement) {
+        // Refocus the element so the cursor stays live
+        activeElement.focus();
+
+        const currentText = activeElement.value || '';
+        const savedStart = lastTargetRef.current?.element === activeElement
+          ? lastTargetRef.current.selectionStart
+          : (activeElement.selectionStart ?? currentText.length);
+        const savedEnd = lastTargetRef.current?.element === activeElement
+          ? lastTargetRef.current.selectionEnd
+          : (activeElement.selectionEnd ?? currentText.length);
+
+        const start = Math.min(Math.max(0, savedStart), currentText.length);
+        const end = Math.min(Math.max(start, savedEnd), currentText.length);
+
+        const prefix = currentText.slice(0, start);
+        const suffix = currentText.slice(end);
+
+        const textToInsert =
+          (prefix && !prefix.endsWith(' ') && !prefix.endsWith('\n') ? ' ' : '') +
+          transcriptText.trim();
+        const newText = prefix + textToInsert + suffix;
+
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value'
+        )?.set;
+        const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLTextAreaElement.prototype,
+          'value'
+        )?.set;
+
+        if (activeElement.tagName === 'INPUT' && nativeInputValueSetter) {
+          nativeInputValueSetter.call(activeElement, newText);
+        } else if (activeElement.tagName === 'TEXTAREA' && nativeTextAreaValueSetter) {
+          nativeTextAreaValueSetter.call(activeElement, newText);
+        } else {
+          activeElement.value = newText;
+        }
+
+        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+        activeElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+        const newCursorPos = start + textToInsert.length;
+        activeElement.setSelectionRange(newCursorPos, newCursorPos);
+
+        // Update tracking to the new cursor position
+        lastTargetRef.current = {
+          element: activeElement,
+          selectionStart: newCursorPos,
+          selectionEnd: newCursorPos,
+        };
+
+        setLastStatus('Text inserted at cursor position');
+      } else {
+        navigator.clipboard.writeText(transcriptText.trim());
+        setLastStatus('Copied to clipboard (Click on an input field to dictate directly)');
+      }
+
+      setLiveTranscript('');
+      finalTranscriptRef.current = '';
+      setTimeout(() => setLastStatus(null), 4000);
+    } catch (err: any) {
+      console.error('Insertion error:', err);
+      setErrorMessage(err.message || 'Failed to insert text.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
 
   // Load saved preferences
   useEffect(() => {
@@ -153,65 +290,6 @@ export function AmbientScribeProvider({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  const clearMessages = useCallback(() => {
-    setErrorMessage(null);
-    setLastStatus(null);
-  }, []);
-
-  const injectText = useCallback((transcriptText: string) => {
-    if (!transcriptText.trim()) {
-      setErrorMessage('No speech detected.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setErrorMessage(null);
-
-    try {
-      const activeElement = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
-
-      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-        const start = activeElement.selectionStart || 0;
-        const end = activeElement.selectionEnd || 0;
-        const currentText = activeElement.value || '';
-        const prefix = currentText.slice(0, start);
-        const suffix = currentText.slice(end);
-
-        const textToInsert = (prefix && !prefix.endsWith(' ') ? ' ' : '') + transcriptText.trim();
-        const newText = prefix + textToInsert + suffix;
-
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-
-        if (activeElement.tagName === 'INPUT' && nativeInputValueSetter) {
-          nativeInputValueSetter.call(activeElement, newText);
-        } else if (activeElement.tagName === 'TEXTAREA' && nativeTextAreaValueSetter) {
-          nativeTextAreaValueSetter.call(activeElement, newText);
-        } else {
-          activeElement.value = newText;
-        }
-
-        activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-
-        const newCursorPos = start + textToInsert.length;
-        activeElement.setSelectionRange(newCursorPos, newCursorPos);
-
-        setLastStatus('Text inserted into active field');
-      } else {
-        navigator.clipboard.writeText(transcriptText.trim());
-        setLastStatus('Copied to clipboard (Click on an input field to dictate directly)');
-      }
-
-      setLiveTranscript('');
-      finalTranscriptRef.current = '';
-      setTimeout(() => setLastStatus(null), 4000);
-    } catch (err: any) {
-      console.error('Insertion error:', err);
-      setErrorMessage(err.message || 'Failed to insert text.');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, []);
 
   const startRecording = useCallback((): boolean => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;

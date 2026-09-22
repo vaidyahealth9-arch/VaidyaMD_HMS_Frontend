@@ -368,20 +368,25 @@ export default function StimulationCalendarGrid({
 <meta charset="utf-8"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Arial', sans-serif; font-size: 8pt; color: #111827; background: white; padding: 8mm; }
-  @page { size: A4 landscape; margin: 8mm; }
-  .clinic-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #3730a3; padding-bottom: 8px; margin-bottom: 10px; }
-  .clinic-name { font-size: 14pt; font-weight: 800; color: #3730a3; }
-  .clinic-sub { font-size: 7.5pt; color: #6b7280; margin-top: 2px; }
-  .doc-title { font-size: 11pt; font-weight: 700; color: #4338ca; text-align: right; }
+  @page { size: A4 landscape; margin: 8mm 10mm; }
+  @media print {
+    body { padding: 0 !important; margin: 0 !important; }
+  }
+  body { font-family: 'Arial', sans-serif; font-size: 7.5pt; color: #111827; background: white; padding: 6mm 8mm; }
+  .clinic-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #3730a3; padding-bottom: 6px; margin-bottom: 8px; }
+  .clinic-name { font-size: 13pt; font-weight: 800; color: #3730a3; }
+  .clinic-sub { font-size: 7.5pt; color: #6b7280; margin-top: 1px; }
+  .doc-title { font-size: 10pt; font-weight: 700; color: #4338ca; text-align: right; }
   .doc-sub { font-size: 7.5pt; color: #6b7280; text-align: right; }
-  .meta-bar { display: flex; gap: 16px; font-size: 8pt; margin-bottom: 8px; background: #f8fafc; padding: 6px 10px; border-radius: 4px; border: 0.5pt solid #e2e8f0; }
-  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
-  th { background: #3730a3; color: white; padding: 3pt 4pt; text-align: left; font-weight: 700; font-size: 6.8pt; text-transform: uppercase; letter-spacing: 0.02em; border: 0.5pt solid #4338ca; }
-  td { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #e2e8f0; border-right: 0.5pt solid #f1f5f9; vertical-align: top; }
+  .meta-bar { display: flex; gap: 16px; font-size: 7.5pt; margin-bottom: 6px; background: #f8fafc; padding: 5px 8px; border-radius: 4px; border: 0.5pt solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; font-size: 7pt; }
+  thead { display: table-header-group; }
+  th { background: #3730a3; color: white; padding: 2.5pt 3.5pt; text-align: left; font-weight: 700; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.02em; border: 0.5pt solid #4338ca; }
+  td { padding: 2pt 3.5pt; border-bottom: 0.5pt solid #e2e8f0; border-right: 0.5pt solid #f1f5f9; vertical-align: top; }
+  tr { page-break-inside: avoid; }
   tr:nth-child(even) td { background: #fafafa; }
   .milestone-row td { background: #eff6ff !important; }
-  .footer { margin-top: 14px; padding-top: 6px; border-top: 1pt solid #d1d5db; display: flex; justify-content: space-between; font-size: 7.5pt; color: #6b7280; }
+  .footer { margin-top: 10px; padding-top: 5px; border-top: 1pt solid #d1d5db; display: flex; justify-content: space-between; font-size: 7pt; color: #6b7280; page-break-inside: avoid; }
 </style>
 </head><body>
 <div class="clinic-header">
@@ -422,6 +427,7 @@ export default function StimulationCalendarGrid({
 </body></html>`);
     win.document.close();
     win.focus();
+    win.onafterprint = () => { win.close(); };
     setTimeout(() => { win.print(); }, 400);
   };
 

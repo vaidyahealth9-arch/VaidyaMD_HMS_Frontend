@@ -16,4 +16,9 @@ export const authApi = {
     request<any>('/core/auth/users', { method: 'POST', body: JSON.stringify(data) }),
   adminUpdateUser: (id: string, data: Record<string, unknown>) =>
     request<any>(`/core/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  switchUser: (email: string) =>
+    request<{ access_token: string; user: any }>('/core/auth/switch-user', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 };

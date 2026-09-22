@@ -31,6 +31,9 @@ import {
   HeartHandshake,
   Eye,
   ClipboardList,
+  Heart,
+  Baby,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -99,7 +102,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   const [localAlerts, setLocalAlerts] = useState<string[] | null>(null);
   const [sidebarTab, setSidebarTab] = useState<'consultations' | 'counseling'>('consultations');
   const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
-  const [historyProformaOpen, setHistoryProformaOpen] = useState(false);
+  const [clinicalHistoryTemplate, setClinicalHistoryTemplate] = useState<'standard' | 'fertility' | 'gynaecology' | 'obstetric'>('standard');
 
   // Fetch Counselor Notes for selected patient
   const { data: counselingNotes = [] } = useQuery<CounselingNote[]>({
@@ -312,6 +315,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       future_consultation_notes: '',
       medications: [{ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' }],
       follow_up: '1_week',
+      clinical_proforma: null as any,
     },
   });
 
@@ -884,18 +888,6 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 <span className="hidden sm:inline">Templates Studio</span>
               </Button>
 
-              {/* Clinical History Proforma Modal Trigger */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setHistoryProformaOpen(true)}
-                className="gap-1.5 text-xs font-bold bg-[#2878a8]/10 text-[#2878a8] border-[#2878a8]/30 hover:bg-[#2878a8]/20 rounded-md h-8 shadow-2xs"
-                title="Open Comprehensive History Proforma (Fertility, Gynaecology, Obstetric)"
-              >
-                <ClipboardList className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">History Proformas</span>
-              </Button>
-
               <Button
                 variant="outline"
                 size="sm"
@@ -1455,64 +1447,154 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 )}
               </div>
 
-              {/* SECTION 1: Subjective / Clinical History (Collapsible Card) */}
-              <Card className="border-slate-200 shadow-sm">
+              {/* SECTION 1: Subjective / Clinical History (Collapsible Card with Inline Template Support) */}
+              <Card id="clinical-history-section" className="border-slate-200 shadow-sm scroll-mt-20">
                 <CardHeader
-                  className="py-3 px-4 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between cursor-pointer select-none"
+                  className="py-3 px-4 border-b border-slate-100 bg-slate-50/70 flex flex-wrap gap-2 items-center justify-between cursor-pointer select-none"
                   onClick={() => setIsHistorySectionExpanded(!isHistorySectionExpanded)}
                 >
-                  <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                    Clinical History &amp; Subjective Assessment
-                  </CardTitle>
-                  <button type="button" className="text-slate-400 hover:text-slate-600">
-                    {isHistorySectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                      Clinical History &amp; Subjective Assessment
+                    </CardTitle>
+                    {clinicalHistoryTemplate !== 'standard' && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2878a8]/10 text-[#2878a8] border border-[#2878a8]/20 capitalize">
+                        {clinicalHistoryTemplate} Template Active
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* Template Mode Switcher right on Section 1 */}
+                    <div className="flex items-center bg-slate-200/80 p-0.5 rounded-md text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setClinicalHistoryTemplate('standard')}
+                        className={`px-2.5 py-1 rounded transition-all ${
+                          clinicalHistoryTemplate === 'standard'
+                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Free-text Chief Complaints & Present History"
+                      >
+                        Free-text
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClinicalHistoryTemplate('fertility')}
+                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
+                          clinicalHistoryTemplate === 'fertility'
+                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Structured Fertility Assessment & Couple Proforma"
+                      >
+                        <Heart className="w-3 h-3 text-rose-500" />
+                        <span>Fertility</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClinicalHistoryTemplate('gynaecology')}
+                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
+                          clinicalHistoryTemplate === 'gynaecology'
+                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Structured Gynaecology Clinical History"
+                      >
+                        <Activity className="w-3 h-3 text-violet-500" />
+                        <span>Gynaecology</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClinicalHistoryTemplate('obstetric')}
+                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
+                          clinicalHistoryTemplate === 'obstetric'
+                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Structured Obstetric Antenatal Record"
+                      >
+                        <Baby className="w-3 h-3 text-emerald-500" />
+                        <span>Obstetric</span>
+                      </button>
+                    </div>
+
+                    <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+                      {isHistorySectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </CardHeader>
+
                 {isHistorySectionExpanded && (
                   <CardContent className="p-4 space-y-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Chief Complaints <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        {...register('chief_complaints', { required: true })}
-                        rows={2}
-                        placeholder="e.g. Primary subfertility for 3 years, irregular menses..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      />
-                    </div>
+                    {clinicalHistoryTemplate === 'standard' ? (
+                      /* Mode A: Standard Free-text Textareas */
+                      <>
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 block mb-1">
+                            Chief Complaints <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            {...register('chief_complaints', { required: true })}
+                            rows={2}
+                            placeholder="e.g. Primary subfertility for 3 years, irregular menses..."
+                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                          />
+                        </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Present History</label>
-                        <textarea
-                          {...register('present_history')}
-                          rows={20}
-                          placeholder="Detailed chronological history of present illness..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Present History</label>
+                            <textarea
+                              {...register('present_history')}
+                              rows={12}
+                              placeholder="Detailed chronological history of present illness..."
+                              className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Previous History</label>
+                            <textarea
+                              {...register('previous_history')}
+                              rows={5}
+                              placeholder="Previous hospitalizations, surgeries, drug allergies..."
+                              className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 block mb-1">Previous Investigations</label>
+                          <textarea
+                            {...register('previous_investigations')}
+                            rows={2}
+                            placeholder="Past reports and imaging..."
+                            className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      /* Mode B: Structured Clinical Template replacing the Free-Text inputs directly inline */
+                      <div className="-mx-4 -my-4 border-t border-slate-200">
+                        <ClinicalHistoryProformaModal
+                          patient={patient}
+                          partner={patient?.partner}
+                          inline={true}
+                          initialType={clinicalHistoryTemplate}
+                          onClose={() => setClinicalHistoryTemplate('standard')}
+                          onDataChange={(proformaData, summary) => {
+                            if (summary.complaints) setValue('chief_complaints', summary.complaints);
+                            if (summary.history) setValue('present_history', summary.history);
+                            if (summary.pastHistory) setValue('previous_history', summary.pastHistory);
+                            if (summary.exam) setValue('examination', summary.exam);
+                            if (proformaData.finalDiagnosis) setValue('provisional_diagnosis', proformaData.finalDiagnosis);
+                            setValue('clinical_proforma', proformaData);
+                          }}
                         />
                       </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Previous History</label>
-                        <textarea
-                          {...register('previous_history')}
-                          rows={6}
-                          placeholder="Previous hospitalizations, surgeries, drug allergies..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Previous Investigations</label>
-                      <textarea
-                        {...register('previous_investigations')}
-                        rows={2}
-                        placeholder="Past reports and imaging..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      />
-                    </div>
+                    )}
                   </CardContent>
                 )}
               </Card>
@@ -2267,18 +2349,6 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         </div>
       )}
 
-      {/* Interactive Clinical History Proforma Modal */}
-      {historyProformaOpen && (
-        <ClinicalHistoryProformaModal
-          patient={patient}
-          partner={patient?.partner}
-          onClose={() => setHistoryProformaOpen(false)}
-          onSaved={() => {
-            queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
-            queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
-          }}
-        />
-      )}
     </div>
   );
 }

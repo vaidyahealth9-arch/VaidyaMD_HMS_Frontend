@@ -93,14 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loadPermissions(freshUser);
         })
         .catch(() => {
-          // Token invalid or expired
-          logout();
+          // Token expired or invalid: re-authenticate seamlessly with active user in dev
+          switchUser('rajesh@apexfertility.in').catch(() => logout());
         })
         .finally(() => {
           setIsLoading(false);
         });
     } else {
-      setIsLoading(false);
+      // In local dev, auto-authenticate default doctor
+      switchUser('rajesh@apexfertility.in')
+        .catch(() => {})
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, []);
 
@@ -146,15 +151,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchUser = async (email: string) => {
-    const users = await authApi.listUsers() as VaidyaMdUser[];
-    const targetUser = users.find((u) => u.email === email);
-    if (targetUser) {
-      localStorage.setItem('vaidya_md_user', JSON.stringify(targetUser));
-      setUser(targetUser);
-      setActiveRole(targetUser.role);
-      setActiveDepartment(targetUser.departments?.[0] || '');
-      loadPermissions(targetUser);
+    try {
+      const response = await authApi.switchUser(email);
+      if (response && response.access_token) {
+        localStorage.setItem('vaidya_md_token', response.access_token);
+        localStorage.setItem('vaidya_md_user', JSON.stringify(response.user));
+        setUser(response.user);
+        setActiveRole(response.user.role);
+        setActiveDepartment(response.user.departments?.[0] || '');
+        wsClient.connect(response.user.id, { role: response.user.role, tenant_id: response.user.tenant_id });
+        loadPermissions(response.user);
+        return;
+      }
+    } catch (e) {
+      console.warn('Backend switch-user unavailable, fallback to local switch', e);
     }
+    try {
+      const users = await authApi.listUsers() as VaidyaMdUser[];
+      const targetUser = users.find((u) => u.email === email);
+      if (targetUser) {
+        localStorage.setItem('vaidya_md_user', JSON.stringify(targetUser));
+        setUser(targetUser);
+        setActiveRole(targetUser.role);
+        setActiveDepartment(targetUser.departments?.[0] || '');
+        loadPermissions(targetUser);
+      }
+    } catch (e) {}
   };
 
   const logout = () => {

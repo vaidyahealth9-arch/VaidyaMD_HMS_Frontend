@@ -102,7 +102,7 @@ export default function MockETPage() {
   const selectCls = `${inputCls} cursor-pointer`;
 
   return (
-    <div className="min-h-screen bg-surface-muted print:bg-white">
+    <div className="min-h-screen print:min-h-0 bg-surface-muted print:bg-white">
       {/* Top bar */}
       <div className="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 print:hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -300,16 +300,6 @@ export default function MockETPage() {
           </div>
         </div>
       </div>
-
-      {/* Print styles */}
-      <style jsx global>{`
-        @media print {
-          .print\\:hidden { display: none !important; }
-          body { background: white; }
-          .rounded-2xl { border-radius: 0; }
-          .shadow-lg, .shadow-sm, .shadow { box-shadow: none; }
-        }
-      `}</style>
     </div>
   );
 }

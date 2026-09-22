@@ -668,7 +668,7 @@ export default function DonorEmbryoTransferModal({
             </div>
           ) : (
             /* Print Preview */
-            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-0 print:m-0 print:border-none print:shadow-none">
               <PrintableReportHeader
                 title="Donor Embryo Transfer (FET) — Official Laboratory Record"
                 subtitle="VaidyaMD Assisted Conception & Donor Gamete BioBank · ART Act 2021 Accredited"

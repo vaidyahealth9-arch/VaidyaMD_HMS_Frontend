@@ -197,9 +197,10 @@ export default function AmbientScribeWidget() {
           top: `${currentY}px`,
           [isRight ? 'right' : 'left']: 0,
         }}
-        className="fixed z-40 select-none group pointer-events-auto"
+        className="fixed z-40 select-none group pointer-events-auto print:hidden"
       >
         <div
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             if (isRecording) {
               setIsExpanded(true);
@@ -237,6 +238,7 @@ export default function AmbientScribeWidget() {
           {/* Undock button */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.stopPropagation();
               setIsDocked(false);
@@ -261,7 +263,7 @@ export default function AmbientScribeWidget() {
         transform: `translate3d(${currentX}px, ${currentY}px, 0)`,
         touchAction: 'none',
       }}
-      className={`fixed top-0 left-0 z-40 select-none pointer-events-auto transition-shadow ${
+      className={`fixed top-0 left-0 z-40 select-none pointer-events-auto transition-shadow print:hidden ${
         isDragging ? 'cursor-grabbing opacity-90 scale-[1.02]' : 'cursor-grab'
       }`}
       onPointerDown={handlePointerDown}
@@ -388,6 +390,7 @@ export default function AmbientScribeWidget() {
               <div className="flex items-center gap-1.5">
                 <Button
                   size="sm"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={toggleRecording}
                   disabled={isProcessing}
                   className={`text-xs font-bold h-7 px-3 rounded-lg shadow-sm gap-1.5 ${
@@ -425,6 +428,7 @@ export default function AmbientScribeWidget() {
                   ? 'w-12 h-12 bg-rose-600 text-white border-2 border-white ring-4 ring-rose-500/30 animate-pulse cursor-pointer'
                   : 'w-11 h-11 bg-gradient-to-tr from-[rgb(var(--clr-primary))] via-[#0B4F6C] to-emerald-600 text-white border-2 border-white/80 hover:scale-105 hover:shadow-2xl cursor-pointer'
               }`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleRecording();
@@ -448,6 +452,7 @@ export default function AmbientScribeWidget() {
               {/* Small Expand Button On Hover */}
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsCollapsed(false);
@@ -478,6 +483,7 @@ export default function AmbientScribeWidget() {
             {/* Primary Voice Scribe Toggle Button */}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleRecording();
@@ -515,6 +521,7 @@ export default function AmbientScribeWidget() {
             {/* Expand / Details Toggle Button */}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
@@ -530,6 +537,7 @@ export default function AmbientScribeWidget() {
             {/* Quick Paste Notes Button */}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 setShowManualModal(true);
@@ -543,6 +551,7 @@ export default function AmbientScribeWidget() {
             {/* Collapse to Floating FAB Button */}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsCollapsed(true);

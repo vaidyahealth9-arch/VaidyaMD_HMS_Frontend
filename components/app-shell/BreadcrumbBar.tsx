@@ -210,6 +210,7 @@ export default function TopBar() {
           <Button
             variant="ghost"
             size="sm"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={toggleRecording}
             className="gap-1.5 h-8 px-2.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 animate-pulse rounded-md"
             title="Scribe Recording Active — Click to Stop & Insert (Alt+D)"
@@ -224,6 +225,7 @@ export default function TopBar() {
               <Button
                 variant="ghost"
                 size="sm"
+                onMouseDown={(e) => e.preventDefault()}
                 className="gap-1.5 h-8 px-2 text-xs font-medium text-text-muted hover:text-text-main hidden sm:flex"
                 title="Ambient AI Scribe (Alt+D)"
               >
@@ -239,6 +241,7 @@ export default function TopBar() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={toggleRecording}
                 className="text-xs font-medium cursor-pointer gap-2"
               >

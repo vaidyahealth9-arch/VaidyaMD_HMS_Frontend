@@ -647,7 +647,7 @@ export default function SpermPreparationModal({
             </div>
           ) : (
             /* Print Preview */
-            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-6 print:border-none">
+            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-0 print:m-0 print:border-none print:shadow-none">
               <PrintableReportHeader
                 title="Semen Analysis & Sperm Preparation Report"
                 subtitle="VaidyaMD Fertility & Andrology Laboratory · Sparta Clinical Suite"

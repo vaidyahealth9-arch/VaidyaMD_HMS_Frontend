@@ -144,13 +144,13 @@ export default function MultiDocumentUploader({
         prev.map((row) =>
           row.id === id
             ? {
-                ...row,
-                file_obj: file,
-                file_name: file.name,
-                file_data: reader.result as string,
-                file_size: (file.size / 1024).toFixed(1) + ' KB',
-                mime_type: file.type || 'application/pdf',
-              }
+              ...row,
+              file_obj: file,
+              file_name: file.name,
+              file_data: reader.result as string,
+              file_size: (file.size / 1024).toFixed(1) + ' KB',
+              mime_type: file.type || 'application/pdf',
+            }
             : row
         )
       );
@@ -177,7 +177,7 @@ export default function MultiDocumentUploader({
           : (known?.label || row.file_name || 'Document');
 
         const targetPatientId = (row.target_patient === 'partner' && partnerId) ? partnerId : primaryPatientId;
-        
+
         let storedFilePath = row.file_data;
         if ((row as any).file_obj) {
           try {
@@ -201,7 +201,7 @@ export default function MultiDocumentUploader({
         });
       }
 
-      
+
       setDocUploadRows([
         {
           id: 'doc-row-' + Math.random().toString(36).substring(2, 9),
@@ -244,7 +244,7 @@ export default function MultiDocumentUploader({
           }}
           className="px-3 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary font-bold text-xs rounded-md border border-primary/20 transition-colors flex items-center gap-1"
         >
-          <Plus className="w-3.5 h-3.5" /> + Add Document Row
+          <Plus className="w-3.5 h-3.5" /> Add Document Row
         </button>
       </div>
 

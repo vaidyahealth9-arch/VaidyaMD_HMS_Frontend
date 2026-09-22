@@ -203,14 +203,14 @@ export default function PrintablePrescription({
               )}
               {hopi && (
                 <div>
-                  <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>HOPI: </span>
-                  <span className="text-xs" style={{ color: '#374151' }}>{hopi}</span>
+                  <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>HOPI / Clinical History: </span>
+                  <div className="text-xs whitespace-pre-line mt-0.5" style={{ color: '#374151' }}>{hopi}</div>
                 </div>
               )}
               {pastHistory && (
                 <div>
                   <span className="font-semibold text-[10px] uppercase tracking-wider" style={{ color: '#6b7280' }}>Past Medical / Surgical History: </span>
-                  <span className="text-xs" style={{ color: '#374151' }}>{pastHistory}</span>
+                  <div className="text-xs whitespace-pre-line mt-0.5" style={{ color: '#374151' }}>{pastHistory}</div>
                 </div>
               )}
             </div>

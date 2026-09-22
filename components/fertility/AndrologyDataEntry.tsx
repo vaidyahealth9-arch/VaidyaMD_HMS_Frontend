@@ -1070,7 +1070,7 @@ export default function AndrologyDataEntry({
             </div>
 
             {/* Printable Document Body */}
-            <div className="p-8 space-y-6 printable-document print:p-6 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
+            <div className="p-8 space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
               <PrintableReportHeader
                 title={activeTab === 'casa' ? 'CASA SEMEN ANALYSIS REPORT' : 'ROUTINE SEMEN ANALYSIS REPORT'}
                 subtitle="Computer-Assisted Sperm Analysis — Laboratory Diagnostic Report"

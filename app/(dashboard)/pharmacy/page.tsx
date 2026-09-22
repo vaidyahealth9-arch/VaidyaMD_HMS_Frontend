@@ -73,6 +73,8 @@ export default function PharmacyPage() {
   
   const [posDiscount, setPosDiscount] = useState<number>(0);
   const [posAmountPaid, setPosAmountPaid] = useState<number | ''>('');
+  const [posPaymentMode, setPosPaymentMode] = useState<string>('Cash');
+  const [posPaymentRef, setPosPaymentRef] = useState<string>('');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -139,7 +141,8 @@ export default function PharmacyPage() {
     const num = (inv.invoice_number || '').toLowerCase();
     const patName = (inv.patient_name || '').toLowerCase();
     const patVid = (inv.patient_vid || inv.patient_mrn || '').toLowerCase();
-    return num.includes(q) || patName.includes(q) || patVid.includes(q);
+    const payMode = (inv.payment_method || '').toLowerCase();
+    return num.includes(q) || patName.includes(q) || patVid.includes(q) || payMode.includes(q);
   });
 
   const openPrintFromPOS = (invData: any) => {
@@ -158,7 +161,8 @@ export default function PharmacyPage() {
       })),
       subtotal: invData.total_amount || 0,
       total_amount: invData.total_amount || 0,
-      paid_amount: invData.total_amount || 0,
+      paid_amount: invData.paid_amount || invData.total_amount || 0,
+      payment_method: invData.payment_method || posPaymentMode || 'Cash',
       pending_due: 0,
     });
   };
@@ -185,6 +189,7 @@ export default function PharmacyPage() {
       pending_due: inv.pending_due || 0,
       discount: inv.discount || 0,
       wallet_amount_used: inv.wallet_amount_used || 0,
+      payment_method: inv.payment_method || 'Cash',
     });
   };
 
@@ -322,6 +327,8 @@ export default function PharmacyPage() {
         notes: 'Dispensed via Point of Sale counter',
         discount: posDiscount,
         amount_paid: posAmountPaid === '' ? Math.max(0, cartTotal - posDiscount) : Number(posAmountPaid),
+        payment_method: posPaymentMode,
+        payment_ref: posPaymentRef ? posPaymentRef.trim() : undefined,
       });
     },
     onSuccess: (data: any) => {
@@ -331,8 +338,10 @@ export default function PharmacyPage() {
       setPosCart([]);
       setPosDiscount(0);
       setPosAmountPaid('');
+      setPosPaymentMode('Cash');
+      setPosPaymentRef('');
       setDispensedInvoice(data);
-      setActionSuccess(`Prescription successfully dispensed! Invoice #${data.invoice_number} created.`);
+      setActionSuccess(`Prescription successfully dispensed! Invoice #${data.invoice_number} created (Mode: ${data.payment_method || posPaymentMode}).`);
       setTimeout(() => setActionSuccess(null), 8000);
     },
     onError: (err: any) => {
@@ -779,6 +788,39 @@ export default function PharmacyPage() {
                         className="h-7 text-xs w-24 text-right bg-white border-emerald-200"
                       />
                     </div>
+
+                    {/* Payment Mode Selector for Records */}
+                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-700 font-bold">Mode of Payment:</span>
+                        <select
+                          value={posPaymentMode}
+                          onChange={(e) => setPosPaymentMode(e.target.value)}
+                          className="h-7 text-xs font-semibold bg-white border border-slate-300 rounded px-2 text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI / QR Code</option>
+                          <option value="Card">Credit / Debit Card</option>
+                          <option value="Net Banking">Net Banking</option>
+                          <option value="Cheque">Cheque</option>
+                          <option value="Insurance">Insurance / TPA</option>
+                          <option value="Wallet">Advance Wallet</option>
+                        </select>
+                      </div>
+
+                      {posPaymentMode !== 'Cash' && (
+                        <div className="flex items-center justify-between text-xs gap-2 pt-1 border-t border-slate-200/60">
+                          <span className="text-slate-500 text-[11px] flex-shrink-0">Txn / Ref No:</span>
+                          <Input
+                            type="text"
+                            value={posPaymentRef}
+                            onChange={(e) => setPosPaymentRef(e.target.value)}
+                            placeholder={posPaymentMode === 'UPI' ? 'UPI Ref / UTR' : posPaymentMode === 'Card' ? 'Card Last 4 digits' : 'Reference / Cheque No'}
+                            className="h-6 text-xs bg-white text-slate-800"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {can('action:dispense_pharmacy') ? (
                     <Button
@@ -862,6 +904,7 @@ export default function PharmacyPage() {
                   <th className="p-3.5">Dispensed Medication(s)</th>
                   <th className="p-3.5 text-center">Date &amp; Time</th>
                   <th className="p-3.5 text-right">Billed Amount</th>
+                  <th className="p-3.5 text-center">Payment Mode</th>
                   <th className="p-3.5 text-center">Payment Status</th>
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
@@ -869,7 +912,7 @@ export default function PharmacyPage() {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {invoicesLoading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-slate-400">
+                    <td colSpan={8} className="text-center py-8 text-slate-400">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                         <span>Loading pharmacy invoices...</span>
@@ -878,7 +921,7 @@ export default function PharmacyPage() {
                   </tr>
                 ) : filteredPharmacyInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-slate-400">
+                    <td colSpan={8} className="text-center py-10 text-slate-400">
                       <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
                       <p className="font-semibold text-slate-600">No Pharmacy Bills Found</p>
                       <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
@@ -921,6 +964,11 @@ export default function PharmacyPage() {
                         </td>
                         <td className="p-3.5 text-right font-bold text-slate-900 font-mono">
                           {formatCurrency(inv.total_amount)}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-sky-50 text-sky-800 border border-sky-200">
+                            {inv.payment_method || 'Cash'}
+                          </span>
                         </td>
                         <td className="p-3.5 text-center">
                           <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
