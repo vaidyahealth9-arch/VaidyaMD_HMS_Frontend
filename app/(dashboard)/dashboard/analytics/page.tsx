@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import PageLayout from '@/components/common/PageLayout';
 import { analyticsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -239,7 +240,7 @@ export default function AnalyticsPage() {
   const cyclesByType = clinicalData?.by_treatment_type || {};
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -961,6 +962,6 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageLayout>
   );
 }

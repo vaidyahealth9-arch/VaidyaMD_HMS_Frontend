@@ -40,6 +40,7 @@ import {
 } from '@/shared/ui/sheet';
 import { formatDateTime } from '@/lib/utils';
 import ManualDiagnosticEntry from '@/components/lims/ManualDiagnosticEntry';
+import PageLayout from '@/components/common/PageLayout';
 
 export default function LimsPage() {
   const { user } = useAuth();
@@ -117,7 +118,7 @@ export default function LimsPage() {
   const authorizedCount = worklist.filter((w: any) => w.status === 'Authorized').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -444,7 +445,7 @@ export default function LimsPage() {
           initialPatientId={initialPatientIdForManualForm}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
 

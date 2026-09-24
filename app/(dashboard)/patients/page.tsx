@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Download, Plus, Search, Building2, User } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import AddToOPDModal from '@/components/opd/AddToOPDModal';
+import PageLayout from '@/components/common/PageLayout';
 
 export default function PatientsPage() {
   const { currentBranch, user } = useAuth();
@@ -90,7 +91,7 @@ export default function PatientsPage() {
   };
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -306,6 +307,6 @@ export default function PatientsPage() {
         onClose={() => setOpdModalPatient(null)}
         patient={opdModalPatient}
       />
-    </div>
+    </PageLayout>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveLogoUrl } from '@/components/common/PrintableReportHeader';
+import PageLayout from '@/components/common/PageLayout';
 import DynamicForm from '@/components/dynamic-form/DynamicForm';
 import {
   Building2,
@@ -59,6 +60,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  Globe,
+  Clock,
+  Palette,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -262,7 +266,7 @@ export const getPurposeBadgeStyle = (purpose: TemplatePurpose) => {
 };
 
 export default function SettingsMasterPage() {
-  const { user } = useAuth();
+  const { user, currentBranch, setCurrentBranch } = useAuth();
   const [activeTab, setActiveTab] = useState<
     'hospital' | 'staff' | 'tariffs' | 'ipd' | 'cycles' | 'templates' | 'labs' | 'pharmacy' | 'profiles' | 'csv_hub'
   >('hospital');
@@ -317,8 +321,16 @@ export default function SettingsMasterPage() {
     cin: '',
     art_reg_number: '',
     cea_reg_number: '',
+    header_bold_color: '#4A2E2B',
+    header_small_color: '#C29B7F',
+    pad_header_height_mm: 35,
+    pad_footer_height_mm: 25,
+    watermark_url: '',
+    watermark_opacity: 0.08,
     disclaimer: 'Valid for statutory compliance and official healthcare documentation.',
   });
+  const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
+  const watermarkInputRef = useRef<HTMLInputElement | null>(null);
 
   // ==========================================
   // 2. STAFF USER ROSTER STATE
@@ -676,6 +688,12 @@ export default function SettingsMasterPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [conflictMode, setConflictMode] = useState<'overwrite' | 'skip'>('overwrite');
   const [isImporting, setIsImporting] = useState(false);
+  const [isPreviewingCsv, setIsPreviewingCsv] = useState(false);
+  const [csvPreviewData, setCsvPreviewData] = useState<any | null>(null);
+  const [csvPreviewRows, setCsvPreviewRows] = useState<any[]>([]);
+  const [csvPreviewFilter, setCsvPreviewFilter] = useState<'all' | 'overrides' | 'new'>('all');
+  const [editingCsvRowIndex, setEditingCsvRowIndex] = useState<number | null>(null);
+  const [editingCsvRowForm, setEditingCsvRowForm] = useState<any>({});
   const [importResult, setImportResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -692,7 +710,7 @@ export default function SettingsMasterPage() {
         setHospitalBranches(brs);
         if (brs.length > 0) {
           const mainBr = brs.find((b) => b.is_main_branch) || brs[0];
-          setLiveReceiptHeader(mainBr.receipt_header || {});
+          setLiveReceiptHeader((prev: any) => ({ ...prev, ...(mainBr.receipt_header || {}) }));
         }
       })
       .catch(() => {});
@@ -794,7 +812,7 @@ export default function SettingsMasterPage() {
   useEffect(() => {
     if (hospitalBranches[selectedBranchIndex]) {
       const b = hospitalBranches[selectedBranchIndex];
-      setLiveReceiptHeader(b.receipt_header || {});
+      setLiveReceiptHeader((prev: any) => ({ ...prev, ...(b.receipt_header || {}) }));
     }
   }, [selectedBranchIndex, hospitalBranches]);
 
@@ -1090,6 +1108,10 @@ export default function SettingsMasterPage() {
       adminApi.getHospitalProfile().then((data) => {
         setHospitalProfile(data.hospital);
         setHospitalBranches(data.branches || []);
+        if (data.branches && data.branches.length > 0 && setCurrentBranch) {
+          const matchingBranch = data.branches.find((b: any) => b.id === curBranch?.id) || data.branches[0];
+          setCurrentBranch(matchingBranch);
+        }
       });
     } catch (e: any) {
       alert(e.message || 'Failed to save hospital settings');
@@ -1098,10 +1120,36 @@ export default function SettingsMasterPage() {
     }
   };
 
-  // Logo Upload Handler
+  // Logo Upload Handler — validates pixel dimensions first
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate dimensions before uploading
+    const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => { resolve({ width: 0, height: 0 }); URL.revokeObjectURL(url); };
+      img.src = url;
+    });
+
+    const MIN_W = 400, MAX_W = 2400, MIN_H = 60, MAX_H = 600;
+    if (dims.width < MIN_W || dims.width > MAX_W || dims.height < MIN_H || dims.height > MAX_H) {
+      alert(
+        `Logo dimensions out of range.\n\n` +
+        `Your image: ${dims.width} × ${dims.height} px\n` +
+        `Required: width ${MIN_W}–${MAX_W} px, height ${MIN_H}–${MAX_H} px\n\n` +
+        `Please crop or resize the image and try again.\n` +
+        `(A horizontal/landscape logo 800–1600 px wide and 120–300 px tall works best.)`
+      );
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingLogo(true);
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
@@ -1129,12 +1177,50 @@ export default function SettingsMasterPage() {
       } catch (saveErr) {
         console.warn('Auto-persist logo notice:', saveErr);
       }
-      alert('Hospital logo uploaded and updated successfully!');
+      alert(`Hospital logo uploaded successfully! (${dims.width} × ${dims.height} px)`);
     } catch (err: any) {
       alert('Failed to upload logo: ' + (err.message || 'Unknown error'));
     } finally {
       setIsUploadingLogo(false);
     }
+  };
+
+  // Watermark / Background Image Upload Handler
+  const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingWatermark(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('document_type', 'letterhead_watermark');
+      formData.append('category', 'branding');
+      const apiBase = getApiBase();
+      const res = await fetch(`${apiBase}/core/documents/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
+        throw new Error(err.detail || 'Upload failed');
+      }
+      const data = await res.json();
+      const newWatermark = data.url;
+      setLiveReceiptHeader((prev: any) => ({ ...prev, watermark_url: newWatermark }));
+      alert('Watermark background image uploaded successfully! View the live preview on the right.');
+    } catch (err: any) {
+      alert('Failed to upload watermark image: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsUploadingWatermark(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveWatermark = () => {
+    setLiveReceiptHeader((prev: any) => ({ ...prev, watermark_url: '' }));
   };
 
   // CSV Hub Authenticated Download Handler
@@ -1818,14 +1904,109 @@ export default function SettingsMasterPage() {
     }
   };
 
+  const handleFileSelectForImport = async (file: File, mode: 'overwrite' | 'skip' = conflictMode) => {
+    setImportFile(file);
+    setIsPreviewingCsv(true);
+    setImportResult(null);
+    setCsvPreviewData(null);
+    setCsvPreviewRows([]);
+    setEditingCsvRowIndex(null);
+
+    try {
+      const res = await adminApi.previewCsv(importDomainModal.key, file, mode);
+      setCsvPreviewData(res);
+      setCsvPreviewRows(res.stats?.preview_rows || []);
+    } catch (err: any) {
+      // Fallback client-side parsing if backend preview gives an error
+      try {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length > 1) {
+          const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+          const fallbackRows = lines.slice(1).map((line, idx) => {
+            const vals = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+            const rowObj: any = {};
+            headers.forEach((h, i) => {
+              rowObj[h] = vals[i] || '';
+            });
+            return {
+              row_index: idx + 1,
+              identifier: vals[0] || `Row ${idx + 1}`,
+              name: vals[1] || vals[0] || `Item ${idx + 1}`,
+              action: 'create',
+              is_override: false,
+              details: 'Ready to insert.',
+              raw: rowObj,
+            };
+          });
+          setCsvPreviewRows(fallbackRows);
+          setCsvPreviewData({
+            stats: {
+              total_rows: fallbackRows.length,
+              to_create: fallbackRows.length,
+              inserted: fallbackRows.length,
+              to_update: 0,
+              updated: 0,
+              to_skip: 0,
+              skipped: 0,
+              preview_rows: fallbackRows,
+            },
+          });
+        }
+      } catch (clientErr) {
+        alert(err.message || 'Failed to preview CSV file');
+      }
+    } finally {
+      setIsPreviewingCsv(false);
+    }
+  };
+
+  const handleConflictModeChange = async (newMode: 'overwrite' | 'skip') => {
+    setConflictMode(newMode);
+    if (importFile && importDomainModal) {
+      handleFileSelectForImport(importFile, newMode);
+    }
+  };
+
   const handleExecuteCsvImport = async () => {
-    if (!importDomainModal || !importFile) return;
+    if (!importDomainModal || (!importFile && csvPreviewRows.length === 0)) return;
     setIsImporting(true);
     setImportResult(null);
     try {
-      const res = await adminApi.importCsv(importDomainModal.key, importFile, conflictMode);
-      setImportResult(res);
-      alert(`Import completed successfully: ${res.stats?.inserted || 0} inserted, ${res.stats?.updated || 0} updated, ${res.stats?.skipped || 0} skipped.`);
+      let fileToUpload: File | Blob = importFile!;
+      // If rows were edited or modified, reconstruct CSV Blob
+      if (csvPreviewRows.length > 0 && importDomainModal.headers) {
+        const headers: string[] = importDomainModal.headers;
+        const csvLines = [headers.join(',')];
+        for (const row of csvPreviewRows) {
+          const rowVals = headers.map((h) => {
+            const val = String(row.raw?.[h] ?? '');
+            if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+              return `"${val.replace(/"/g, '""')}"`;
+            }
+            return val;
+          });
+          csvLines.push(rowVals.join(','));
+        }
+        fileToUpload = new Blob([csvLines.join('\r\n')], { type: 'text/csv' });
+      }
+
+      const res = await adminApi.importCsv(importDomainModal.key, fileToUpload, conflictMode, false);
+      const inserted = res.stats?.inserted ?? res.stats?.created ?? 0;
+      const updated = res.stats?.updated ?? 0;
+      const skipped = res.stats?.skipped ?? 0;
+      const normalizedResult = {
+        ...res,
+        stats: {
+          ...res.stats,
+          inserted,
+          updated,
+          skipped,
+          total_rows: res.stats?.total_rows ?? csvPreviewRows.length,
+        },
+      };
+      setImportResult(normalizedResult);
+      alert(`Import completed successfully: ${inserted} inserted, ${updated} updated, ${skipped} skipped.`);
       loadInitialData();
     } catch (e: any) {
       alert(e.message || 'CSV Ingestion failed');
@@ -1858,7 +2039,7 @@ export default function SettingsMasterPage() {
   }
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-6">
+    <PageLayout className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div>
@@ -2152,6 +2333,29 @@ export default function SettingsMasterPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">Website URL</label>
+                      <input
+                        type="text"
+                        value={liveReceiptHeader.website || ''}
+                        onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, website: e.target.value })}
+                        placeholder="e.g. www.vaidyafertility.in"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">Clinic Timings (for footer)</label>
+                      <input
+                        type="text"
+                        value={liveReceiptHeader.timings || ''}
+                        onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, timings: e.target.value })}
+                        placeholder="e.g. Mon–Sat: 9:00 AM – 6:00 PM"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-md"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Statutory Invoice Footer / Disclaimer</label>
                     <textarea
@@ -2160,6 +2364,209 @@ export default function SettingsMasterPage() {
                       onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, disclaimer: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 rounded-md text-xs"
                     />
+                  </div>
+
+                  {/* ── Print Header Lines & Color Customization ── */}
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <Palette className="w-4 h-4 text-primary" />
+                      <span>Print Header Lines & Pre-printed Pad Dimensions</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Bold Accent Line Color */}
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                        <label className="block text-slate-700 font-semibold text-[11px]">
+                          Bold Header & Footer Stripe (Primary)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={liveReceiptHeader.header_bold_color || '#4A2E2B'}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, header_bold_color: e.target.value })}
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={liveReceiptHeader.header_bold_color || '#4A2E2B'}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, header_bold_color: e.target.value })}
+                            className="w-24 px-2 py-1 text-xs border border-slate-200 rounded font-mono uppercase font-bold"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <span className="text-[10px] text-slate-400">Presets:</span>
+                          {[
+                            { color: '#4A2E2B', label: 'Mahogany' },
+                            { color: '#0B4F6C', label: 'Navy' },
+                            { color: '#065F46', label: 'Emerald' },
+                            { color: '#1E40AF', label: 'Royal' },
+                            { color: '#334155', label: 'Slate' },
+                          ].map((p) => (
+                            <button
+                              key={p.color}
+                              type="button"
+                              onClick={() => setLiveReceiptHeader({ ...liveReceiptHeader, header_bold_color: p.color })}
+                              title={p.label}
+                              className="w-4 h-4 rounded-full border border-white shadow-xs hover:scale-110 transition-transform"
+                              style={{ background: p.color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Small / Thin Divider Line Color */}
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                        <label className="block text-slate-700 font-semibold text-[11px]">
+                          Small Divider Line (Secondary)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={liveReceiptHeader.header_small_color || '#C29B7F'}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, header_small_color: e.target.value })}
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={liveReceiptHeader.header_small_color || '#C29B7F'}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, header_small_color: e.target.value })}
+                            className="w-24 px-2 py-1 text-xs border border-slate-200 rounded font-mono uppercase font-bold"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <span className="text-[10px] text-slate-400">Presets:</span>
+                          {[
+                            { color: '#C29B7F', label: 'Warm Tan' },
+                            { color: '#94A3B8', label: 'Subtle Slate' },
+                            { color: '#D97706', label: 'Amber Gold' },
+                            { color: '#E2A99B', label: 'Rose Gold' },
+                            { color: '#64748B', label: 'Cool Gray' },
+                          ].map((p) => (
+                            <button
+                              key={p.color}
+                              type="button"
+                              onClick={() => setLiveReceiptHeader({ ...liveReceiptHeader, header_small_color: p.color })}
+                              title={p.label}
+                              className="w-4 h-4 rounded-full border border-white shadow-xs hover:scale-110 transition-transform"
+                              style={{ background: p.color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pre-printed Pad Spacing Dimensions */}
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-slate-700 font-semibold text-[11px] mb-1">
+                          Pad Header Spacing (Non-header prints)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="10"
+                            max="100"
+                            value={liveReceiptHeader.pad_header_height_mm ?? 35}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, pad_header_height_mm: Number(e.target.value) })}
+                            className="w-28 px-3 py-1.5 border border-slate-200 rounded font-mono text-xs font-bold"
+                          />
+                          <span className="text-xs text-slate-500 font-medium">mm (default: 35)</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-slate-700 font-semibold text-[11px] mb-1">
+                          Pad Footer Spacing (Non-header prints)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="10"
+                            max="80"
+                            value={liveReceiptHeader.pad_footer_height_mm ?? 25}
+                            onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, pad_footer_height_mm: Number(e.target.value) })}
+                            className="w-28 px-3 py-1.5 border border-slate-200 rounded font-mono text-xs font-bold"
+                          />
+                          <span className="text-xs text-slate-500 font-medium">mm (default: 25)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Background Watermark Upload & Configuration ── */}
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <UploadCloud className="w-4 h-4 text-primary" />
+                        <span>Print Watermark / Background Image</span>
+                      </div>
+                      {liveReceiptHeader.watermark_url && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveWatermark}
+                          className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold"
+                        >
+                          Remove Watermark
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 items-center">
+                      <div>
+                        <input
+                          ref={watermarkInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleWatermarkUpload}
+                        />
+                        <button
+                          type="button"
+                          disabled={isUploadingWatermark}
+                          onClick={() => watermarkInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-2 py-2 px-3 border-2 border-dashed border-slate-300 hover:border-primary rounded-lg text-slate-700 font-semibold text-xs transition-colors bg-slate-50/50"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{isUploadingWatermark ? 'Uploading...' : liveReceiptHeader.watermark_url ? 'Change Watermark Image' : 'Upload Watermark Image'}</span>
+                        </button>
+                        <span className="text-[10px] text-slate-400 block mt-1">
+                          PNG or JPG (transparent background works best)
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-700 font-semibold text-[11px] mb-1">
+                          Watermark Opacity: {Math.round((liveReceiptHeader.watermark_opacity ?? 0.08) * 100)}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0.02"
+                          max="0.25"
+                          step="0.01"
+                          value={liveReceiptHeader.watermark_opacity ?? 0.08}
+                          onChange={(e) => setLiveReceiptHeader({ ...liveReceiptHeader, watermark_opacity: parseFloat(e.target.value) })}
+                          className="w-full cursor-pointer accent-primary"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-400">
+                          <span>Faint (2%)</span>
+                          <span>Default (8%)</span>
+                          <span>Vivid (25%)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {liveReceiptHeader.watermark_url && (
+                      <div className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                        <img
+                          src={resolveLogoUrl(liveReceiptHeader.watermark_url)}
+                          alt="Watermark Preview"
+                          className="w-12 h-12 object-contain bg-white rounded border border-slate-200 p-1"
+                        />
+                        <div className="text-xs">
+                          <span className="font-semibold text-slate-800 block">Watermark Active</span>
+                          <span className="text-[10px] text-slate-500">Will render centered behind content on all hospital prints</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2 flex justify-end">
@@ -2187,148 +2594,197 @@ export default function SettingsMasterPage() {
               <span className="text-[11px] text-slate-500">Reflects real-time input changes</span>
             </div>
 
-            {/* A4 Sheet Container */}
-            <div className="bg-white border-2 border-slate-300 rounded-xl p-6 shadow-md min-h-[580px] font-sans text-slate-800 space-y-5">
-              {/* Top Letterhead Header — Aligned 1:1 with PrintableReportHeader */}
-              <div className="border-b-2 border-[#0B4F6C] pb-4 flex justify-between items-start gap-4">
-                <div className="flex items-start gap-3 min-w-0">
-                  {hospitalProfile?.logo_url || liveReceiptHeader?.logo_url ? (
-                    <div className="h-12 w-auto max-w-[150px] flex items-center justify-center shrink-0">
-                      <img
-                        src={resolveLogoUrl(hospitalProfile?.logo_url || liveReceiptHeader?.logo_url)}
-                        alt="Hospital Logo"
-                        className="max-h-12 max-w-[150px] object-contain"
-                        crossOrigin="anonymous"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  ) : (
+            {/* A4 Sheet Container — mirrors PrintableReportHeader + PrintableReportFooter exactly */}
+            <div className="bg-white border-2 border-slate-300 rounded-xl shadow-md font-sans text-slate-800 flex flex-col min-h-[700px] overflow-hidden relative">
+
+              {/* Centered Watermark Background (matching reference photo) */}
+              {liveReceiptHeader.watermark_url && (
+                <div
+                  className="pointer-events-none select-none absolute inset-0 flex items-center justify-center overflow-hidden z-0"
+                  aria-hidden="true"
+                >
+                  <img
+                    src={resolveLogoUrl(liveReceiptHeader.watermark_url)}
+                    alt=""
+                    className="w-64 max-h-64 object-contain"
+                    style={{ opacity: liveReceiptHeader.watermark_opacity ?? 0.08 }}
+                  />
+                </div>
+              )}
+
+              {/* ── TOP BOLD ACCENT STRIPE (Full Bleed to Paper Edges) ── */}
+              <div
+                className="h-2 w-full relative z-10 block m-0 p-0"
+                style={{
+                  background: liveReceiptHeader.header_bold_color || '#4A2E2B',
+                  borderTop: `6px solid ${liveReceiptHeader.header_bold_color || '#4A2E2B'}`,
+                }}
+              />
+
+              {/* ── LOGO-ONLY CENTERED HEADER ── */}
+              <div className="pb-3 pt-3 flex flex-col items-center justify-center text-center gap-1 px-6 relative z-10">
+                {hospitalProfile?.logo_url || liveReceiptHeader?.logo_url ? (
+                  <img
+                    src={resolveLogoUrl(hospitalProfile?.logo_url || liveReceiptHeader?.logo_url)}
+                    alt="Hospital Logo"
+                    className="max-h-24 max-w-full object-contain mx-auto"
+                    crossOrigin="anonymous"
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
                     <div
-                      className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-xs"
-                      style={{ background: '#0B4F6C' }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow"
+                      style={{ background: liveReceiptHeader.header_bold_color || '#4A2E2B' }}
                     >
                       {hospitalProfile?.name?.charAt(0) || 'V'}
                     </div>
-                  )}
-                  <div>
-                    <h1 className="font-bold text-base sm:text-lg leading-tight text-[#0B4F6C]">
-                      {liveReceiptHeader.title || hospitalProfile?.name || 'HOSPITAL & FERTILITY INSTITUTE'}
-                    </h1>
-                    <p className="text-[11px] font-semibold text-slate-700 mt-0.5">
-                      {liveReceiptHeader.tagline || 'Clinical Department & Medical Records · Main Facility'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      {[
-                        liveReceiptHeader.address || hospitalProfile?.address,
-                        liveReceiptHeader.phone || hospitalProfile?.phone ? `Tel: ${liveReceiptHeader.phone || hospitalProfile?.phone}` : null,
-                        liveReceiptHeader.email || hospitalProfile?.email ? `Email: ${liveReceiptHeader.email || hospitalProfile?.email}` : null,
-                      ].filter(Boolean).join(' · ')}
-                    </p>
-                    {[
-                      liveReceiptHeader.art_reg_number ? `ART Reg: ${liveReceiptHeader.art_reg_number}` : null,
-                      liveReceiptHeader.gstin ? `GSTIN: ${liveReceiptHeader.gstin}` : null,
-                      liveReceiptHeader.cea_reg_number ? `CEA: ${liveReceiptHeader.cea_reg_number}` : null,
-                    ].filter(Boolean).length > 0 && (
-                      <p className="text-[9px] text-slate-400 font-mono mt-0.5">
-                        {[
-                          liveReceiptHeader.art_reg_number ? `ART Reg: ${liveReceiptHeader.art_reg_number}` : null,
-                          liveReceiptHeader.gstin ? `GSTIN: ${liveReceiptHeader.gstin}` : null,
-                          liveReceiptHeader.cea_reg_number ? `CEA: ${liveReceiptHeader.cea_reg_number}` : null,
-                        ].filter(Boolean).join(' · ')}
+                    <div className="text-left">
+                      <h1 className="font-bold text-base leading-tight text-slate-900 tracking-wide uppercase">
+                        {hospitalProfile?.name || 'HOSPITAL & FERTILITY INSTITUTE'}
+                      </h1>
+                      <p className="text-[10px] font-semibold text-slate-500">
+                        {liveReceiptHeader.tagline || 'Clinical Department & Medical Records'}
                       </p>
-                    )}
+                    </div>
                   </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <span className="inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-[#0B4F6C] border border-blue-200">
-                    Official Receipt
-                  </span>
-                  <div className="text-[10px] text-slate-400 font-mono mt-2">
-                    Date: {new Date().toLocaleDateString('en-IN')}
-                  </div>
-                </div>
+                )}
+                {/* ── SMALL / THIN DIVIDER LINE UNDER LOGO ── */}
+                <div
+                  className="w-full mt-2"
+                  style={{
+                    height: '1.5px',
+                    background: liveReceiptHeader.header_small_color || '#C29B7F',
+                    borderTop: `1.5px solid ${liveReceiptHeader.header_small_color || '#C29B7F'}`,
+                  }}
+                />
               </div>
 
-              {/* Sample Patient Metadata Banner — Aligned with PrintableReportHeader */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
+              {/* ── DOCUMENT TITLE ── */}
+              <div className="text-center py-2 border-b border-slate-100 px-6 relative z-10">
+                <h2 className="text-xs font-bold text-slate-900 tracking-wide uppercase">OFFICIAL INVOICE / CLINICAL REPORT</h2>
+              </div>
+
+              {/* ── PATIENT METADATA BANNER ── */}
+              <div className="bg-slate-50/90 border-b border-slate-200 p-3 grid grid-cols-4 gap-3 text-[10px] px-6 relative z-10 backdrop-blur-2xs">
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Female Partner</span>
-                  <span className="font-bold text-slate-800">Priya Sharma (29y)</span>
-                  <span className="text-slate-500 block text-[10px] font-mono">VID: HYD01-2024-0012</span>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Patient</span>
+                  <span className="font-bold text-slate-800">Priya Sharma</span>
+                  <span className="text-slate-500 block">29Y / Female</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Male Partner</span>
-                  <span className="font-bold text-slate-800">Vikram Sharma (33y)</span>
-                  <span className="text-slate-500 block text-[10px] font-mono">Partner VID: HYD01-2024-0013</span>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">VID / MRN</span>
+                  <span className="font-bold font-mono text-slate-800">HYD01-2024-0012</span>
+                  <span className="text-slate-500 block">Blood: A+</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Consultant Specialist</span>
-                  <span className="font-semibold text-slate-800">Dr. Ananya Rao, MD, DRM</span>
-                  <span className="text-slate-500 block text-[10px]">Reg No: TSMC-44912</span>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Consultant</span>
+                  <span className="font-bold text-slate-800">Dr. Ananya Rao</span>
+                  <span className="text-slate-500 block">MD, DRM · TSMC-44912</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Document Number</span>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Document No.</span>
                   <span className="font-bold font-mono text-slate-800">INV-MAIN-00104</span>
-                  <span className="text-slate-500 block text-[10px]">Status: Verified &amp; Signed</span>
+                  <span className="text-slate-500 block">Date: {new Date().toLocaleDateString('en-IN')}</span>
                 </div>
               </div>
 
-              {/* Sample Line Items Table */}
-              <table className="w-full text-left text-xs border border-slate-200 rounded-md overflow-hidden">
-                <thead className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="py-2 px-3">Service Code & Description</th>
-                    <th className="py-2 px-2 text-center">HSN/SAC</th>
-                    <th className="py-2 px-2 text-center">Qty</th>
-                    <th className="py-2 px-3 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-[11px]">
-                  <tr>
-                    <td className="py-2 px-3 font-medium">IVF ICSI Cycle Procedure Fee</td>
-                    <td className="py-2 px-2 text-center text-slate-500">999312</td>
-                    <td className="py-2 px-2 text-center">1</td>
-                    <td className="py-2 px-3 text-right font-mono">₹1,20,000.00</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-medium">Follicular Monitoring Ultrasound (Serial)</td>
-                    <td className="py-2 px-2 text-center text-slate-500">999312</td>
-                    <td className="py-2 px-2 text-center">4</td>
-                    <td className="py-2 px-3 text-right font-mono">₹4,800.00</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-medium">LIMS Serum Estradiol (E2) Rapid Assay</td>
-                    <td className="py-2 px-2 text-center text-slate-500">999316</td>
-                    <td className="py-2 px-2 text-center">2</td>
-                    <td className="py-2 px-3 text-right font-mono">₹1,600.00</td>
-                  </tr>
-                </tbody>
-                <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-300">
-                  <tr>
-                    <td colSpan={3} className="py-2 px-3 text-right">Total Payable Amount:</td>
-                    <td className="py-2 px-3 text-right font-mono text-primary font-bold">₹1,26,400.00</td>
-                  </tr>
-                </tfoot>
-              </table>
+              {/* ── SAMPLE LINE ITEMS ── */}
+              <div className="flex-1 px-6 py-4 relative z-10">
+                <table className="w-full text-left text-[10px] border border-slate-200 rounded overflow-hidden bg-white/95">
+                  <thead className="bg-slate-100 text-slate-700 text-[9px] uppercase font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2 px-3">Service Description</th>
+                      <th className="py-2 px-2 text-center">Qty</th>
+                      <th className="py-2 px-2 text-right">Unit Price</th>
+                      <th className="py-2 px-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr><td className="py-1.5 px-3 font-medium">IVF ICSI Cycle Procedure Fee</td><td className="py-1.5 px-2 text-center">1</td><td className="py-1.5 px-2 text-right font-mono">₹1,20,000</td><td className="py-1.5 px-3 text-right font-mono">₹1,20,000</td></tr>
+                    <tr><td className="py-1.5 px-3 font-medium">Follicular Monitoring Ultrasound</td><td className="py-1.5 px-2 text-center">4</td><td className="py-1.5 px-2 text-right font-mono">₹1,200</td><td className="py-1.5 px-3 text-right font-mono">₹4,800</td></tr>
+                    <tr><td className="py-1.5 px-3 font-medium">LIMS Serum Estradiol (E2) Assay</td><td className="py-1.5 px-2 text-center">2</td><td className="py-1.5 px-2 text-right font-mono">₹800</td><td className="py-1.5 px-3 text-right font-mono">₹1,600</td></tr>
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 font-bold text-[10px]">
+                    <tr>
+                      <td colSpan={3} className="py-2 px-3 text-right">Total Payable:</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: liveReceiptHeader.header_bold_color || '#4A2E2B' }}>
+                        ₹1,26,400
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
 
-              {/* Statutory Footer */}
-              <div className="pt-6 mt-auto border-t border-slate-200 flex justify-between items-end text-[10px] text-slate-500">
-                <div className="max-w-xs">
-                  <p className="font-semibold text-slate-700">Terms & Statutory Notice:</p>
-                  <p>{liveReceiptHeader.disclaimer || 'Official EMR computer-generated bill. Prescriptions require physician sign-off.'}</p>
+                {/* Signatory */}
+                <div className="flex justify-between items-end mt-6 text-[10px] text-slate-500">
+                  <p className="italic">{liveReceiptHeader.disclaimer || 'Computer-generated certified clinical documentation.'}</p>
+                  <div className="text-center">
+                    <div className="w-28 border-b border-slate-400 mb-1" />
+                    <span className="font-semibold text-slate-700">Authorized Signatory</span>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="w-32 border-b border-slate-400 mb-1"></div>
-                  <span className="font-semibold text-slate-700">Authorized Signatory</span>
+              </div>
+
+              {/* ── FOOTER — matches PrintableReportFooter exactly (Full Bleed) ── */}
+              <div className="relative z-10 mt-auto w-full">
+                <div className="px-6 space-y-1 text-center">
+                  {/* ── Small Divider Line Above Footer ── */}
+                  <div
+                    className="w-full"
+                    style={{
+                      height: '1.5px',
+                      background: liveReceiptHeader.header_small_color || '#C29B7F',
+                      borderTop: `1.5px solid ${liveReceiptHeader.header_small_color || '#C29B7F'}`,
+                    }}
+                  />
+
+                  <div className="pt-2 pb-1 space-y-1">
+                    {(hospitalProfile?.address || liveReceiptHeader?.address) && (
+                      <div className="flex items-start justify-center gap-1 font-semibold text-slate-700 text-[9px]">
+                        <MapPin className="w-2.5 h-2.5 text-slate-500 shrink-0 mt-0.5" />
+                        <span>{hospitalProfile?.address || liveReceiptHeader?.address || 'Clinic Address'}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center justify-center gap-x-2.5 text-[8.5px] text-slate-600 font-medium">
+                      {(hospitalProfile?.phone || liveReceiptHeader?.phone) && (
+                        <div className="flex items-center gap-1">
+                          <Phone className="w-2 h-2 text-slate-500" />
+                          <span>{hospitalProfile?.phone || liveReceiptHeader?.phone}</span>
+                        </div>
+                      )}
+                      {(hospitalProfile?.phone || liveReceiptHeader?.phone) && (hospitalProfile?.email || liveReceiptHeader?.email) && <span className="text-slate-300">|</span>}
+                      {(hospitalProfile?.email || liveReceiptHeader?.email) && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="w-2 h-2 text-slate-500" />
+                          <span>{hospitalProfile?.email || liveReceiptHeader?.email}</span>
+                        </div>
+                      )}
+                      {(liveReceiptHeader?.website) && <><span className="text-slate-300">|</span><div className="flex items-center gap-1"><Globe className="w-2 h-2 text-slate-500" /><span>{liveReceiptHeader.website}</span></div></>}
+                      {(liveReceiptHeader?.timings) && <><span className="text-slate-300">|</span><div className="flex items-center gap-1"><Clock className="w-2 h-2 text-slate-500" /><span>{liveReceiptHeader.timings}</span></div></>}
+                    </div>
+                  </div>
+
+                  {/* Dynamic Page Counter & Certification */}
+                  <div className="flex items-center justify-between text-[8px] text-slate-400 pb-1">
+                    <span className="italic truncate">{liveReceiptHeader.disclaimer || 'Certified computer-generated medical record.'}</span>
+                    <span className="font-mono font-medium shrink-0">Page 1 of 1</span>
+                  </div>
                 </div>
+
+                {/* ── BOTTOM BOLD ACCENT STRIPE (Full Bleed to Paper Edges) ── */}
+                <div
+                  className="h-2 w-full block m-0 p-0"
+                  style={{
+                    backgroundColor: liveReceiptHeader.header_bold_color || '#4A2E2B',
+                    borderTop: `6px solid ${liveReceiptHeader.header_bold_color || '#4A2E2B'}`,
+                  }}
+                />
               </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* ========================================================================= */}
       {/* TAB 2: STAFF USER ROSTER & CREDENTIALING                                  */}
@@ -6535,132 +6991,451 @@ export default function SettingsMasterPage() {
       {/* ========================================================================= */}
       {/* MODAL: IN-APP CSV IMPORT EXECUTION                                        */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* MODAL: IN-APP CSV IMPORT EXECUTION & OVERRIDE PREVIEW                     */}
+      {/* ========================================================================= */}
       {importDomainModal && (
-        <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-rail-bg/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-8 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">Import CSV: {importDomainModal.title}</h3>
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-primary" />
+                  <span>Import CSV: {importDomainModal.title}</span>
+                </h3>
                 <p className="text-[11px] text-slate-500">Domain: {importDomainModal.key} ({importDomainModal.filename})</p>
               </div>
-              <button onClick={() => setImportDomainModal(null)} className="text-slate-400 hover:text-slate-700">
+              <button
+                onClick={() => {
+                  setImportDomainModal(null);
+                  setImportFile(null);
+                  setCsvPreviewRows([]);
+                  setCsvPreviewData(null);
+                  setImportResult(null);
+                  setEditingCsvRowIndex(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
               {/* Conflict Policy Selector */}
               <div>
                 <label className="block text-slate-700 font-semibold mb-1.5">Conflict Resolution Policy:</label>
                 <div className="grid grid-cols-2 gap-3">
                   <label
-                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer ${
-                      conflictMode === 'overwrite' ? 'bg-primary/10 border-primary/40' : 'bg-slate-50 border-slate-200'
+                    className={`flex items-center gap-2.5 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      conflictMode === 'overwrite' ? 'bg-amber-500/10 border-amber-500/40 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-700'
                     }`}
                   >
                     <input
                       type="radio"
                       name="conflict"
                       checked={conflictMode === 'overwrite'}
-                      onChange={() => setConflictMode('overwrite')}
-                      className="text-primary focus:ring-primary"
+                      onChange={() => handleConflictModeChange('overwrite')}
+                      className="text-amber-600 focus:ring-amber-500"
                     />
                     <div>
-                      <span className="font-bold text-slate-900 block text-xs">Overwrite (Upsert)</span>
-                      <span className="text-[10px] text-slate-500">Updates existing rows by unique key</span>
+                      <span className="font-bold block text-xs flex items-center gap-1">
+                        <span>⚡ Overwrite (Upsert)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-500">Existing records in database will be updated with uploaded CSV values</span>
                     </div>
                   </label>
                   <label
-                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer ${
-                      conflictMode === 'skip' ? 'bg-primary/10 border-primary/40' : 'bg-slate-50 border-slate-200'
+                    className={`flex items-center gap-2.5 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      conflictMode === 'skip' ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-slate-50 border-slate-200 text-slate-700'
                     }`}
                   >
                     <input
                       type="radio"
                       name="conflict"
                       checked={conflictMode === 'skip'}
-                      onChange={() => setConflictMode('skip')}
+                      onChange={() => handleConflictModeChange('skip')}
                       className="text-primary focus:ring-primary"
                     />
                     <div>
-                      <span className="font-bold text-slate-900 block text-xs">Skip Existing</span>
-                      <span className="text-[10px] text-slate-500">Only inserts new rows; preserves existing</span>
+                      <span className="font-bold block text-xs">○ Skip Existing</span>
+                      <span className="text-[10px] text-slate-500">Only inserts new rows; preserves existing database records untouched</span>
                     </div>
                   </label>
                 </div>
               </div>
 
               {/* Drag and drop file picker */}
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-300 hover:border-primary rounded-xl p-6 text-center cursor-pointer bg-slate-50/50 transition-colors"
-              >
-                <UploadCloud className="w-8 h-8 text-primary mx-auto mb-2" />
-                {importFile ? (
-                  <div className="text-slate-800 font-bold text-xs">{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</div>
-                ) : (
-                  <div>
-                    <span className="font-bold text-slate-700 block">Click to select CSV file</span>
-                    <span className="text-[10px] text-slate-500">Standard RFC 4180 CSV formatted file</span>
+              {!importFile ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-primary rounded-xl p-8 text-center cursor-pointer bg-slate-50/50 transition-colors"
+                >
+                  <UploadCloud className="w-10 h-10 text-primary mx-auto mb-2" />
+                  <span className="font-bold text-slate-700 block text-sm">Click to select CSV file</span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Standard RFC 4180 CSV formatted file matching canonical headers
+                  </span>
+                  <div className="mt-2 text-[10px] text-slate-400 font-mono">
+                    Expected headers: {importDomainModal.headers?.join(', ')}
                   </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setImportFile(e.target.files[0]);
-                    }
-                  }}
-                />
-              </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileSelectForImport(e.target.files[0]);
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-100/80 rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-primary shadow-xs border border-slate-200">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 block text-xs">{importFile.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {(importFile.size / 1024).toFixed(1)} KB · {csvPreviewRows.length} total rows detected
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImportFile(null);
+                      setCsvPreviewRows([]);
+                      setCsvPreviewData(null);
+                      setImportResult(null);
+                      setEditingCsvRowIndex(null);
+                    }}
+                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50"
+                  >
+                    Change File
+                  </button>
+                </div>
+              )}
 
-              {/* Statistics Results display */}
-              {importResult && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Ingestion Successful
+              {/* Ingestion Conflict Analysis & Preview */}
+              {isPreviewingCsv && (
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <RefreshCw className="w-6 h-6 text-primary mx-auto animate-spin" />
+                  <p className="font-semibold text-xs text-slate-800">Analyzing CSV rows & cross-referencing live database...</p>
+                  <p className="text-[10px] text-slate-400">Checking for duplicate keys and existing entities</p>
+                </div>
+              )}
+
+              {!isPreviewingCsv && csvPreviewRows.length > 0 && !importResult && (
+                <div className="space-y-3">
+                  {/* Summary Badges Bar */}
+                  <div className="grid grid-cols-4 gap-2 text-center font-mono">
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <div className="text-[9px] uppercase font-bold text-slate-400">Total Rows</div>
+                      <div className="text-base font-bold text-slate-800">{csvPreviewRows.length}</div>
+                    </div>
+                    <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                      <div className="text-[9px] uppercase font-bold text-emerald-600">New (Insert)</div>
+                      <div className="text-base font-bold text-emerald-700">
+                        {csvPreviewRows.filter((r) => !r.is_override).length}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                      <div className="text-[9px] uppercase font-bold text-amber-700 flex items-center justify-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>Overrides (Update)</span>
+                      </div>
+                      <div className="text-base font-bold text-amber-800">
+                        {csvPreviewRows.filter((r) => r.is_override && conflictMode === 'overwrite').length}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <div className="text-[9px] uppercase font-bold text-slate-400">Skipped</div>
+                      <div className="text-base font-bold text-slate-500">
+                        {csvPreviewRows.filter((r) => r.is_override && conflictMode === 'skip').length}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] grid grid-cols-4 gap-1 text-center mt-2 font-mono">
-                    <div className="bg-white p-1 rounded border border-emerald-100">
-                      <div className="text-[9px] text-slate-400">TOTAL</div>
-                      <div className="font-bold">{importResult.stats?.total_rows || 0}</div>
+
+                  {/* Filter tabs */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setCsvPreviewFilter('all')}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          csvPreviewFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        All Rows ({csvPreviewRows.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCsvPreviewFilter('overrides')}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          csvPreviewFilter === 'overrides' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        ⚡ Overrides ({csvPreviewRows.filter((r) => r.is_override).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCsvPreviewFilter('new')}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          csvPreviewFilter === 'new' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        + New ({csvPreviewRows.filter((r) => !r.is_override).length})
+                      </button>
                     </div>
-                    <div className="bg-white p-1 rounded border border-emerald-100">
-                      <div className="text-[9px] text-slate-400">INSERTED</div>
-                      <div className="font-bold text-emerald-700">{importResult.stats?.inserted || 0}</div>
+
+                    <span className="text-[11px] text-slate-400 italic">
+                      Review changes below before saving
+                    </span>
+                  </div>
+
+                  {/* Interactive Rows Preview Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-700 text-[10px] uppercase font-bold sticky top-0 border-b border-slate-200 z-10">
+                        <tr>
+                          <th className="py-2 px-3 w-12 text-center">Row</th>
+                          <th className="py-2 px-3 w-28">Action</th>
+                          <th className="py-2 px-3">Unique Key / Identifier</th>
+                          <th className="py-2 px-3">Entity Name / Details</th>
+                          <th className="py-2 px-3 text-right w-24">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {csvPreviewRows
+                          .filter((r) => {
+                            if (csvPreviewFilter === 'overrides') return r.is_override;
+                            if (csvPreviewFilter === 'new') return !r.is_override;
+                            return true;
+                          })
+                          .map((row) => (
+                            <tr
+                              key={row.row_index}
+                              className={`hover:bg-slate-50/80 transition-colors ${
+                                row.is_override
+                                  ? conflictMode === 'overwrite'
+                                    ? 'bg-amber-50/40'
+                                    : 'bg-slate-50/40 opacity-70'
+                                  : ''
+                              }`}
+                            >
+                              <td className="py-2 px-3 text-center font-mono text-slate-400 text-[11px]">
+                                #{row.row_index}
+                              </td>
+                              <td className="py-2 px-3">
+                                {row.is_override ? (
+                                  conflictMode === 'overwrite' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                      <span>⚡ Overwrite</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                      <span>○ Skip</span>
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <span>+ New</span>
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 font-mono font-bold text-slate-800">
+                                {row.identifier || '—'}
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="font-semibold text-slate-800 block truncate max-w-md">
+                                  {row.name || '—'}
+                                </span>
+                                <span className="text-[10px] text-slate-500 block truncate max-w-md">
+                                  {row.details}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right space-x-1 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  title="Edit row data before importing"
+                                  onClick={() => {
+                                    setEditingCsvRowIndex(row.row_index);
+                                    setEditingCsvRowForm({ ...row.raw });
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-primary rounded hover:bg-slate-100"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Remove this row from import"
+                                  onClick={() => {
+                                    setCsvPreviewRows((prev) => prev.filter((r) => r.row_index !== row.row_index));
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Inline Row Editor Dialog */}
+                  {editingCsvRowIndex !== null && (
+                    <div className="p-4 bg-slate-50 border border-primary/30 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <Edit2 className="w-3.5 h-3.5 text-primary" />
+                          <span>Modify Row #{editingCsvRowIndex} Before Saving</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingCsvRowIndex(null)}
+                          className="text-slate-400 hover:text-slate-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                        {Object.keys(editingCsvRowForm).map((colKey) => (
+                          <div key={colKey}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate mb-0.5">
+                              {colKey}
+                            </label>
+                            <input
+                              type="text"
+                              value={editingCsvRowForm[colKey] || ''}
+                              onChange={(e) =>
+                                setEditingCsvRowForm({
+                                  ...editingCsvRowForm,
+                                  [colKey]: e.target.value,
+                                })
+                              }
+                              className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded font-mono bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setEditingCsvRowIndex(null)}
+                          className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded text-xs font-semibold"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCsvPreviewRows((prev) =>
+                              prev.map((r) => {
+                                if (r.row_index === editingCsvRowIndex) {
+                                  const firstVal = Object.values(editingCsvRowForm)[0] || r.identifier;
+                                  const secondVal = Object.values(editingCsvRowForm)[1] || r.name;
+                                  return {
+                                    ...r,
+                                    identifier: String(firstVal),
+                                    name: String(secondVal),
+                                    raw: { ...editingCsvRowForm },
+                                  };
+                                }
+                                return r;
+                              })
+                            );
+                            setEditingCsvRowIndex(null);
+                          }}
+                          className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white rounded text-xs font-semibold shadow-xs"
+                        >
+                          Apply Row Edits
+                        </button>
+                      </div>
                     </div>
-                    <div className="bg-white p-1 rounded border border-emerald-100">
-                      <div className="text-[9px] text-slate-400">UPDATED</div>
-                      <div className="font-bold text-primary">{importResult.stats?.updated || 0}</div>
+                  )}
+                </div>
+              )}
+
+              {/* Statistics Results display after execution */}
+              {importResult && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-2">
+                  <div className="font-bold flex items-center gap-1.5 text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>CSV Ingestion Completed Successfully!</span>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    Database synchronization complete for domain <strong>{importDomainModal.title}</strong>.
+                  </p>
+                  <div className="text-xs grid grid-cols-4 gap-2 text-center mt-2 font-mono">
+                    <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-xs">
+                      <div className="text-[9px] text-slate-400 font-bold uppercase">Total Rows</div>
+                      <div className="font-bold text-sm text-slate-800">{importResult.stats?.total_rows || 0}</div>
                     </div>
-                    <div className="bg-white p-1 rounded border border-emerald-100">
-                      <div className="text-[9px] text-slate-400">SKIPPED</div>
-                      <div className="font-bold text-slate-500">{importResult.stats?.skipped || 0}</div>
+                    <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-xs">
+                      <div className="text-[9px] text-emerald-600 font-bold uppercase">Inserted (New)</div>
+                      <div className="font-bold text-sm text-emerald-700">{importResult.stats?.inserted ?? importResult.stats?.created ?? 0}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-xs">
+                      <div className="text-[9px] text-amber-600 font-bold uppercase">Updated (Upsert)</div>
+                      <div className="font-bold text-sm text-amber-700">{importResult.stats?.updated || 0}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-xs">
+                      <div className="text-[9px] text-slate-400 font-bold uppercase">Skipped</div>
+                      <div className="font-bold text-sm text-slate-600">{importResult.stats?.skipped || 0}</div>
                     </div>
                   </div>
                 </div>
               )}
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            {/* Modal Actions Footer */}
+            <div className="flex justify-between items-center pt-3 border-t border-slate-100 shrink-0">
+              <span className="text-[11px] text-slate-400">
+                {importFile ? `${csvPreviewRows.length} rows queued` : 'Select a file to begin'}
+              </span>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setImportDomainModal(null)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg"
+                  onClick={() => {
+                    setImportDomainModal(null);
+                    setImportFile(null);
+                    setCsvPreviewRows([]);
+                    setCsvPreviewData(null);
+                    setImportResult(null);
+                    setEditingCsvRowIndex(null);
+                  }}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg text-xs"
                 >
-                  Close
+                  {importResult ? 'Done' : 'Cancel'}
                 </button>
-                <button
-                  type="button"
-                  disabled={!importFile || isImporting}
-                  onClick={handleExecuteCsvImport}
-                  className="px-4 py-2 bg-primary hover:bg-primary-mid disabled:opacity-50 text-white font-semibold rounded-lg shadow-sm"
-                >
-                  {isImporting ? 'Ingesting Rows...' : 'Execute Ingestion'}
-                </button>
+
+                {!importResult && (
+                  <button
+                    type="button"
+                    disabled={!importFile || isImporting || isPreviewingCsv || csvPreviewRows.length === 0}
+                    onClick={handleExecuteCsvImport}
+                    className="px-5 py-2 bg-primary hover:bg-primary-mid disabled:opacity-50 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center gap-1.5"
+                  >
+                    {isImporting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Saving & Ingesting Data...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Save & Ingest ({csvPreviewRows.length} Rows)</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -7238,6 +8013,6 @@ export default function SettingsMasterPage() {
         </div>
       )}
 
-    </div>
+    </PageLayout>
   );
 }

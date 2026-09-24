@@ -1,13 +1,21 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { cosgynApi } from '@/lib/api';
+import { cosgynApi, patientsApi } from '@/lib/api';
 import CosgynScheduler from '@/components/cosgyn/CosgynScheduler';
-import { Activity } from 'lucide-react';
+import PageLayout from '@/components/common/PageLayout';
+import PrintableCosGynScheduleModal from '@/components/common/PrintableCosGynScheduleModal';
+import { Activity, Printer } from 'lucide-react';
 
 export default function PatientCosGynTab({ params }: { params: { id: string } }) {
   const patientId = params.id;
+  const [printableScheduleData, setPrintableScheduleData] = useState<any>(null);
+
+  const { data: patient } = useQuery({
+    queryKey: ['patient', patientId],
+    queryFn: () => patientsApi.get(patientId),
+  });
 
   const { data: plans, isLoading, refetch } = useQuery({
     queryKey: ['cosgyn', 'patient_plans', patientId],
@@ -15,7 +23,7 @@ export default function PatientCosGynTab({ params }: { params: { id: string } })
   });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       <div className="flex justify-between items-center bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -46,11 +54,27 @@ export default function PatientCosGynTab({ params }: { params: { id: string } })
                     <h3 className="font-bold text-lg text-slate-800">{plan.treatment_name}</h3>
                     <p className="text-sm text-slate-500">Started on: {new Date(plan.start_date).toLocaleDateString()} &bull; Frequency: {plan.frequency.replace('_', ' ')}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-1">
                     <div className="font-bold text-slate-900">₹{plan.total_amount.toLocaleString()}</div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${plan.billed === 'true' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {plan.billed === 'true' ? 'Billed' : 'Unbilled'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${plan.billed === 'true' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {plan.billed === 'true' ? 'Billed' : 'Unbilled'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPrintableScheduleData({
+                          patient: { name: patient?.name || 'Patient', vid: patient?.vid || '—' },
+                          packageName: plan.treatment_name,
+                          packagePrice: plan.total_amount,
+                          sessions: plan.sessions || [],
+                        })}
+                        className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition"
+                        title="Print Treatment Schedule"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>Print Schedule</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -81,6 +105,16 @@ export default function PatientCosGynTab({ params }: { params: { id: string } })
           </div>
         )}
       </div>
-    </div>
+
+      {printableScheduleData && (
+        <PrintableCosGynScheduleModal
+          patient={printableScheduleData.patient}
+          packageName={printableScheduleData.packageName}
+          packagePrice={printableScheduleData.packagePrice}
+          sessions={printableScheduleData.sessions}
+          onClose={() => setPrintableScheduleData(null)}
+        />
+      )}
+    </PageLayout>
   );
 }

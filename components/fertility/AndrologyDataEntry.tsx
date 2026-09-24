@@ -5,6 +5,9 @@ import { andrologyApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Save, ClipboardList, Printer, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableReportFooter from '@/components/common/PrintableReportFooter';
+import PrintableModal from '@/components/common/PrintableModal';
+import A4Sheet from '@/components/common/A4Sheet';
 
 export interface CasaSemenAnalysisData {
   // Patient Info & Sampling
@@ -1015,67 +1018,22 @@ export default function AndrologyDataEntry({
       {/* ======================================================== */}
       {/* STANDARDIZED PRINT REPORT MODAL (Matching HTML Template)   */}
       {/* ======================================================== */}
-      {showPrintModal && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowPrintModal(false);
-          }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-12 sm:pt-16 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible"
-          style={{ background: 'rgba(0,0,0,0.65)' }}
-        >
-          <div className="bg-white max-w-4xl w-full shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-lg print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between px-5 py-3 gap-2 print:hidden bg-slate-900 text-white">
-              <div>
-                <p className="text-sm font-semibold">
-                  {activeTab === 'casa' ? 'CASA Semen Analysis Preview' : 'Routine Semen Analysis Preview'}
-                </p>
-                <p className="text-xs opacity-60 mt-0.5">WHO 6th Edition lower reference standards</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center bg-slate-800 p-0.5 rounded-md border border-slate-700 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIncludeLetterhead(true)}
-                    className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                      includeLetterhead ? 'bg-[rgb(var(--clr-primary))] text-white font-bold' : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    With Header
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIncludeLetterhead(false)}
-                    className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                      !includeLetterhead ? 'bg-amber-600 text-white font-bold' : 'text-slate-300 hover:text-white'
-                    }`}
-                    title="Use for pre-printed letterhead pads"
-                  >
-                    Pre-printed Pad
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-opacity hover:opacity-90 shadow-sm"
-                  style={{ background: 'rgb(var(--clr-primary))', color: 'white' }}
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Print (A4)
-                </button>
-                <button onClick={() => setShowPrintModal(false)} className="p-1 opacity-60 hover:opacity-100 transition-opacity">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Document Body */}
-            <div className="p-8 space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
+      <PrintableModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title={activeTab === 'casa' ? 'CASA Semen Analysis Preview' : 'Routine Semen Analysis Preview'}
+        subtitle="WHO 6th Edition lower reference standards"
+        defaultIncludeHeader={includeLetterhead}
+        maxWidth="max-w-4xl"
+      >
+        {({ hideHeader }) => (
+          <A4Sheet
+            header={
               <PrintableReportHeader
                 title={activeTab === 'casa' ? 'CASA SEMEN ANALYSIS REPORT' : 'ROUTINE SEMEN ANALYSIS REPORT'}
                 subtitle="Computer-Assisted Sperm Analysis — Laboratory Diagnostic Report"
                 badge="WHO 6th ED (2021)"
-                includeHeader={includeLetterhead}
+                hideHospitalHeader={hideHeader}
                 department="Department of Andrology & Reproductive Biology"
                 patient={{
                   name: patientName || 'Male Patient',
@@ -1087,6 +1045,22 @@ export default function AndrologyDataEntry({
                   { label: 'Collection Date', value: activeTab === 'casa' ? casaForm.collection_date : normalForm.collection_date },
                 ]}
               />
+            }
+            footer={
+              <PrintableReportFooter
+                signatoryTitle={casaForm.analyzed_by || 'Chief Andrologist'}
+                signatorySubtitle="Laboratory Andrologist / Embryologist"
+                showSignatory={true}
+                showWitness={true}
+                witnessTitle="Consultant Gynaecologist / ART Specialist"
+                hideHospitalFooter={hideHeader}
+                disclaimer="Reference ranges shown reflect WHO 6th edition (2021) lower reference limits. Values are indicative and should be interpreted by your treating reproductive specialist."
+                pageNumber={1}
+                totalPages={1}
+              />
+            }
+          >
+            <div className="px-6 sm:px-8 print:px-[12mm] py-3 space-y-4 flex-1">
 
               {activeTab === 'casa' ? (
                 <>
@@ -1473,16 +1447,12 @@ export default function AndrologyDataEntry({
                     </div>
                   </div>
 
-                  {/* Footer WHO Reference Note */}
-                  <div className="text-[9px] text-slate-400 border-t border-slate-200 pt-2 text-center">
-                    Reference ranges shown reflect WHO 6th edition (2021) lower reference limits. Values are indicative and should be interpreted by your treating reproductive specialist.
-                  </div>
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </A4Sheet>
+        )}
+      </PrintableModal>
     </div>
   );
 }

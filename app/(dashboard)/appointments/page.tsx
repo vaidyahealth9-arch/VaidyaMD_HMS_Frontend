@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { appointmentsApi, patientsApi, authApi, templatesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { statusColors, statusLabels, formatDateTime, isUserDoctor } from '@/lib/utils';
 import { toast } from '@/contexts/ToastContext';
+import PageLayout from '@/components/common/PageLayout';
 import Link from 'next/link';
 import {
   Calendar,
@@ -33,6 +34,8 @@ import {
   Send,
   UserPlus,
   Bell,
+  Building2,
+  ChevronDown,
 } from 'lucide-react';
 
 const statusOrder = ['in_progress', 'waiting', 'scheduled', 'completed', 'cancelled'];
@@ -141,6 +144,19 @@ export default function AppointmentsPage() {
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState<'all' | 'female' | 'male' | 'other'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilters, setDepartmentFilters] = useState<string[]>([]);
+  const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+  const deptDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutsideDept(event: MouseEvent) {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(event.target as Node)) {
+        setIsDeptDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideDept);
+    return () => document.removeEventListener('mousedown', handleClickOutsideDept);
+  }, []);
 
   // Dynamic Visit Types from Database Templates
   const { data: dbVisitTypesData } = useQuery({
@@ -163,6 +179,25 @@ export default function AppointmentsPage() {
     }
     return fertilityVisitTypes;
   }, [dbVisitTypesData]);
+
+  // Dynamic Available Departments for Multi-Select Filter
+  const availableDepartments = useMemo(() => {
+    const set = new Set<string>();
+    set.add('Fertility & IVF');
+    set.add('Cosmetic Gynecology');
+    set.add('Obstetrics & Gynecology');
+    set.add('Andrology');
+    appointments.forEach((a: any) => {
+      if (a.department) set.add(a.department);
+    });
+    doctors.forEach((d: any) => {
+      if (d.specialization) set.add(d.specialization);
+      if (Array.isArray(d.departments)) {
+        d.departments.forEach((dept: string) => set.add(dept));
+      }
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [appointments, doctors]);
 
   // Triage Modal State
   const [triageApt, setTriageApt] = useState<any>(null);
@@ -504,6 +539,10 @@ export default function AppointmentsPage() {
       const aptGender = (a.patient_gender || patients.find((p) => p.id === a.patient_id)?.gender || '').toLowerCase();
       if (aptGender !== genderFilter.toLowerCase()) return false;
     }
+    if (departmentFilters.length > 0) {
+      const aptDept = a.department || 'Fertility & IVF';
+      if (!departmentFilters.includes(aptDept)) return false;
+    }
     if (searchQuery && !a.patient_name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -530,7 +569,7 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -590,6 +629,92 @@ export default function AppointmentsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="vmd-input text-xs pl-8 w-44"
             />
+          </div>
+
+          {/* Department Multi-Select Filter */}
+          <div className="relative" ref={deptDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+              className={`vmd-input text-xs flex items-center justify-between gap-1.5 cursor-pointer h-9 px-3 ${
+                departmentFilters.length > 0
+                  ? 'bg-primary/10 border-primary/40 text-primary font-bold shadow-2xs'
+                  : 'text-slate-700 bg-white'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                <Building2 className={`w-3.5 h-3.5 ${departmentFilters.length > 0 ? 'text-primary' : 'text-slate-400'}`} />
+                <span>
+                  {departmentFilters.length === 0
+                    ? 'All Departments'
+                    : departmentFilters.length === 1
+                    ? departmentFilters[0]
+                    : `${departmentFilters.length} Depts Selected`}
+                </span>
+              </div>
+              <ChevronDown className={`w-3 h-3 transition-transform ${isDeptDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isDeptDropdownOpen && (
+              <div className="absolute right-0 mt-1 z-50 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-100">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 text-xs">
+                  <span className="font-bold text-slate-800">
+                    Departments {departmentFilters.length > 0 && `(${departmentFilters.length})`}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDepartmentFilters([...availableDepartments])}
+                      className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setDepartmentFilters([])}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                  {availableDepartments.map((dept) => {
+                    const isChecked = departmentFilters.includes(dept);
+                    const count = appointments.filter((a) => (a.department || 'Fertility & IVF') === dept).length;
+                    return (
+                      <label
+                        key={dept}
+                        className={`flex items-center justify-between p-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                          isChecked ? 'bg-primary/10 font-bold text-primary' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setDepartmentFilters([...departmentFilters, dept]);
+                              } else {
+                                setDepartmentFilters(departmentFilters.filter((d) => d !== dept));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-primary focus:ring-primary w-3.5 h-3.5"
+                          />
+                          <span className="truncate max-w-[150px]">{dept}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 rounded bg-slate-100 font-semibold">
+                          {count}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Doctor Filter (only real doctors & Admin + Doctor) */}
@@ -676,6 +801,9 @@ export default function AppointmentsPage() {
             const aptGender = (apt.patient_gender || patients.find((p) => p.id === apt.patient_id)?.gender || '').toLowerCase();
             const matchedPatient = patients.find((p) => p.id === apt.patient_id);
             const tokenNumber = `#${String(idx + 1).padStart(2, '0')}`;
+            const isCosGyn = (apt.department || '').toLowerCase().includes('cosmetic') || 
+                             (apt.department || '').toLowerCase().includes('cosgyn') ||
+                             (apt.visit_type || '').toLowerCase().includes('cosgyn');
 
             return (
               <div
@@ -772,8 +900,8 @@ export default function AppointmentsPage() {
                   </div>
                 )}
 
-                {/* Triage Vitals Banner */}
-                {apt.metadata_?.triage?.vitals && (
+                {/* Triage Vitals Banner (Not required for Cosmetic Gynecology) */}
+                {!isCosGyn && apt.metadata_?.triage?.vitals && (
                   <div className="text-[11px] bg-emerald-50 border border-emerald-100 px-2.5 py-1.5 rounded-md text-emerald-800 font-medium flex items-center justify-between">
                     <span className="flex items-center gap-1 font-semibold">
                       <Check className="w-3 h-3 text-emerald-600" />
@@ -785,8 +913,8 @@ export default function AppointmentsPage() {
 
                 {/* Status Actions */}
                 <div className="flex gap-2 pt-1 border-t border-slate-100 flex-wrap">
-                  {/* Triage button for waiting or scheduled */}
-                  {(apt.status === 'waiting' || apt.status === 'scheduled') && can('action:record_vitals') && (
+                  {/* Triage button for waiting or scheduled (NOT required for Cosmetic Gynecology) */}
+                  {!isCosGyn && (apt.status === 'waiting' || apt.status === 'scheduled') && can('action:record_vitals') && (
                     <button
                       onClick={() => {
                         setTriageApt(apt);
@@ -818,7 +946,18 @@ export default function AppointmentsPage() {
                     </button>
                   )}
 
-                  {apt.status === 'waiting' && can('action:start_consultation') && (
+                  {/* Consultation / Procedure actions */}
+                  {apt.status === 'waiting' && isCosGyn && (
+                    <button
+                      onClick={() => updateStatus(apt.id, 'completed')}
+                      className="flex-1 text-xs font-bold px-3 py-2 bg-gradient-to-r from-pink-600 to-rose-500 text-white rounded-md hover:from-pink-700 hover:to-rose-600 transition-colors shadow-xs flex items-center justify-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Complete Procedure</span>
+                    </button>
+                  )}
+
+                  {apt.status === 'waiting' && !isCosGyn && can('action:start_consultation') && (
                     <button
                       onClick={() => handleStartConsultation(apt)}
                       className="flex-1 text-xs font-bold px-3 py-2 bg-primary text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
@@ -830,7 +969,7 @@ export default function AppointmentsPage() {
 
                   {apt.status === 'in_progress' && (
                     <>
-                      {can('action:start_consultation') && (
+                      {!isCosGyn && can('action:start_consultation') && (
                         <button
                           onClick={() => handleStartConsultation(apt)}
                           className="flex-1 text-xs font-bold px-3 py-2 bg-primary text-white rounded-md hover:bg-[rgb(var(--clr-primary)/0.9)] transition-colors shadow-xs flex items-center justify-center gap-1"
@@ -866,12 +1005,26 @@ export default function AppointmentsPage() {
                     </button>
                   )}
 
-                  <Link
-                    href={`/patients/${apt.patient_id}`}
-                    className="text-xs font-bold px-2.5 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
-                  >
-                    EMR
-                  </Link>
+                  {/* EMR Button - Not for Cosmetic Gynecology */}
+                  {!isCosGyn && (
+                    <Link
+                      href={`/patients/${apt.patient_id}`}
+                      className="text-xs font-bold px-2.5 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
+                    >
+                      EMR
+                    </Link>
+                  )}
+
+                  {isCosGyn && (
+                    <Link
+                      href="/cosgyn"
+                      className="text-xs font-bold px-2.5 py-2 bg-pink-50 text-pink-700 border border-pink-200 rounded-md hover:bg-pink-100 transition-colors flex items-center gap-1"
+                      title="Open Cosmetic Gynecology Dashboard"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-pink-600" />
+                      <span>CosGyn</span>
+                    </Link>
+                  )}
                 </div>
               </div>
             );
@@ -1453,6 +1606,6 @@ export default function AppointmentsPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

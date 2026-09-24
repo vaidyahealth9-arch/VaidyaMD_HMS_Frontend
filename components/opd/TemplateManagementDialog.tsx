@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog';
 import { opdApi } from '@/features/opd/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import {
   FileText,
   Pill,
@@ -340,18 +341,28 @@ export default function TemplateManagementDialog({
     }
   };
 
-  // Delete Custom Template
-  const handleDeleteTemplate = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete the template "${name}"?`)) return;
+  const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
 
+  // Delete Custom Template
+  const confirmDeleteTemplate = async () => {
+    if (!deletingTemplate) return;
+    setIsDeletingTemplate(true);
     try {
-      await opdApi.deleteTemplate(id);
-      toast.success('Template Deleted', `Template "${name}" has been removed.`);
+      await opdApi.deleteTemplate(deletingTemplate.id);
+      toast.success('Template Deleted', `Template "${deletingTemplate.name}" has been removed.`);
       await fetchCustomTemplates();
       if (onTemplatesUpdated) onTemplatesUpdated();
     } catch (err: any) {
       toast.error('Delete Failed', err.message || 'Failed to delete template');
+    } finally {
+      setIsDeletingTemplate(false);
+      setDeletingTemplate(null);
     }
+  };
+
+  const handleDeleteTemplate = (id: string, name: string) => {
+    setDeletingTemplate({ id, name });
   };
 
   // Add/remove medication rows
@@ -1075,6 +1086,17 @@ export default function TemplateManagementDialog({
             )}
           </div>
         </div>
+
+        <ConfirmDialog
+          isOpen={!!deletingTemplate}
+          onClose={() => setDeletingTemplate(null)}
+          onConfirm={confirmDeleteTemplate}
+          title="Delete Template"
+          description={`Are you sure you want to delete the template "${deletingTemplate?.name}"? This action cannot be undone.`}
+          confirmLabel="Yes, Delete"
+          variant="danger"
+          isLoading={isDeletingTemplate}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { templatesApi } from '@/lib/api';
 import DynamicForm from '@/components/dynamic-form/DynamicForm';
+import PageLayout from '@/components/common/PageLayout';
 import { Lock, Settings, Save, AlertTriangle } from 'lucide-react';
 
 export default function TemplateManagerPage() {
@@ -160,7 +161,7 @@ export default function TemplateManagerPage() {
   }
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -301,6 +302,6 @@ export default function TemplateManagerPage() {
         </div>
 
       </div>
-    </div>
+    </PageLayout>
   );
 }

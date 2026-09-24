@@ -105,7 +105,7 @@ export default function MockETPage() {
     <div className="min-h-screen print:min-h-0 bg-surface-muted print:bg-white">
       {/* Top bar */}
       <div className="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 print:hidden">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               href="/fertility/treatment-board"

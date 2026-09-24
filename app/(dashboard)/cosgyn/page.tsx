@@ -1,62 +1,112 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/ui/card';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
 import {
   Sparkles,
   Zap,
   Calendar,
-  Clock,
   CheckCircle2,
-  AlertCircle,
   Plus,
-  Search,
-  Users,
-  User,
   Activity,
   Stethoscope,
-  X,
-  Loader2,
-  ShieldCheck,
-  RotateCcw
+  List,
+  Package,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import PageLayout from '@/components/common/PageLayout';
+import TabBar from '@/components/common/TabBar';
+import PrintableCosGynScheduleModal from '@/components/common/PrintableCosGynScheduleModal';
 import { cosgynApi, patientsApi } from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import {
+  BookedPackagesTab,
+  ScheduleTab,
+  CalendarTab,
+  PackageCatalogTab,
+  BookPackageModal,
+  EditPlanScheduleModal,
+  CosGynBillingModal,
+  addDaysToDate,
+  getStepDays,
+} from '@/components/cosgyn';
+import type { EditableSessionItem } from '@/components/cosgyn/BookPackageModal';
 
 export default function CosGynDashboard() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'schedule' | 'packages'>('schedule');
+  const [activeTab, setActiveTab] = useState<'packages_booked' | 'schedule' | 'calendar' | 'packages'>('packages_booked');
   const [equipmentFilter, setEquipmentFilter] = useState<'all' | 'Jet Plasma' | 'Tesla Chair'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Booked Packages Tab State
+  const [packagesSearchQuery, setPackagesSearchQuery] = useState('');
+  const [packagesFilter, setPackagesFilter] = useState<'all' | 'in_progress' | 'completed' | 'unbilled'>('all');
+  const [expandedPlanIds, setExpandedPlanIds] = useState<Record<string, boolean>>({});
+
+  // Edit Package Schedule Modal State
+  const [isEditScheduleOpen, setIsEditScheduleOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [planEditSessions, setPlanEditSessions] = useState<{
+    id: string;
+    session_number: number;
+    equipment: string;
+    date: string;
+    time: string;
+    duration_mins: number;
+    status: string;
+  }[]>([]);
+
+  // Dedicated Billing Modal State
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [billingPlan, setBillingPlan] = useState<any | null>(null);
+
+  // Booking Modal Pricing & Billing options
+  const [bookingPackagePrice, setBookingPackagePrice] = useState<number>(0);
+  const [bookingBillingChoice, setBookingBillingChoice] = useState<'bill_later' | 'bill_now'>('bill_later');
+  const [bookingPaymentMethod, setBookingPaymentMethod] = useState<string>('cash');
+  const [bookingDiscount, setBookingDiscount] = useState<number>(0);
+  const [bookingPaidAmount, setBookingPaidAmount] = useState<number | null>(null);
+  const [bookingNotes, setBookingNotes] = useState<string>('');
+  const [bookingUpiRef, setBookingUpiRef] = useState<string>('');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // Booking Modal State
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState('');
-  const [modalPatientSearch, setModalPatientSearch] = useState('');
-  const [isModalPatientDropdownOpen, setIsModalPatientDropdownOpen] = useState(false);
-  const modalPatientDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [frequency, setFrequency] = useState('weekly');
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (modalPatientDropdownRef.current && !modalPatientDropdownRef.current.contains(event.target as Node)) {
-        setIsModalPatientDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Modality-Specific Start Dates, Times, Frequencies, and Durations
+  const [cosgynStartDate, setCosgynStartDate] = useState(todayStr);
+  const [cosgynTime, setCosgynTime] = useState('10:00');
+  const [cosgynFrequency, setCosgynFrequency] = useState('weekly');
+  const [cosgynDuration, setCosgynDuration] = useState(30);
+
+  const [teslaStartDate, setTeslaStartDate] = useState(todayStr);
+  const [teslaTime, setTeslaTime] = useState('11:30');
+  const [teslaFrequency, setTeslaFrequency] = useState('twice_weekly');
+  const [teslaDuration, setTeslaDuration] = useState(28);
+
+  const [prpStartDate, setPrpStartDate] = useState(todayStr);
+  const [prpTime, setPrpTime] = useState('12:30');
+  const [prpFrequency, setPrpFrequency] = useState('fortnightly');
+  const [prpDuration, setPrpDuration] = useState(45);
+
+  // Granular Editable Sessions Array
+  const [editableSessions, setEditableSessions] = useState<EditableSessionItem[]>([]);
+
+  // Printable Schedule State
+  const [printableScheduleData, setPrintableScheduleData] = useState<any | null>(null);
+
+  // Calendar View State
+  const [calendarDate, setCalendarDate] = useState(todayStr);
+  const [calendarEquipmentFilter, setCalendarEquipmentFilter] = useState<'all' | 'Tesla Chair' | 'Jet Plasma'>('all');
 
   // Fetch Treatments
-  const { data: treatments = [], isLoading: treatmentsLoading } = useQuery({
+  const { data: treatments = [] } = useQuery({
     queryKey: ['cosgyn', 'treatments'],
     queryFn: cosgynApi.getTreatments,
   });
@@ -68,6 +118,13 @@ export default function CosGynDashboard() {
     refetchInterval: 30000,
   });
 
+  // Fetch Booked Patient Treatment Plans
+  const { data: bookedPlans = [], isLoading: plansLoading } = useQuery({
+    queryKey: ['cosgyn', 'plans'],
+    queryFn: () => cosgynApi.getAllPlans(),
+    refetchInterval: 30000,
+  });
+
   // Fetch Patients
   const { data: patientsData } = useQuery({
     queryKey: ['patients-list'],
@@ -75,41 +132,361 @@ export default function CosGynDashboard() {
   });
   const patients = patientsData?.patients || patientsData?.items || [];
 
-  // Create Plan & Appointments Mutation
+  const selectedTreatment = treatments.find((t: any) => t.id === selectedTreatmentId);
+
+  // Auto-populate sessions whenever package or modality controls change
+  const generateSessions = () => {
+    if (!selectedTreatmentId) {
+      setEditableSessions([]);
+      return;
+    }
+
+    const list: EditableSessionItem[] = [];
+    let sNum = 1;
+
+    // 1. Jet Plasma / Cosmetic Gynae Procedure Sessions
+    const numJp = selectedTreatment
+      ? selectedTreatment.jet_plasma_sessions
+      : selectedTreatmentId === 'custom_jet'
+      ? 1
+      : 0;
+
+    let curJpDate = cosgynStartDate || todayStr;
+    for (let i = 0; i < numJp; i++) {
+      list.push({
+        id: `jp-${i + 1}`,
+        equipment: 'Jet Plasma',
+        session_number: sNum++,
+        date: curJpDate,
+        time: cosgynTime || '10:00',
+        duration_mins: Number(cosgynDuration) || selectedTreatment?.jet_plasma_duration_mins || 30,
+      });
+      curJpDate = addDaysToDate(curJpDate, getStepDays(cosgynFrequency, i));
+    }
+
+    // 2. Tesla Chair Pelvic Floor Sessions
+    const numTc = selectedTreatment
+      ? selectedTreatment.tesla_chair_sessions
+      : selectedTreatmentId === 'custom_tesla'
+      ? 1
+      : 0;
+
+    let curTcDate = teslaStartDate || todayStr;
+    for (let i = 0; i < numTc; i++) {
+      list.push({
+        id: `tc-${i + 1}`,
+        equipment: 'Tesla Chair',
+        session_number: sNum++,
+        date: curTcDate,
+        time: teslaTime || '11:30',
+        duration_mins: Number(teslaDuration) || selectedTreatment?.tesla_chair_duration_mins || 28,
+      });
+      curTcDate = addDaysToDate(curTcDate, getStepDays(teslaFrequency, i));
+    }
+
+    // 3. PRP Sessions
+    const numPrp = selectedTreatment ? selectedTreatment.prp_sessions : 0;
+    let curPrpDate = prpStartDate || todayStr;
+    for (let i = 0; i < numPrp; i++) {
+      list.push({
+        id: `prp-${i + 1}`,
+        equipment: 'PRP Therapy',
+        session_number: sNum++,
+        date: curPrpDate,
+        time: prpTime || '12:30',
+        duration_mins: Number(prpDuration) || 45,
+      });
+      curPrpDate = addDaysToDate(curPrpDate, getStepDays(prpFrequency, i));
+    }
+
+    // Fallback if standalone procedure
+    if (list.length === 0 && selectedTreatment) {
+      list.push({
+        id: 'proc-1',
+        equipment: selectedTreatment.package_combo || 'CosGyn Procedure',
+        session_number: 1,
+        date: cosgynStartDate || todayStr,
+        time: cosgynTime || '10:00',
+        duration_mins: 45,
+      });
+    }
+
+    setEditableSessions(list);
+  };
+
+  useEffect(() => {
+    generateSessions();
+  }, [
+    selectedTreatmentId,
+    cosgynStartDate,
+    cosgynTime,
+    cosgynFrequency,
+    cosgynDuration,
+    teslaStartDate,
+    teslaTime,
+    teslaFrequency,
+    teslaDuration,
+    prpStartDate,
+    prpTime,
+    prpFrequency,
+    prpDuration,
+  ]);
+
+  const handleOpenBookingModal = (treatmentId?: string, prefillDate?: string, prefillTime?: string, prefillEquip?: string) => {
+    const tId = treatmentId || (treatments.length > 0 ? treatments[0].id : '');
+    setSelectedTreatmentId(tId);
+
+    const targetTreat = treatments.find((t: any) => t.id === tId);
+    const p = targetTreat?.price || 0;
+    setBookingPackagePrice(p);
+    setBookingBillingChoice('bill_later');
+    setBookingDiscount(0);
+    setBookingPaidAmount(p);
+    setBookingPaymentMethod('cash');
+    setBookingNotes('');
+    setBookingUpiRef('');
+
+    const initialDate = prefillDate || todayStr;
+    setCosgynStartDate(initialDate);
+    setTeslaStartDate(initialDate);
+    setPrpStartDate(initialDate);
+
+    if (prefillTime) {
+      if (prefillEquip === 'Tesla Chair') setTeslaTime(prefillTime);
+      else setCosgynTime(prefillTime);
+    }
+
+    setIsBookingOpen(true);
+  };
+
+  const handleEditSessionRow = (index: number, field: keyof EditableSessionItem, value: any) => {
+    setEditableSessions((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const isSlotBooked = (equip: string, date: string, time: string) => {
+    return sessions.some((s: any) => {
+      if (s.status?.toLowerCase() === 'cancelled') return false;
+      if (s.equipment?.toLowerCase() !== equip.toLowerCase()) return false;
+      const sDate = s.scheduled_datetime ? s.scheduled_datetime.split('T')[0] : '';
+      const sTime = s.scheduled_datetime
+        ? new Date(s.scheduled_datetime).toTimeString().slice(0, 5)
+        : '';
+      return sDate === date && sTime === time;
+    });
+  };
+
+  // Mutations
   const createPlanMutation = useMutation({
     mutationFn: (payload: any) => cosgynApi.createPlan(payload),
-    onSuccess: () => {
+    onSuccess: (data: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['cosgyn', 'sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['cosgyn', 'plans'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setIsBookingOpen(false);
-      setSelectedPatientId('');
-      setSelectedTreatmentId('');
+
+      const pat = patients.find((p: any) => p.id === variables.patient_id);
+      const treat = treatments.find((t: any) => t.id === variables.treatment_id);
+
       setActionSuccess('Treatment package scheduled! Procedure appointments auto-generated in HMS calendar.');
       setTimeout(() => setActionSuccess(null), 6000);
+
+      if (variables._shouldPrint && variables.custom_sessions) {
+        setPrintableScheduleData({
+          patient: {
+            name: pat?.name || 'Patient',
+            mrn: pat?.mrn || pat?.vid,
+            age: pat?.age,
+            gender: pat?.gender,
+            phone: pat?.phone,
+          },
+          packageName: treat?.name || 'Cosmetic Gynecology Package',
+          packagePrice: treat?.price,
+          sessions: variables.custom_sessions,
+        });
+      }
+
+      setSelectedPatientId('');
     },
     onError: (err: any) => {
       alert(`Booking Failed: ${err.message || 'Error scheduling treatment package'}`);
     },
   });
 
-  // Update Session Status Mutation
   const updateSessionMutation = useMutation({
     mutationFn: ({ sessionId, status }: { sessionId: string; status: string }) =>
       cosgynApi.updateSession(sessionId, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cosgyn', 'sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['cosgyn', 'plans'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setActionSuccess('Session status updated successfully.');
       setTimeout(() => setActionSuccess(null), 4000);
     },
   });
 
-  const handleBookSubmit = (e: React.FormEvent) => {
+  const updatePlanScheduleMutation = useMutation({
+    mutationFn: ({ planId, sessionsPayload }: { planId: string; sessionsPayload: any[] }) =>
+      cosgynApi.updatePlanSchedule(planId, { sessions: sessionsPayload }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cosgyn', 'plans'] });
+      queryClient.invalidateQueries({ queryKey: ['cosgyn', 'sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setIsEditScheduleOpen(false);
+      setEditingPlan(null);
+      setActionSuccess('Treatment package schedule updated and synchronized with HMS calendar.');
+      setTimeout(() => setActionSuccess(null), 5000);
+    },
+    onError: (err: any) => {
+      alert(`Failed to update schedule: ${err.message || 'Error updating schedule'}`);
+    },
+  });
+
+  const handleOpenBillingModal = (plan: any) => {
+    setBillingPlan(plan);
+    setIsBillingModalOpen(true);
+  };
+
+  const handleOpenBillingModalForSession = (session: any) => {
+    let targetPlan = bookedPlans.find((p: any) => p.id === session.plan_id);
+    if (!targetPlan) {
+      const relatedSessions = sessions.filter(
+        (s: any) => s.plan_id === session.plan_id || s.patient_id === session.patient_id
+      );
+      targetPlan = {
+        id: session.plan_id,
+        patient_id: session.patient_id,
+        patient_name: session.patient_name,
+        patient_mrn: session.patient_id?.slice(0, 8),
+        treatment_name: session.treatment_name,
+        total_amount: 4000,
+        sessions: relatedSessions.length > 0 ? relatedSessions : [session],
+      };
+    }
+    handleOpenBillingModal(targetPlan);
+  };
+
+  const handleOpenEditSchedule = (plan: any) => {
+    setEditingPlan(plan);
+    const sessionsList = (plan.sessions || []).map((s: any) => {
+      const dateStr = s.scheduled_datetime ? s.scheduled_datetime.split('T')[0] : todayStr;
+      const timeStr = s.scheduled_datetime
+        ? (s.scheduled_datetime.split('T')[1]?.slice(0, 5) || '10:00')
+        : '10:00';
+      return {
+        id: s.id,
+        session_number: s.session_number,
+        equipment: s.equipment || 'CosGyn Procedure',
+        date: dateStr,
+        time: timeStr,
+        duration_mins: s.duration_mins || 30,
+        status: (s.status?.toLowerCase?.() || 'scheduled'),
+      };
+    });
+    setPlanEditSessions(sessionsList);
+    setIsEditScheduleOpen(true);
+  };
+
+  const handleOpenEditScheduleForSession = (session: any) => {
+    let targetPlan = bookedPlans.find((p: any) => p.id === session.plan_id);
+    if (!targetPlan) {
+      const relatedSessions = sessions.filter(
+        (s: any) => s.plan_id === session.plan_id || s.patient_id === session.patient_id
+      );
+      targetPlan = {
+        id: session.plan_id,
+        patient_id: session.patient_id,
+        patient_name: session.patient_name,
+        patient_mrn: session.patient_id?.slice(0, 8),
+        treatment_name: session.treatment_name,
+        sessions: relatedSessions.length > 0 ? relatedSessions : [session],
+      };
+    }
+    handleOpenEditSchedule(targetPlan);
+  };
+
+  const handleSavePlanSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan) return;
+    const payload = planEditSessions.map((s) => ({
+      id: s.id,
+      scheduled_datetime: `${s.date}T${s.time}:00`,
+      duration_mins: Number(s.duration_mins) || 30,
+      status: s.status,
+    }));
+    updatePlanScheduleMutation.mutate({ planId: editingPlan.id, sessionsPayload: payload });
+  };
+
+  const shiftAllDates = (days: number) => {
+    setPlanEditSessions((prev) =>
+      prev.map((s) => ({
+        ...s,
+        date: addDaysToDate(s.date, days),
+      }))
+    );
+  };
+
+  const bulkSetDuration = (duration: number) => {
+    setPlanEditSessions((prev) => prev.map((s) => ({ ...s, duration_mins: duration })));
+  };
+
+  const updatePlanEditSessionField = (index: number, field: string, val: any) => {
+    setPlanEditSessions((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: val };
+      return copy;
+    });
+  };
+
+  const toggleExpandPlan = (planId: string) => {
+    setExpandedPlanIds((prev) => ({ ...prev, [planId]: !prev[planId] }));
+  };
+
+  const filteredBookedPlans = useMemo(() => {
+    return bookedPlans.filter((p: any) => {
+      if (packagesFilter === 'in_progress') {
+        if (p.completed_sessions >= p.total_sessions && p.total_sessions > 0) return false;
+      } else if (packagesFilter === 'completed') {
+        if (p.completed_sessions < p.total_sessions || p.total_sessions === 0) return false;
+      } else if (packagesFilter === 'unbilled') {
+        if (p.billed === 'true') return false;
+      }
+
+      if (packagesSearchQuery) {
+        const q = packagesSearchQuery.toLowerCase().trim();
+        const pName = p.patient_name?.toLowerCase() || '';
+        const pMrn = p.patient_mrn?.toLowerCase() || '';
+        const pPhone = p.patient_phone?.toLowerCase() || '';
+        const tName = p.treatment_name?.toLowerCase() || '';
+        if (!pName.includes(q) && !pMrn.includes(q) && !pPhone.includes(q) && !tName.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [bookedPlans, packagesFilter, packagesSearchQuery]);
+
+  const handleBookSubmit = (e: React.FormEvent, shouldPrint = false) => {
     e.preventDefault();
     if (!selectedPatientId || !selectedTreatmentId) {
       alert('Please select both a registered patient and a treatment package.');
       return;
     }
+
+    if (editableSessions.length === 0) {
+      alert('No sessions configured for this package.');
+      return;
+    }
+
+    const customSessionsPayload = editableSessions.map((s) => ({
+      equipment: s.equipment,
+      session_number: s.session_number,
+      scheduled_datetime: `${s.date}T${s.time}:00`,
+      duration_mins: Number(s.duration_mins) || 30,
+    }));
 
     let finalTreatmentId = selectedTreatmentId;
     let singleEquipment = undefined;
@@ -121,12 +498,30 @@ export default function CosGynDashboard() {
       singleEquipment = 'Tesla Chair';
     }
 
+    const finalAmount = bookingPackagePrice || selectedTreatment?.price || 0;
+    const shouldBill = bookingBillingChoice === 'bill_now';
+    const netReceivable = Math.max(0, finalAmount - (Number(bookingDiscount) || 0));
+    const paidAmt = shouldBill
+      ? (bookingPaidAmount !== null ? Number(bookingPaidAmount) : netReceivable)
+      : 0;
+
+    const fullNotes = [
+      bookingNotes,
+      bookingUpiRef ? `UPI Ref: ${bookingUpiRef}` : null,
+    ].filter(Boolean).join(' | ');
+
     createPlanMutation.mutate({
       patient_id: selectedPatientId,
       treatment_id: finalTreatmentId !== 'manual' ? finalTreatmentId : undefined,
       equipment: singleEquipment,
-      start_date: startDate,
-      frequency: frequency,
+      custom_sessions: customSessionsPayload,
+      total_amount: finalAmount,
+      should_bill_now: shouldBill,
+      payment_method: bookingPaymentMethod,
+      discount: Number(bookingDiscount) || 0,
+      paid_amount: paidAmt,
+      billing_notes: fullNotes || undefined,
+      _shouldPrint: shouldPrint,
     });
   };
 
@@ -144,15 +539,47 @@ export default function CosGynDashboard() {
     return true;
   });
 
-  const selectedTreatment = treatments.find((t: any) => t.id === selectedTreatmentId);
+  // Calendar calculations
+  const operationalTimeSlots = useMemo(() => [
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+    '18:00', '18:30', '19:00',
+  ], []);
 
-  // Quick stats
+  const daySessions = useMemo(() => {
+    return sessions.filter((s: any) => {
+      if (!s.scheduled_datetime) return false;
+      const sDate = s.scheduled_datetime.split('T')[0];
+      return sDate === calendarDate && s.status !== 'cancelled';
+    });
+  }, [sessions, calendarDate]);
+
+  const vacancyStats = useMemo(() => {
+    const totalSlotsPerEquip = operationalTimeSlots.length;
+    const teslaBooked = daySessions.filter((s: any) => s.equipment === 'Tesla Chair').length;
+    const jetBooked = daySessions.filter((s: any) => s.equipment === 'Jet Plasma').length;
+
+    const totalSlots = totalSlotsPerEquip * 2;
+    const totalBooked = teslaBooked + jetBooked;
+    const totalVacant = Math.max(0, totalSlots - totalBooked);
+
+    return {
+      totalSlots,
+      totalBooked,
+      totalVacant,
+      teslaVacant: Math.max(0, totalSlotsPerEquip - teslaBooked),
+      jetVacant: Math.max(0, totalSlotsPerEquip - jetBooked),
+      occupancyRate: totalSlots > 0 ? Math.round((totalBooked / totalSlots) * 100) : 0,
+    };
+  }, [operationalTimeSlots, daySessions]);
+
   const totalSessions = sessions.length;
   const jetPlasmaCount = sessions.filter((s: any) => s.equipment === 'Jet Plasma' && s.status !== 'cancelled').length;
   const teslaChairCount = sessions.filter((s: any) => s.equipment === 'Tesla Chair' && s.status !== 'cancelled').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -167,18 +594,13 @@ export default function CosGynDashboard() {
               </Badge>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Protocol packages, Jet Plasma, Tesla Chair pelvic floor therapy, and automated appointment scheduling
+              Automated multi-modality scheduling for Tesla Chair pelvic floor therapy, Jet Plasma rejuvenation, and patient cards
             </p>
           </div>
         </div>
 
         <Button
-          onClick={() => {
-            if (treatments.length > 0 && !selectedTreatmentId) {
-              setSelectedTreatmentId(treatments[0].id);
-            }
-            setIsBookingOpen(true);
-          }}
+          onClick={() => handleOpenBookingModal()}
           className="gap-2 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white font-bold h-10 px-4 rounded-lg shadow-sm text-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -249,550 +671,185 @@ export default function CosGynDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 gap-6 text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('schedule')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-            activeTab === 'schedule'
-              ? 'border-pink-600 text-pink-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Equipment Sessions &amp; Appointments ({filteredSessions.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('packages')}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-            activeTab === 'packages'
-              ? 'border-pink-600 text-pink-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Treatment Packages &amp; Protocols ({treatments.length})</span>
-        </button>
-      </div>
+      <TabBar
+        variant="underline"
+        tabs={[
+          { id: 'packages_booked', label: 'Booked Packages', icon: Package, badge: bookedPlans.length },
+          { id: 'schedule', label: `Equipment Sessions & Appointments (${filteredSessions.length})`, icon: List },
+          { id: 'calendar', label: 'Calendar & Vacancy Slot Matrix', icon: Calendar },
+          { id: 'packages', label: `Treatment Packages & Protocols (${treatments.length})`, icon: Sparkles },
+        ]}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as any)}
+      />
 
-      {/* TAB 1: EQUIPMENT SCHEDULE */}
+      {/* Tab Contents */}
+      {activeTab === 'packages_booked' && (
+        <BookedPackagesTab
+          bookedPlans={bookedPlans}
+          plansLoading={plansLoading}
+          packagesSearchQuery={packagesSearchQuery}
+          setPackagesSearchQuery={setPackagesSearchQuery}
+          packagesFilter={packagesFilter}
+          setPackagesFilter={setPackagesFilter}
+          filteredBookedPlans={filteredBookedPlans}
+          expandedPlanIds={expandedPlanIds}
+          toggleExpandPlan={toggleExpandPlan}
+          onOpenBookingModal={handleOpenBookingModal}
+          onOpenEditSchedule={handleOpenEditSchedule}
+          onPrintSchedule={(plan) => {
+            setPrintableScheduleData({
+              patient: {
+                name: plan.patient_name,
+                vid: plan.patient_id?.slice(0, 8),
+                mrn: plan.patient_mrn,
+                age: plan.patient_age,
+                gender: plan.patient_gender,
+                phone: plan.patient_phone,
+              },
+              packageName: plan.treatment_name,
+              packagePrice: plan.total_amount,
+              sessions: plan.sessions || [],
+            });
+          }}
+          onOpenBillingModal={handleOpenBillingModal}
+          onUpdateSessionStatus={(sessionId, status) => updateSessionMutation.mutate({ sessionId, status })}
+          isUpdatingSession={updateSessionMutation.isPending}
+        />
+      )}
+
       {activeTab === 'schedule' && (
-        <div className="space-y-4">
-          {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="relative w-64 sm:w-72">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search patient, ID, or treatment..."
-                  className="pl-8 pr-7 h-8 text-xs bg-slate-50"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Equipment Filter */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md">
-                <button
-                  onClick={() => setEquipmentFilter('all')}
-                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    equipmentFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All Equipment
-                </button>
-                <button
-                  onClick={() => setEquipmentFilter('Jet Plasma')}
-                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    equipmentFilter === 'Jet Plasma' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Jet Plasma
-                </button>
-                <button
-                  onClick={() => setEquipmentFilter('Tesla Chair')}
-                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    equipmentFilter === 'Tesla Chair' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Tesla Chair
-                </button>
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md">
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All Status
-                </button>
-                <button
-                  onClick={() => setStatusFilter('scheduled')}
-                  className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'scheduled' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Scheduled
-                </button>
-                <button
-                  onClick={() => setStatusFilter('completed')}
-                  className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Completed
-                </button>
-              </div>
-            </div>
-
-            <span className="text-slate-500 font-medium">
-              Showing {filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}
-            </span>
-          </div>
-
-          {/* Sessions Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            {sessionsLoading ? (
-              <div className="py-12 flex justify-center items-center">
-                <Loader2 className="w-8 h-8 animate-spin text-pink-600" />
-              </div>
-            ) : filteredSessions.length === 0 ? (
-              <div className="py-16 text-center space-y-3">
-                <Calendar className="w-12 h-12 text-slate-300 mx-auto" />
-                <p className="text-sm font-bold text-slate-700">No equipment sessions found</p>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Use the "Book Package &amp; Schedule Sessions" button above to enroll a patient in a Cosmetic Gynecology protocol.
-                </p>
-                <Button
-                  onClick={() => setIsBookingOpen(true)}
-                  className="bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold h-8 mt-2"
-                >
-                  + Book First Session
-                </Button>
-              </div>
-            ) : (
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3.5">Patient</th>
-                    <th className="p-3.5">Equipment</th>
-                    <th className="p-3.5">Protocol / Package</th>
-                    <th className="p-3.5">Scheduled Date &amp; Time</th>
-                    <th className="p-3.5">Duration</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredSessions.map((session: any) => {
-                    const isJet = session.equipment === 'Jet Plasma';
-                    const isDone = session.status?.toLowerCase() === 'completed';
-
-                    return (
-                      <tr key={session.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="p-3.5">
-                          <p className="font-bold text-slate-900">{session.patient_name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">ID: {session.patient_id?.slice(0, 8)}...</p>
-                        </td>
-                        <td className="p-3.5">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs font-bold gap-1.5 ${
-                              isJet
-                                ? 'bg-primary/10 border-primary/20 text-primary'
-                                : 'bg-purple-50 border-purple-200 text-purple-700'
-                            }`}
-                          >
-                            <Zap className="w-3 h-3" />
-                            {session.equipment}
-                          </Badge>
-                        </td>
-                        <td className="p-3.5 font-semibold text-slate-800 max-w-xs truncate">
-                          {session.treatment_name}
-                        </td>
-                        <td className="p-3.5 font-bold text-slate-900">
-                          {new Date(session.scheduled_datetime).toLocaleString('en-IN', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </td>
-                        <td className="p-3.5 text-slate-600 font-semibold flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          {session.duration_mins} mins
-                        </td>
-                        <td className="p-3.5">
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
-                              isDone
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                : session.status?.toLowerCase() === 'cancelled'
-                                ? 'bg-rose-100 text-rose-800 border-rose-300'
-                                : 'bg-sky-100 text-sky-800 border-sky-300'
-                            }`}
-                          >
-                            {session.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3.5 text-right">
-                          {!isDone ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateSessionMutation.mutate({ sessionId: session.id, status: 'completed' })}
-                              disabled={updateSessionMutation.isPending}
-                              className="h-7 text-xs font-bold border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                              Mark Done
-                            </Button>
-                          ) : (
-                            <span className="text-[11px] text-emerald-600 font-bold flex items-center justify-end gap-1">
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                              Completed
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        <ScheduleTab
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          equipmentFilter={equipmentFilter}
+          setEquipmentFilter={setEquipmentFilter}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          filteredSessions={filteredSessions}
+          sessions={sessions}
+          patients={patients}
+          sessionsLoading={sessionsLoading}
+          onOpenBookingModal={handleOpenBookingModal}
+          onPrintSchedule={setPrintableScheduleData}
+          onOpenEditScheduleForSession={handleOpenEditScheduleForSession}
+          onOpenBillingModalForSession={handleOpenBillingModalForSession}
+          onUpdateSessionStatus={(sessionId, status) => updateSessionMutation.mutate({ sessionId, status })}
+          isUpdatingSession={updateSessionMutation.isPending}
+        />
       )}
 
-      {/* TAB 2: PACKAGES & PROTOCOLS */}
+      {activeTab === 'calendar' && (
+        <CalendarTab
+          calendarDate={calendarDate}
+          setCalendarDate={setCalendarDate}
+          calendarEquipmentFilter={calendarEquipmentFilter}
+          setCalendarEquipmentFilter={setCalendarEquipmentFilter}
+          todayStr={todayStr}
+          operationalTimeSlots={operationalTimeSlots}
+          daySessions={daySessions}
+          slotVacancyStats={vacancyStats}
+          onOpenBookingModal={handleOpenBookingModal}
+        />
+      )}
+
       {activeTab === 'packages' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {treatments.map((t: any) => (
-            <Card key={t.id} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-              <div>
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <Badge variant="purple" className="text-[10px] font-bold mb-1.5">
-                        {t.package_combo || 'Cosmetic Gynae'}
-                      </Badge>
-                      <CardTitle className="text-base font-bold text-slate-900 leading-snug">
-                        {t.name}
-                      </CardTitle>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3 text-xs">
-                  <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100 font-medium">
-                    <div className="flex items-center justify-between text-slate-700">
-                      <span className="flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-primary" />
-                        Jet Plasma Sessions:
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {t.jet_plasma_sessions}x ({t.jet_plasma_duration_mins}m)
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-slate-700">
-                      <span className="flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-purple-500" />
-                        Tesla Chair Sessions:
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {t.tesla_chair_sessions}x ({t.tesla_chair_duration_mins}m)
-                      </span>
-                    </div>
-
-                    {t.prp_sessions > 0 && (
-                      <div className="flex items-center justify-between text-slate-700">
-                        <span className="flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-                          PRP Infiltrations:
-                        </span>
-                        <span className="font-bold text-slate-900">{t.prp_sessions} session</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </div>
-
-              <div className="p-4 pt-0 border-t border-slate-100 mt-2 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Package Fee</span>
-                  <span className="text-lg font-extrabold text-pink-700">{formatCurrency(t.price)}</span>
-                </div>
-                <Button
-                  onClick={() => {
-                    setSelectedTreatmentId(t.id);
-                    setIsBookingOpen(true);
-                  }}
-                  className="bg-pink-600 hover:bg-pink-700 text-white font-bold h-8 text-xs rounded-md shadow-xs"
-                >
-                  Book Package
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <PackageCatalogTab
+          treatments={treatments}
+          onOpenBookingModal={handleOpenBookingModal}
+        />
       )}
 
-      {/* BOOK PACKAGE & SCHEDULE MODAL */}
-      {isBookingOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="bg-gradient-to-r from-pink-600 to-rose-500 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-5 h-5" />
-                <div>
-                  <h3 className="text-base font-bold">Book Cosmetic Gynecology Package</h3>
-                  <p className="text-xs text-pink-100">Generates treatment plan &amp; recurring appointments in HMS calendar</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsBookingOpen(false)}
-                className="text-white/70 hover:text-white text-xl font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Modals */}
+      <BookPackageModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        patients={patients}
+        treatments={treatments}
+        selectedPatientId={selectedPatientId}
+        setSelectedPatientId={setSelectedPatientId}
+        selectedTreatmentId={selectedTreatmentId}
+        setSelectedTreatmentId={setSelectedTreatmentId}
+        selectedTreatment={selectedTreatment}
+        cosgynStartDate={cosgynStartDate}
+        setCosgynStartDate={setCosgynStartDate}
+        cosgynTime={cosgynTime}
+        setCosgynTime={setCosgynTime}
+        cosgynFrequency={cosgynFrequency}
+        setCosgynFrequency={setCosgynFrequency}
+        cosgynDuration={cosgynDuration}
+        setCosgynDuration={setCosgynDuration}
+        teslaStartDate={teslaStartDate}
+        setTeslaStartDate={setTeslaStartDate}
+        teslaTime={teslaTime}
+        setTeslaTime={setTeslaTime}
+        teslaFrequency={teslaFrequency}
+        setTeslaFrequency={setTeslaFrequency}
+        teslaDuration={teslaDuration}
+        setTeslaDuration={setTeslaDuration}
+        editableSessions={editableSessions}
+        generateSessions={generateSessions}
+        handleEditSessionRow={handleEditSessionRow}
+        isSlotBooked={isSlotBooked}
+        bookingPackagePrice={bookingPackagePrice}
+        setBookingPackagePrice={setBookingPackagePrice}
+        bookingBillingChoice={bookingBillingChoice}
+        setBookingBillingChoice={setBookingBillingChoice}
+        bookingDiscount={bookingDiscount}
+        setBookingDiscount={setBookingDiscount}
+        bookingPaidAmount={bookingPaidAmount}
+        setBookingPaidAmount={setBookingPaidAmount}
+        bookingPaymentMethod={bookingPaymentMethod}
+        setBookingPaymentMethod={setBookingPaymentMethod}
+        bookingUpiRef={bookingUpiRef}
+        setBookingUpiRef={setBookingUpiRef}
+        bookingNotes={bookingNotes}
+        setBookingNotes={setBookingNotes}
+        handleBookSubmit={handleBookSubmit}
+        isCreatingPlan={createPlanMutation.isPending}
+      />
 
-            <form onSubmit={handleBookSubmit} className="p-6 space-y-4 text-xs">
-              {/* Patient Selector with Searchable Combobox */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 block">Select Patient *</label>
-                {(() => {
-                  const selectedPat = patients.find((p: any) => p.id === selectedPatientId);
+      <EditPlanScheduleModal
+        isOpen={isEditScheduleOpen}
+        editingPlan={editingPlan}
+        onClose={() => {
+          setIsEditScheduleOpen(false);
+          setEditingPlan(null);
+        }}
+        planEditSessions={planEditSessions}
+        onSave={handleSavePlanSchedule}
+        isSaving={updatePlanScheduleMutation.isPending}
+        shiftAllDates={shiftAllDates}
+        bulkSetDuration={bulkSetDuration}
+        updatePlanEditSessionField={updatePlanEditSessionField}
+      />
 
-                  if (selectedPat) {
-                    return (
-                      <div className="p-3 bg-pink-50 border border-pink-200 rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-pink-200 text-pink-800 flex items-center justify-center font-bold text-xs">
-                            {selectedPat.name?.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-pink-950">{selectedPat.name}</p>
-                            <p className="text-[11px] text-pink-700 font-mono">
-                              MRN: {selectedPat.mrn || selectedPat.vid || 'N/A'} · {selectedPat.gender || 'F'} · {selectedPat.age ? `${selectedPat.age}y` : ''} · {selectedPat.phone || ''}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPatientId('');
-                            setModalPatientSearch('');
-                            setIsModalPatientDropdownOpen(true);
-                          }}
-                          className="h-7 text-xs border-pink-300 text-pink-800 hover:bg-pink-100"
-                        >
-                          Change
-                        </Button>
-                      </div>
-                    );
-                  }
-
-                  const query = modalPatientSearch.toLowerCase().trim();
-                  const filtered = patients.filter((p: any) => {
-                    if (!query) return true;
-                    return (
-                      p.name?.toLowerCase().includes(query) ||
-                      p.mrn?.toLowerCase().includes(query) ||
-                      p.vid?.toLowerCase().includes(query) ||
-                      p.phone?.toLowerCase().includes(query)
-                    );
-                  }).slice(0, 15);
-
-                  return (
-                    <div className="relative" ref={modalPatientDropdownRef}>
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input
-                          type="text"
-                          placeholder="Type patient name, MRN, VID, or phone..."
-                          value={modalPatientSearch}
-                          onChange={(e) => {
-                            setModalPatientSearch(e.target.value);
-                            setIsModalPatientDropdownOpen(true);
-                          }}
-                          onFocus={() => setIsModalPatientDropdownOpen(true)}
-                          className="pl-9 pr-9 h-9 text-xs bg-slate-50 border-slate-300 focus:bg-white focus:ring-2 focus:ring-pink-500"
-                        />
-                        {modalPatientSearch && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setModalPatientSearch('');
-                              setIsModalPatientDropdownOpen(true);
-                            }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Dropdown list */}
-                      {isModalPatientDropdownOpen && (
-                        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100">
-                          {filtered.length === 0 ? (
-                            <div className="p-3 text-center text-xs text-slate-500 font-medium">
-                              No patients found matching "{modalPatientSearch}"
-                            </div>
-                          ) : (
-                            filtered.map((p: any) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPatientId(p.id);
-                                  setModalPatientSearch('');
-                                  setIsModalPatientDropdownOpen(false);
-                                }}
-                                className="w-full text-left p-2.5 hover:bg-pink-50/60 transition-colors flex items-center justify-between group"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[11px] group-hover:bg-pink-100 group-hover:text-pink-800">
-                                    {p.name?.slice(0, 2).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-bold text-slate-900 group-hover:text-pink-950">
-                                      {p.name}
-                                    </p>
-                                    <p className="text-[10px] text-slate-500 font-mono">
-                                      MRN: {p.mrn || p.vid || 'N/A'} · {p.gender || 'F'} · {p.age ? `${p.age}y` : ''} · {p.phone || 'No phone'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <span className="text-[10px] font-bold text-pink-600 opacity-0 group-hover:opacity-100 uppercase tracking-wider">
-                                  Select →
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Treatment Package Selector */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Treatment Protocol / Package *</label>
-                <select
-                  value={selectedTreatmentId}
-                  onChange={(e) => setSelectedTreatmentId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  required
-                >
-                  <option value="">-- Choose Protocol --</option>
-                  <optgroup label="Single Standalone Sessions">
-                    <option value="custom_jet">Single Session: Jet Plasma</option>
-                    <option value="custom_tesla">Single Session: Tesla Chair</option>
-                  </optgroup>
-                  <optgroup label="Pre-configured Packages">
-                    {treatments.map((t: any) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} — {formatCurrency(t.price)}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              {/* Selected Package Summary Card */}
-              {selectedTreatment && (
-                <div className="p-3 bg-pink-50 border border-pink-200 rounded-lg space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-pink-950 text-xs">{selectedTreatment.name}</span>
-                    <span className="font-extrabold text-pink-700 text-sm">{formatCurrency(selectedTreatment.price)}</span>
-                  </div>
-                  <div className="flex gap-4 text-[11px] text-pink-800">
-                    <span>⚡ Jet Plasma: {selectedTreatment.jet_plasma_sessions} sessions</span>
-                    <span>🪑 Tesla Chair: {selectedTreatment.tesla_chair_sessions} sessions</span>
-                    {selectedTreatment.prp_sessions > 0 && <span>✨ PRP: {selectedTreatment.prp_sessions} session</span>}
-                  </div>
-                </div>
-              )}
-
-              {/* Date & Frequency */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">First Session Date *</label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="h-9 text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Session Frequency *</label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 h-9 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="twice_weekly">Twice a Week (e.g. Mon / Thu)</option>
-                    <option value="weekly">Weekly (Every 7 Days)</option>
-                    <option value="fortnightly">Fortnightly (Every 14 Days)</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-md border border-slate-200 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-pink-600 flex-shrink-0" />
-                <span>
-                  Confirming this will automatically schedule all {selectedTreatment ? (selectedTreatment.jet_plasma_sessions + selectedTreatment.tesla_chair_sessions) : 'protocol'} sessions in the hospital procedure calendar.
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsBookingOpen(false)}
-                  className="h-9 text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createPlanMutation.isPending || !selectedPatientId || !selectedTreatmentId}
-                  className="bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white font-bold h-9 text-xs px-5 shadow-sm"
-                >
-                  {createPlanMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                      Generating Appointments...
-                    </>
-                  ) : (
-                    'Confirm & Schedule Package'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {isBillingModalOpen && billingPlan && (
+        <CosGynBillingModal
+          isOpen={isBillingModalOpen}
+          billingPlan={billingPlan}
+          onClose={() => {
+            setIsBillingModalOpen(false);
+            setBillingPlan(null);
+          }}
+          onSuccess={(res) => {
+            setIsBillingModalOpen(false);
+            setBillingPlan(null);
+            setActionSuccess(`Official Invoice #${res.invoice_number} created successfully! Total: ₹${res.total_amount}`);
+            setTimeout(() => setActionSuccess(null), 6000);
+          }}
+        />
       )}
-    </div>
+
+      {printableScheduleData && (
+        <PrintableCosGynScheduleModal
+          patient={printableScheduleData.patient}
+          packageName={printableScheduleData.packageName}
+          packagePrice={printableScheduleData.packagePrice}
+          sessions={printableScheduleData.sessions}
+          onClose={() => setPrintableScheduleData(null)}
+        />
+      )}
+    </PageLayout>
   );
 }

@@ -43,6 +43,8 @@ export interface PrintableReportHeaderProps {
   };
   date?: string;
   metaFields?: Array<{ label: string; value: React.ReactNode }>;
+  headerBoldColor?: string;
+  headerSmallColor?: string;
   [key: string]: any;
 }
 
@@ -73,6 +75,8 @@ export default function PrintableReportHeader({
   doctor,
   date = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
   metaFields,
+  headerBoldColor: propBoldColor,
+  headerSmallColor: propSmallColor,
 }: PrintableReportHeaderProps) {
   const isHeaderVisible = hideHospitalHeader !== undefined ? !hideHospitalHeader : includeHeader;
   const { currentBranch, user } = useAuth() || {};
@@ -118,12 +122,23 @@ export default function PrintableReportHeader({
     : '';
 
   const statutoryLine = [regPart, gstinPart].filter(Boolean).join(' · ');
+  const effectiveBoldColor =
+    propBoldColor ||
+    currentBranch?.receipt_header?.header_bold_color ||
+    '#4A2E2B';
+  const effectiveSmallColor =
+    propSmallColor ||
+    currentBranch?.receipt_header?.header_small_color ||
+    '#C29B7F';
+  const padHeaderHeight = currentBranch?.receipt_header?.pad_header_height_mm
+    ? `${currentBranch.receipt_header.pad_header_height_mm}mm`
+    : '32mm';
   const initialLetter = (effectiveHospitalName || 'H').charAt(0).toUpperCase();
 
   return (
-    <div className="space-y-4">
+    <div className="printable-report-header printable-header-container w-full">
       {onTogglePrePrintedPad && (
-        <div className="flex justify-end print:hidden -mb-2">
+        <div className="flex justify-end print:hidden px-6 sm:px-8 pt-2 pb-1">
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
             <input
               type="checkbox"
@@ -135,88 +150,106 @@ export default function PrintableReportHeader({
           </label>
         </div>
       )}
-      {/* ── Hospital Letterhead Banner (Conditional) ── */}
-      {isHeaderVisible ? (
-        <div className="flex items-start justify-between pb-3 border-b-2 border-[#0B4F6C]">
-          <div className="flex items-start gap-3">
+
+      {/* ── Header container: standard flex flow at top of sheet on screen and in print ── */}
+      <div className="print-header-anchor w-full bg-white shrink-0">
+        {/* ── Top Bold Accent Stripe (Full Bleed to Paper Edges) ── */}
+        {isHeaderVisible ? (
+          <div
+            className="h-2 w-full block m-0 p-0 shrink-0"
+            style={{
+              backgroundColor: effectiveBoldColor,
+              borderTop: `6px solid ${effectiveBoldColor}`,
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact',
+            }}
+          />
+        ) : null}
+
+        {/* ── Hospital Letterhead Banner (Logo Only, Centered & Clean) ── */}
+        {isHeaderVisible ? (
+          <div className="px-6 sm:px-8 print:px-[12mm] pb-2 pt-2 flex flex-col items-center justify-center text-center gap-1">
             {effectiveLogoUrl ? (
-              <div className="h-12 w-auto max-w-[150px] flex items-center justify-center shrink-0">
-                <img
-                  src={effectiveLogoUrl}
-                  alt={effectiveHospitalName}
-                  className="max-h-12 max-w-[150px] object-contain"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
-                    const fallback = e.currentTarget.parentElement?.nextElementSibling as HTMLElement;
-                    if (fallback) fallback.style.display = 'flex';
-                  }}
-                />
-              </div>
+              /* Logo-only header — matching reference letterhead */
+              <img
+                src={effectiveLogoUrl}
+                alt={effectiveHospitalName}
+                className="max-h-24 max-w-[400px] object-contain mx-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                  const sib = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (sib) sib.style.display = 'flex';
+                }}
+              />
             ) : null}
+            {/* Text fallback — shown only when no logo or logo fails to load */}
             <div
-              className={`w-11 h-11 rounded-lg items-center justify-center flex-shrink-0 text-white font-bold text-lg shadow-xs ${
-                effectiveLogoUrl ? 'hidden' : 'flex'
-              }`}
-              style={{ background: '#0B4F6C' }}
+              className={`flex items-center justify-center gap-2 ${effectiveLogoUrl ? 'hidden' : 'flex'}`}
             >
-              {initialLetter}
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow"
+                style={{
+                  backgroundColor: effectiveBoldColor,
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact',
+                }}
+              >
+                {initialLetter}
+              </div>
+              <div className="text-left">
+                <h1 className="font-bold text-xl leading-tight text-slate-900 tracking-wide uppercase">
+                  {effectiveHospitalName}
+                </h1>
+                {effectiveSubtitle && (
+                  <p className="text-xs font-semibold text-slate-500">{effectiveSubtitle}</p>
+                )}
+              </div>
             </div>
-            <div>
-              <h1 className="font-bold text-base sm:text-lg leading-tight text-[#0B4F6C]">
-                {effectiveHospitalName}
-              </h1>
-              <p className="text-[11px] font-semibold text-slate-700 mt-0.5">
-                {department} · {effectiveSubtitle}
-              </p>
-              {effectiveSubtext && (
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  {effectiveSubtext}
-                </p>
-              )}
-              {statutoryLine && (
-                <p className="text-[9px] text-slate-400 font-mono mt-0.5">
-                  {statutoryLine}
-                </p>
-              )}
-            </div>
+            {/* ── Small / Thin Divider Line Under Logo (Full Bleed) ── */}
+            <div
+              className="w-full mt-2"
+              style={{
+                height: '1.5px',
+                backgroundColor: effectiveSmallColor,
+                borderTop: `1.5px solid ${effectiveSmallColor}`,
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
+              }}
+            />
           </div>
-
-          <div className="text-right flex-shrink-0">
-            {badge && (
-              <span className="inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-[#0B4F6C] border border-blue-200">
-                {badge}
-              </span>
-            )}
-            <p className="text-[11px] font-mono text-slate-600 font-semibold mt-1">
+        ) : (
+          /* Top spacing for pre-printed letterhead pads (repeats on every page in print) */
+          <div
+            className="w-full flex items-end justify-between border-b border-slate-300 print:border-none pb-2 px-6 sm:px-8 print:px-[12mm]"
+            style={{ height: padHeaderHeight }}
+          >
+            <span className="text-[10px] text-slate-400 italic print:hidden">
+              [Pre-printed Letterhead Pad Space ({currentBranch?.receipt_header?.pad_header_height_mm || 35} mm)]
+            </span>
+            <span className="text-[10px] font-mono text-slate-500 font-bold">
               Date: {date}
-            </p>
+            </span>
           </div>
-        </div>
-      ) : (
-        /* Top spacing for pre-printed letterhead pads */
-        <div className="h-20 print:h-24 flex items-end justify-between border-b border-slate-300 print:border-none pb-2">
-          <span className="text-[10px] text-slate-400 italic print:hidden">
-            [Pre-printed Letterhead Pad Space]
-          </span>
-          <span className="text-[10px] font-mono text-slate-500 font-bold">
-            Date: {date}
-          </span>
-        </div>
-      )}
-
-      {/* ── Document Title ── */}
-      <div className="text-center my-2">
-        <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-wide uppercase">
-          {title}
-        </h2>
+        )}
       </div>
 
-      {/* ── Patient & Clinical Demographics Strip ── */}
-      {(patient || partner || doctor || metaFields) && (
-        <div
-          className="rounded-lg p-3 text-xs grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-4"
-          style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}
-        >
+      {/* ── Page Clinical Demographics & Document Title ── */}
+      <div className="px-6 sm:px-8 print:px-[12mm] pt-2 space-y-3">
+        {/* ── Document Title ── */}
+        {title && (
+          <div className="text-center my-1">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-wide uppercase">
+              {title}
+            </h2>
+          </div>
+        )}
+
+        {/* ── Patient & Clinical Demographics Strip ── */}
+        {(patient || partner || doctor || metaFields) && (
+          <div
+            className="rounded-lg p-3 text-xs grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-4"
+            style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}
+          >
           {patient?.name && (
             <div>
               <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">
@@ -295,6 +328,8 @@ export default function PrintableReportHeader({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
+

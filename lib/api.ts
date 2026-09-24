@@ -70,6 +70,8 @@ export * from '@/features/auth/types';
 export * from '@/features/patients/types';
 export * from '@/features/billing/types';
 export * from '@/features/fertility/types';
+export * from '@/features/cosgyn/types';
+export * from '@/features/ipd/types';
 
 // ==========================================
 // 1. Core Auth, Branches, Users, Permissions, Templates

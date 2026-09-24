@@ -43,9 +43,13 @@ import { Badge } from '@/shared/ui/badge';
 import SmartOrderDialog from './SmartOrderDialog';
 import TemplateManagementDialog, { ClinicalTemplateItem, RxTemplateItem } from './TemplateManagementDialog';
 import PrintablePrescription from '@/components/common/PrintablePrescription';
-import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableCounselingSheetModal from '@/components/common/PrintableCounselingSheetModal';
 import ClinicalHistoryProformaModal from './ClinicalHistoryProformaModal';
 import EditAlertsModal from '@/components/patients/EditAlertsModal';
+import OPDSidebar from './OPDSidebar';
+import OPDVitalsSection from './OPDVitalsSection';
+import OPDPrescriptionSection from './OPDPrescriptionSection';
+import ConsultationRecordModal from './ConsultationRecordModal';
 import { toast } from '@/contexts/ToastContext';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
 
@@ -285,7 +289,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   }, [triageData, currentAppointment, consultationHistory]);
 
   // Form Setup with Clean Non-Dummy Defaults
-  const { register, handleSubmit, setValue, watch, reset, control } = useForm({
+  const { register, handleSubmit, setValue, getValues, watch, reset, control } = useForm({
     defaultValues: {
       weight: '',
       height: '',
@@ -319,7 +323,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     },
   });
 
-  const { fields: medFields, append: appendMed, remove: removeMed } = useFieldArray({
+  const { fields: medFields, append: appendMed, remove: removeMed, replace: replaceMeds } = useFieldArray({
     control,
     name: 'medications'
   });
@@ -399,34 +403,93 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Helper to extract structured prescription medications with fallback
+  // Helper to extract structured prescription medications
   const resolvePrescriptionMeds = (rawMeds: any[], fallbackPlan?: string) => {
     if (Array.isArray(rawMeds) && rawMeds.length > 0) {
       const valid = rawMeds
-        .filter((m: any) => (m.drug_name || m.drug) && (m.drug_name || m.drug).trim())
+        .filter((m: any) => (m?.drug_name || m?.drug) && (m?.drug_name || m?.drug).toString().trim())
         .map((m: any) => ({
-          drug: m.drug_name || m.drug,
-          dose: m.dose || '1 tab',
+          drug: (m.drug_name || m.drug).toString().trim(),
+          dose: m.dose ? m.dose.toString().trim() : '1 tab',
           freq: m.frequency || m.freq || 'OD',
-          duration: m.duration || '—',
-          instructions: m.instructions || 'After food',
+          duration: m.duration ? m.duration.toString().trim() : '—',
+          instructions: m.instructions ? m.instructions.toString().trim() : 'After food',
         }));
       if (valid.length > 0) return valid;
     }
 
-    if (fallbackPlan) {
-      return fallbackPlan
+    if (fallbackPlan && typeof fallbackPlan === 'string' && fallbackPlan.trim()) {
+      const lines = fallbackPlan
         .split('\n')
-        .filter((l: string) => l.trim().length > 0)
-        .map((line: string) => ({
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0);
+      
+      // Only treat fallback lines as meds if they look like medications (e.g. Tab/Inj/Cap/Syp/numbered lines)
+      const likelyMeds = lines.filter(l => /^(tab|inj|cap|syp|tablet|injection|capsule|\d+[\.\)])\s+/i.test(l));
+      if (likelyMeds.length > 0) {
+        return likelyMeds.map((line: string) => ({
           drug: line.replace(/^\d+[\.\)]\s*/, '').trim(),
           dose: 'As advised',
           freq: 'OD',
           duration: '—',
           instructions: 'As directed by physician',
         }));
+      }
     }
     return [];
+  };
+
+  // Open Prescription Print Preview directly from current form state
+  const handleOpenPrintPreview = (customMeds?: any[]) => {
+    const rawMeds = customMeds || getValues('medications') || [];
+    const meds = resolvePrescriptionMeds(rawMeds);
+    const formVals = getValues();
+    setPrintablePrescription({
+      patient: {
+        name: patient?.name,
+        vid: patient?.vid,
+        mrn: patient?.mrn,
+        age: patient?.age,
+        gender: patient?.gender,
+        phone: patient?.phone,
+        blood_group: patient?.blood_group,
+      },
+      doctor: {
+        name: user?.name || 'Dr. Consultant Specialist',
+        department: 'Reproductive Medicine & Infertility',
+      },
+      visitDate: new Date().toISOString().split('T')[0],
+      chiefComplaint: formVals.chief_complaints,
+      hopi: formVals.present_history || formVals.history_of_illness,
+      pastHistory: formVals.previous_history,
+      examination: formVals.examination,
+      vitals: {
+        bp:
+          formVals.blood_pressure_systolic && formVals.blood_pressure_diastolic
+            ? `${formVals.blood_pressure_systolic}/${formVals.blood_pressure_diastolic}`
+            : undefined,
+        pulse: formVals.heart_rate ? `${formVals.heart_rate} bpm` : undefined,
+        temp: formVals.temperature ? `${formVals.temperature} °F` : undefined,
+        weight: formVals.weight ? `${formVals.weight} kg` : undefined,
+        height: formVals.height ? `${formVals.height} cm` : undefined,
+        bmi: formVals.bmi ? `${formVals.bmi}` : undefined,
+        spo2: formVals.spo2 ? `${formVals.spo2}%` : undefined,
+        rr: formVals.respiratory_rate ? `${formVals.respiratory_rate} /min` : undefined,
+      },
+      diagnosis: formVals.provisional_diagnosis || (formVals.examination ? undefined : 'Fertility Review'),
+      differentialDiagnosis: formVals.differential_diagnosis,
+      investigations: formVals.investigations_to_be_advised || formVals.investigations_ordered || formVals.previous_investigations,
+      medications: meds,
+      advice: formVals.treatment_notes || formVals.plan,
+      nextFollowUp:
+        formVals.follow_up === '1_week'
+          ? 'Review in 1 week'
+          : formVals.follow_up === '2_weeks'
+          ? 'Review in 2 weeks'
+          : formVals.follow_up === '1_month'
+          ? 'Review in 1 month'
+          : 'As advised',
+    });
   };
 
   // Apply Rx Template to structured medications array
@@ -435,11 +498,11 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     if (!tmpl) return;
 
     // Filter out completely blank rows
-    const currentMeds = watch('medications') || [];
-    const existing = currentMeds.filter((f: any) => f.drug_name && f.drug_name.trim());
+    const currentMeds = getValues('medications') || watch('medications') || [];
+    const existing = currentMeds.filter((f: any) => (f.drug_name || f.drug) && (f.drug_name || f.drug).trim());
     
-    // Set medications with template rows
-    setValue('medications', [
+    // Set medications with template rows using replaceMeds so useFieldArray updates immediately
+    const updatedMeds = [
       ...existing,
       ...tmpl.medications.map((m) => ({
         drug_name: m.drug_name,
@@ -448,7 +511,8 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         duration: m.duration || '',
         instructions: m.instructions,
       })),
-    ]);
+    ];
+    replaceMeds(updatedMeds);
 
     if (tmpl.advice) {
       const currentAdvice = watch('treatment_notes');
@@ -489,7 +553,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     if (d.future_consultation_notes) setValue('future_consultation_notes', d.future_consultation_notes);
     if (d.follow_up) setValue('follow_up', d.follow_up);
     if (Array.isArray(d.medications) && d.medications.length > 0) {
-      setValue('medications', d.medications);
+      replaceMeds(d.medications);
     }
 
     toast.info('Consultation Loaded', `Loaded consultation (${rec.created_at?.split('T')[0] || 'history'}) in in-place update mode`);
@@ -627,51 +691,29 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       return;
     }
 
-    saveMutation.mutate(data, {
+    // Accurately capture medications from form or values
+    const rawMeds = (data.medications && data.medications.length > 0) ? data.medications : (getValues('medications') || []);
+    const validMeds = Array.isArray(rawMeds)
+      ? rawMeds
+          .filter((m: any) => (m?.drug_name || m?.drug) && (m?.drug_name || m?.drug).toString().trim())
+          .map((m: any) => ({
+            drug_name: (m.drug_name || m.drug).toString().trim(),
+            dose: (m.dose || '').toString().trim(),
+            frequency: (m.frequency || m.freq || 'OD').toString().trim(),
+            duration: (m.duration || '').toString().trim(),
+            instructions: (m.instructions || '').toString().trim(),
+          }))
+      : [];
+
+    const consultationData = {
+      ...data,
+      medications: validMeds,
+    };
+
+    saveMutation.mutate(consultationData, {
       onSuccess: () => {
         if (andPrint) {
-          const meds = resolvePrescriptionMeds(data.medications, data.treatment_notes || data.plan);
-          setPrintablePrescription({
-            patient: {
-              name: patient?.name,
-              vid: patient?.vid,
-              mrn: patient?.mrn,
-              age: patient?.age,
-              gender: patient?.gender,
-              phone: patient?.phone,
-              blood_group: patient?.blood_group,
-            },
-            doctor: {
-              name: user?.name || 'Dr. Consultant Specialist',
-              department: 'Reproductive Medicine & Infertility',
-            },
-            visitDate: new Date().toISOString().split('T')[0],
-            chiefComplaint: data.chief_complaints,
-            hopi: data.present_history || data.history_of_illness,
-            pastHistory: data.previous_history || data.past_medical_history,
-            vitals: {
-              bp:
-                data.blood_pressure_systolic && data.blood_pressure_diastolic
-                  ? `${data.blood_pressure_systolic}/${data.blood_pressure_diastolic}`
-                  : undefined,
-              pulse: data.heart_rate ? `${data.heart_rate} bpm` : undefined,
-              temp: data.temperature ? `${data.temperature} °F` : undefined,
-              weight: data.weight ? `${data.weight} kg` : undefined,
-              spo2: data.spo2 ? `${data.spo2}%` : undefined,
-            },
-            diagnosis: data.examination || data.provisional_diagnosis || 'Fertility Review',
-            investigations: data.investigations_to_be_advised || data.investigations_ordered || data.previous_investigations,
-            medications: meds,
-            advice: data.treatment_notes || data.plan,
-            nextFollowUp:
-              data.follow_up === '1_week'
-                ? 'Review in 1 week'
-                : data.follow_up === '2_weeks'
-                ? 'Review in 2 weeks'
-                : data.follow_up === '1_month'
-                ? 'Review in 1 month'
-                : 'As advised',
-          });
+          handleOpenPrintPreview(validMeds);
         }
       },
     });
@@ -758,6 +800,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       chiefComplaint: rec.data?.chief_complaints,
       hopi: rec.data?.present_history || rec.data?.history_of_illness,
       pastHistory: rec.data?.previous_history || rec.data?.past_medical_history,
+      examination: rec.data?.examination,
       vitals: {
         bp:
           rec.data?.blood_pressure_systolic && rec.data?.blood_pressure_diastolic
@@ -766,9 +809,13 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         pulse: rec.data?.heart_rate ? `${rec.data.heart_rate} bpm` : undefined,
         temp: rec.data?.temperature ? `${rec.data.temperature} °F` : undefined,
         weight: rec.data?.weight ? `${rec.data.weight} kg` : undefined,
+        height: rec.data?.height ? `${rec.data.height} cm` : undefined,
+        bmi: rec.data?.bmi ? `${rec.data.bmi}` : undefined,
         spo2: rec.data?.spo2 ? `${rec.data.spo2}%` : undefined,
+        rr: rec.data?.respiratory_rate ? `${rec.data.respiratory_rate} /min` : undefined,
       },
-      diagnosis: rec.data?.examination || rec.data?.provisional_diagnosis || 'Fertility Review',
+      diagnosis: rec.data?.provisional_diagnosis || (rec.data?.examination ? undefined : 'Fertility Review'),
+      differentialDiagnosis: rec.data?.differential_diagnosis,
       investigations: rec.data?.investigations_to_be_advised || rec.data?.investigations_ordered || rec.data?.previous_investigations,
       medications: meds,
       advice: rec.data?.treatment_notes || rec.data?.plan,
@@ -904,217 +951,22 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
       {/* Main Split-Screen Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT PANE: Collapsible Consultation History Sidebar (Zero Demographics Duplication) */}
-        <div
-          className={`border-r border-slate-200 bg-white flex flex-col transition-all duration-300 flex-shrink-0 ${
-            isSidebarOpen ? 'w-72 sm:w-80' : 'w-12'
-          }`}
-        >
-          {/* Sidebar Header with Collapse Toggle & Mode Switch */}
-          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
-            {isSidebarOpen ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Clinical Records</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-200/60 transition-colors"
-                    title="Collapse History Sidebar"
-                  >
-                    <PanelLeftClose className="w-4 h-4" />
-                  </button>
-                </div>
-                {/* 2-Tab Switcher: Consultations vs Counselor Notes */}
-                <div className="grid grid-cols-2 p-0.5 bg-slate-200/70 rounded-md text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setSidebarTab('consultations')}
-                    className={`py-1 px-1.5 rounded text-[11px] flex items-center justify-center gap-1 transition-all ${
-                      sidebarTab === 'consultations'
-                        ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <History className="w-3 h-3 text-slate-500" />
-                    <span>Consults ({consultationHistory?.length || 0})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarTab('counseling')}
-                    className={`py-1 px-1.5 rounded text-[11px] flex items-center justify-center gap-1 transition-all relative ${
-                      sidebarTab === 'counseling'
-                        ? 'bg-white text-violet-900 shadow-2xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <HeartHandshake className="w-3 h-3 text-violet-600" />
-                    <span>Counseling ({counselingNotes?.length || 0})</span>
-                    {counselingNotes && counselingNotes.length > 0 && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-pulse" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(true)}
-                className="w-full flex justify-center text-slate-500 hover:text-slate-800 p-1"
-                title="Expand History Sidebar"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Previous Records List */}
-          {isSidebarOpen && (
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-              {/* Active Clinical Alerts in Sidebar */}
-              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <span className="font-bold block text-[10px] uppercase tracking-wider text-amber-900">Clinical Alerts</span>
-                    <span className="text-[11px] truncate block">
-                      {activeAlerts && activeAlerts.length > 0 ? activeAlerts.join(', ') : 'No active alerts'}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowEditAlertsModal(true)}
-                  className="text-[10px] font-bold text-amber-900 hover:underline flex-shrink-0 px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors"
-                >
-                  Edit
-                </button>
-              </div>
-
-              {sidebarTab === 'consultations' ? (
-                /* Doctor Consultations List */
-                consultationHistory && consultationHistory.length > 0 ? (
-                  consultationHistory.map((rec: any) => (
-                    <div
-                      key={rec.id}
-                      className={`p-2.5 border rounded-md transition-colors group relative shadow-2xs ${
-                        activeConsultationRecordId === rec.id
-                          ? 'bg-amber-50/70 border-amber-400 ring-1 ring-amber-400'
-                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
-                        <span
-                          onClick={() => setViewingRecord(rec)}
-                          className="flex items-center gap-1 group-hover:text-[rgb(var(--clr-primary))] transition-colors cursor-pointer"
-                        >
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          {formatDateTime(rec.created_at)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleLoadConsultationForEdit(rec)}
-                            className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded flex items-center gap-0.5 shadow-2xs"
-                            title="Load into Workbench to edit / update this record"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePrintPrevious(rec)}
-                            className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] border border-[rgb(var(--clr-primary)/0.2)] rounded flex items-center gap-1 shadow-2xs"
-                            title="Print Prescription (Rx)"
-                          >
-                            <Printer className="w-2.5 h-2.5" />
-                            <span>Rx</span>
-                          </button>
-                          <Badge
-                            variant="outline"
-                            className={`text-[9px] px-1.5 py-0 font-medium ${
-                              rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
-                                ? 'bg-rose-50 text-rose-700 border-rose-300'
-                                : 'bg-primary/10 text-primary border-primary/20'
-                            }`}
-                          >
-                            {rec.data?.nurse_triage_merged || (rec.data?.vitals && rec.data?.plan)
-                              ? 'OPD (Vitals+Rx)'
-                              : rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage'
-                              ? 'Triage'
-                              : 'OPD'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <p
-                        onClick={() => setViewingRecord(rec)}
-                        className="text-xs font-bold text-slate-800 line-clamp-1 cursor-pointer"
-                      >
-                        Dx: {rec.data?.provisional_diagnosis || rec.data?.chief_complaints || 'Clinical Review'}
-                      </p>
-                      {rec.data?.plan && (
-                        <p
-                          onClick={() => setViewingRecord(rec)}
-                          className="text-[10px] text-slate-600 line-clamp-2 mt-1 bg-white p-1 rounded border border-slate-100 cursor-pointer"
-                        >
-                          {rec.data.plan}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-slate-400 text-xs">
-                    No previous consultations recorded for this patient.
-                  </div>
-                )
-              ) : (
-                /* Pre-ART Counselor Sessions List */
-                counselingNotes && counselingNotes.length > 0 ? (
-                  counselingNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      onClick={() => setViewingCounselingNote(note)}
-                      className="p-2.5 bg-violet-50/50 hover:bg-violet-50 border border-violet-200 rounded-md transition-all group cursor-pointer shadow-2xs space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1 text-slate-500 font-medium">
-                          <Clock className="w-3 h-3 text-violet-500" />
-                          {formatDateTime(note.created_at)}
-                        </span>
-                        <Badge className="bg-violet-100 text-violet-800 border-violet-300 text-[10px] px-1.5 py-0 font-bold">
-                          {note.procedure || 'Pre-ART'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-slate-900">
-                          Source: <span className="text-violet-700">{note.source || 'Direct'}</span>
-                        </span>
-                        <span className="text-[10px] font-bold text-violet-600 bg-white px-1.5 py-0.5 rounded border border-violet-200 shadow-2xs group-hover:bg-violet-600 group-hover:text-white transition-colors">
-                          View 8-Pt Sheet →
-                        </span>
-                      </div>
-                      {note.discussion && (
-                        <p className="text-[10px] text-slate-600 line-clamp-2 bg-white/80 p-1 rounded border border-violet-100">
-                          <strong>Discussion:</strong> {note.discussion}
-                        </p>
-                      )}
-                      <div className="pt-0.5 flex items-center justify-between text-[10px] text-slate-500 border-t border-violet-100/60">
-                        <span>By: <strong>{note.counselor_name || 'Counselor'}</strong></span>
-                        <span className="italic text-slate-400">Sig: {note.signature || 'Signed'}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-slate-400 text-xs">
-                    <HeartHandshake className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
-                    No pre-ART counseling sessions recorded for this patient.
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </div>
+        {/* LEFT PANE: Collapsible Consultation History Sidebar */}
+        <OPDSidebar
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          sidebarTab={sidebarTab}
+          setSidebarTab={setSidebarTab}
+          consultationHistory={consultationHistory || []}
+          counselingNotes={counselingNotes || []}
+          activeAlerts={activeAlerts || []}
+          onEditAlerts={() => setShowEditAlertsModal(true)}
+          activeConsultationRecordId={activeConsultationRecordId}
+          onSelectRecord={(rec) => setViewingRecord(rec)}
+          onLoadConsultationForEdit={(rec) => handleLoadConsultationForEdit(rec)}
+          onPrintPrevious={(rec) => handlePrintPrevious(rec)}
+          onSelectCounselingNote={(note) => setViewingCounselingNote(note)}
+        />
 
         {/* RIGHT PANE: Dynamic Form (Doctor Consultation vs Nurse Triage) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative">
@@ -1130,128 +982,16 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
           {/* ========================================================= */}
           {workbenchMode === 'nurse' ? (
             <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 max-w-4xl pb-24">
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <HeartPulse className="w-4 h-4 text-rose-600" />
-                    <CardTitle className="text-sm font-bold text-slate-900">Nurse Triage Assessment &amp; Vital Signs</CardTitle>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setValue('blood_pressure_systolic', '120');
-                      setValue('blood_pressure_diastolic', '80');
-                      setValue('heart_rate', '72');
-                      setValue('respiratory_rate', '16');
-                      setValue('temperature', '98.6');
-                      setValue('spo2', '98');
-                      setValue('cvs_findings', 'S1 S2 heard, no murmurs');
-                      setValue('cns_findings', 'Conscious, oriented, afebrile');
-                      setValue('rs_findings', 'Bilateral vesicular breath sounds, clear');
-                    }}
-                    className="text-[11px] font-bold text-primary hover:text-primary-mid bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-md transition-colors"
-                  >
-                    + Autofill Normal Vitals
-                  </button>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                  {/* Vitals Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">BP Systolic</label>
-                      <Input type="number" {...register('blood_pressure_systolic')} placeholder="120" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">BP Diastolic</label>
-                      <Input type="number" {...register('blood_pressure_diastolic')} placeholder="80" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Pulse (bpm)</label>
-                      <Input type="number" {...register('heart_rate')} placeholder="72" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Resp Rate</label>
-                      <Input type="number" {...register('respiratory_rate')} placeholder="16" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Temp (°F)</label>
-                      <Input type="number" step="0.1" {...register('temperature')} placeholder="98.6" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">SpO2 (%)</label>
-                      <Input type="number" {...register('spo2')} placeholder="98" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Weight (kg)</label>
-                      <Input type="number" step="0.1" {...register('weight')} placeholder="65" className="h-9 text-xs font-semibold" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Height (cm)</label>
-                      <Input type="number" {...register('height')} placeholder="165" className="h-9 text-xs font-semibold" />
-                    </div>
-                  </div>
-
-                  {/* Calculated BMI */}
-                  {watch('bmi') && (
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-md text-xs">
-                      <span className="font-semibold text-slate-600">Calculated Body Mass Index (BMI):</span>
-                      <strong className="text-slate-900">{watch('bmi')} kg/m²</strong>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        {Number(watch('bmi')) < 18.5
-                          ? 'Underweight'
-                          : Number(watch('bmi')) < 25
-                          ? 'Normal'
-                          : Number(watch('bmi')) < 30
-                          ? 'Overweight'
-                          : 'Obese'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Triage Chief Complaint & Nurse Notes */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Chief Complaint (Patient Statement) <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        {...register('chief_complaints', { required: true })}
-                        rows={3}
-                        placeholder="e.g. Lower abdominal pain since yesterday, feeling feverish..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Nurse Observation Notes</label>
-                      <textarea
-                        {...register('nurse_notes')}
-                        rows={3}
-                        placeholder="e.g. Patient ambulatory, alert. Accompanied by spouse..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Quick Systemic Findings */}
-                  <div className="pt-2 border-t border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-700 mb-2">Preliminary Systemic Findings (Optional)</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 block mb-1">CVS</label>
-                        <Input {...register('cvs_findings')} placeholder="e.g. Normal S1 S2" className="h-8 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 block mb-1">CNS</label>
-                        <Input {...register('cns_findings')} placeholder="e.g. Conscious, oriented" className="h-8 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 block mb-1">RS</label>
-                        <Input {...register('rs_findings')} placeholder="e.g. Clear breath sounds" className="h-8 text-xs" />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <OPDVitalsSection
+                workbenchMode="nurse"
+                register={register}
+                watch={watch}
+                setValue={setValue}
+                effectiveTriage={effectiveTriage}
+                isDoctorVitalsExpanded={isDoctorVitalsExpanded}
+                setIsDoctorVitalsExpanded={setIsDoctorVitalsExpanded}
+                isPending={saveNurseTriageMutation.isPending}
+              />
 
               {/* Nurse Triage Save Action */}
               <div className="flex items-center justify-start gap-3 pt-4 border-t border-slate-200">
@@ -1334,118 +1074,15 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
               )}
 
               {/* Top Collapsible Vitals & Triage Summary Banner (Doctor View) */}
-              <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-xs transition-all">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      <HeartPulse className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                      <span className="uppercase tracking-wider text-[11px] text-slate-500">Triage Vitals:</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
-                        BP: <strong className="text-slate-900">{watch('blood_pressure_systolic') && watch('blood_pressure_diastolic') ? `${watch('blood_pressure_systolic')}/${watch('blood_pressure_diastolic')}` : '—'}</strong> mmHg
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
-                        HR: <strong className="text-slate-900">{watch('heart_rate') || '—'}</strong> bpm
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
-                        Temp: <strong className="text-slate-900">{watch('temperature') || '—'}</strong> °F
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
-                        SpO2: <strong className="text-slate-900">{watch('spo2') || '—'}</strong>%
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700">
-                        Wt: <strong className="text-slate-900">{watch('weight') || '—'}</strong> kg
-                      </span>
-                      {watch('bmi') && (
-                        <span className="px-2 py-0.5 bg-primary/10 border border-primary/20 rounded font-bold text-primary">
-                          BMI: {watch('bmi')}
-                        </span>
-                      )}
-                    </div>
-                    {effectiveTriage && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                        ✓ Triage Vitals Linked
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsDoctorVitalsExpanded(!isDoctorVitalsExpanded)}
-                    className="text-xs font-bold text-primary hover:text-primary-mid flex items-center gap-1 px-2.5 py-1 rounded hover:bg-primary/10 transition-colors self-end sm:self-center"
-                  >
-                    {isDoctorVitalsExpanded ? (
-                      <>
-                        <ChevronUp className="w-3.5 h-3.5" />
-                        <span>Collapse Vitals</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-3.5 h-3.5" />
-                        <span>Edit / View Vitals &amp; Exam</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Nurse Observation Notes Banner (if provided) */}
-                {watch('nurse_notes') && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-start gap-2 text-xs bg-slate-50/80 p-2 rounded-md">
-                    <FileText className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide">Nurse Triage Notes: </span>
-                      <span className="text-slate-700 text-xs">{watch('nurse_notes')}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Expanded Vitals & Systemic Exam Editor */}
-                {isDoctorVitalsExpanded && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-4 animate-in fade-in slide-in-from-top-1">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">BP Systolic</label>
-                        <Input type="number" {...register('blood_pressure_systolic')} placeholder="120" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">BP Diastolic</label>
-                        <Input type="number" {...register('blood_pressure_diastolic')} placeholder="80" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Heart Rate</label>
-                        <Input type="number" {...register('heart_rate')} placeholder="72" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Resp Rate</label>
-                        <Input type="number" {...register('respiratory_rate')} placeholder="16" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Temp (°F)</label>
-                        <Input type="number" step="0.1" {...register('temperature')} placeholder="98.6" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">SpO2 (%)</label>
-                        <Input type="number" {...register('spo2')} placeholder="98" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Weight (kg)</label>
-                        <Input type="number" step="0.1" {...register('weight')} placeholder="65" className="h-8 text-xs font-semibold" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Height (cm)</label>
-                        <Input type="number" {...register('height')} placeholder="165" className="h-8 text-xs font-semibold" />
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Examination Findings</label>
-                      <textarea {...register('examination')} placeholder="e.g. Vitals stable, P/A soft, CVS normal..." rows={3} className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800" />
-                    </div>
-                  </div>
-                )}
-              </div>
+              <OPDVitalsSection
+                workbenchMode="doctor"
+                register={register}
+                watch={watch}
+                setValue={setValue}
+                effectiveTriage={effectiveTriage}
+                isDoctorVitalsExpanded={isDoctorVitalsExpanded}
+                setIsDoctorVitalsExpanded={setIsDoctorVitalsExpanded}
+              />
 
               {/* SECTION 1: Subjective / Clinical History (Collapsible Card with Inline Template Support) */}
               <Card id="clinical-history-section" className="border-slate-200 shadow-sm scroll-mt-20">
@@ -1599,261 +1236,26 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                 )}
               </Card>
 
-              {/* SECTION 2: Assessment & Plan (Collapsible Card) */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardHeader
-                  className="py-3 px-4 border-b border-slate-100 bg-slate-50/70 flex flex-row items-center justify-between cursor-pointer select-none"
-                  onClick={() => setIsPlanSectionExpanded(!isPlanSectionExpanded)}
-                >
-                  <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                    Assessment, Orders &amp; Management Plan
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSmartOrderOpen(true);
-                      }}
-                      className="gap-1.5 text-[11px] text-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.08)] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.12)] rounded h-7"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Insert Order Set</span>
-                    </Button>
-                    <button type="button" className="text-slate-400 hover:text-slate-600">
-                      {isPlanSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </CardHeader>
-                {isPlanSectionExpanded && (
-                  <CardContent className="p-4 space-y-4">
-                    {/* Provisional & Differential Diagnosis removed as per new standard template */}
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <FlaskConical className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                          <span>Investigations</span>
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-medium">Click options below to quickly add/remove</span>
-                      </div>
-
-                      {/* Quick Selectable Investigation Options */}
-                      <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-slate-50/80 rounded-md border border-slate-200">
-                        {dynamicInvestigations.map((opt) => {
-                          const currentVal = watch('investigations_to_be_advised') || '';
-                          const isSelected = currentVal.toLowerCase().includes(opt.toLowerCase());
-                          return (
-                            <button
-                              key={opt}
-                              type="button"
-                              onClick={() => {
-                                const lines = currentVal.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                                const matchIdx = lines.findIndex((l: string) => l.toLowerCase() === opt.toLowerCase() || l.toLowerCase().includes(opt.toLowerCase()));
-                                if (matchIdx >= 0) {
-                                  lines.splice(matchIdx, 1);
-                                  setValue('investigations_to_be_advised', lines.join('\n'));
-                                } else {
-                                  lines.push(opt);
-                                  setValue('investigations_to_be_advised', lines.join('\n'));
-                                }
-                              }}
-                              className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[rgb(var(--clr-primary))]/10 border-[rgb(var(--clr-primary))] text-[rgb(var(--clr-primary))] font-bold shadow-2xs'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                              }`}
-                            >
-                              {isSelected ? `✓ ${opt}` : `+ ${opt}`}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <textarea
-                        {...register('investigations_to_be_advised')}
-                        rows={3}
-                        placeholder="Selected investigations will appear here, or type additional investigations..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <Pill className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
-                          <span>Treatment (Medications)</span>
-                        </label>
-                        {/* Rx Template Selector */}
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                handleApplyRxTemplate(e.target.value);
-                                e.target.value = '';
-                              }
-                            }}
-                            defaultValue=""
-                            className="h-7 px-2 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md hover:bg-primary/15 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer shadow-2xs max-w-[220px] truncate"
-                          >
-                            <option value="" disabled>⚡ Apply Rx Template...</option>
-                            {allRxTemplates.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.isCustom ? `★ ${t.category}: ${t.name}` : `${t.category}: ${t.name}`}
-                              </option>
-                            ))}
-                          </select>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setTemplateDialogTab('rx');
-                              setTemplateDialogOpen(true);
-                            }}
-                            className="h-7 px-2 text-[11px] font-bold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1 shadow-2xs"
-                            title="Manage & Edit Prescription Templates"
-                          >
-                            <SlidersHorizontal className="w-3 h-3 text-primary" />
-                            <span>Manage</span>
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Structured Medication Array */}
-                      <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                        {medFields.map((field, index) => (
-                          <div key={field.id} className="flex gap-2 items-start relative flex-wrap sm:flex-nowrap">
-                            <div className="flex-1 min-w-[130px]">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
-                              <Input
-                                {...register(`medications.${index}.drug_name`)}
-                                list="drugList"
-                                placeholder="e.g. Tab Paracetamol"
-                                className="h-8 text-xs mt-1 bg-white"
-                              />
-                            </div>
-                            <div className="w-20">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
-                              <Input
-                                {...register(`medications.${index}.dose`)}
-                                placeholder="500mg"
-                                className="h-8 text-xs mt-1 bg-white"
-                              />
-                            </div>
-                            <div className="w-28">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
-                              <select
-                                {...register(`medications.${index}.frequency`)}
-                                className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                              >
-                                <option value="">Select...</option>
-                                <option value="OD">OD (Once daily)</option>
-                                <option value="BD">BD (Twice daily)</option>
-                                <option value="TDS">TDS (Thrice daily)</option>
-                                <option value="QID">QID (Four times daily)</option>
-                                <option value="SOS">SOS (As needed)</option>
-                                <option value="Stat">Stat (Immediately)</option>
-                              </select>
-                            </div>
-                            <div className="w-24">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
-                              <Input
-                                {...register(`medications.${index}.duration`)}
-                                placeholder="e.g. 5 days"
-                                className="h-8 text-xs mt-1 bg-white"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-[130px]">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
-                              <Input
-                                {...register(`medications.${index}.instructions`)}
-                                placeholder="After food"
-                                className="h-8 text-xs mt-1 bg-white"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeMed(index)}
-                              className="mt-6 p-1.5 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                        
-                        <datalist id="drugList">
-                          <option value="Tab Paracetamol 500mg" />
-                          <option value="Tab Metformin 500mg" />
-                          <option value="Tab Folic Acid 5mg" />
-                          <option value="Cap Doxycycline 100mg" />
-                          <option value="Inj Progesterone 100mg" />
-                        </datalist>
-
-                        <button
-                          type="button"
-                          onClick={() => appendMed({ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' })}
-                          className="text-xs font-bold text-[rgb(var(--clr-primary))] flex items-center gap-1 hover:underline pt-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Add Medicine
-                        </button>
-                      </div>
-
-                      <div className="mt-3">
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Treatment Notes (Non-Pharmacological / Dietary)</label>
-                        <textarea
-                          {...register('treatment_notes')}
-                          rows={3}
-                          placeholder="Dietary and lifestyle instructions, additional advice..."
-                          className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                        />
-                      </div>
-
-                      {/* Notes for Future Consultation Reference (Requirement 5) */}
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <FileText className="w-3.5 h-3.5 text-amber-700" />
-                            <span>Notes for Future Consultation Reference</span>
-                          </label>
-                          <span className="text-[10px] text-slate-400 font-medium">Internal clinical reference for upcoming visits</span>
-                        </div>
-                        <textarea
-                          {...register('future_consultation_notes')}
-                          rows={3}
-                          placeholder="e.g. Next visit: Assess Day 10 endometrial pattern and consider adding vaginal sildenafil if < 7mm. Check partner seminal culture..."
-                          className="w-full bg-amber-50/40 border border-amber-200 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="w-48">
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1">Follow-Up Schedule</label>
-                      <input
-                        list="followup-options"
-                        {...register('follow_up')}
-                        placeholder="Select or type custom (e.g. 10 days)"
-                        className="w-full h-8 px-2 text-xs bg-slate-50 border border-slate-200 rounded-md focus:bg-white"
-                      />
-                      <datalist id="followup-options">
-                        <option value="SOS (As Needed)" />
-                        <option value="2 days" />
-                        <option value="3 days" />
-                        <option value="5 days" />
-                        <option value="1 week" />
-                        <option value="10 days" />
-                        <option value="2 weeks" />
-                        <option value="1 month" />
-                        <option value="PCOS Metabolic Review (3 mo)" />
-                        <option value="No Follow-up required" />
-                      </datalist>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
+              {/* SECTION 2: Assessment, Orders & Management Plan */}
+              <OPDPrescriptionSection
+                register={register}
+                watch={watch}
+                setValue={setValue}
+                medFields={medFields}
+                appendMed={appendMed}
+                removeMed={removeMed}
+                dynamicInvestigations={dynamicInvestigations}
+                allRxTemplates={allRxTemplates}
+                onApplyRxTemplate={handleApplyRxTemplate}
+                onManageTemplates={() => {
+                  setTemplateDialogTab('rx');
+                  setTemplateDialogOpen(true);
+                }}
+                onPreviewRx={() => handleOpenPrintPreview()}
+                isPlanSectionExpanded={isPlanSectionExpanded}
+                setIsPlanSectionExpanded={setIsPlanSectionExpanded}
+                onOpenSmartOrder={() => setSmartOrderOpen(true)}
+              />
 
               {/* Bottom Form Actions */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
@@ -1891,286 +1293,12 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       />
 
       {/* History Full View Modal */}
-      {viewingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-rail-bg/50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-lg">Consultation Record</h3>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] bg-primary/10 text-primary border-primary/20"
-                  >
-                    {viewingRecord.record_type || 'OPD Consultation'}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>
-                    {formatDateTime(viewingRecord.created_at || viewingRecord.updated_at || viewingRecord.data?.created_at)}
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => setViewingRecord(null)}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200 text-slate-500 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto space-y-5 divide-y divide-slate-100">
-              {/* Section 1: Subjective & History */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Subjective &amp; History</span>
-                </h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/70 space-y-3">
-                  <div>
-                    <span className="font-semibold text-slate-700 text-xs">Chief Complaints:</span>
-                    <p className="text-xs font-medium text-slate-900 mt-1 whitespace-pre-line">
-                      {viewingRecord.data?.chief_complaints || 'None recorded'}
-                    </p>
-                  </div>
-                  {(viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history || viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/60">
-                      {(viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history) && (
-                        <div>
-                          <span className="font-semibold text-slate-600 text-xs">History of Present Illness (HPI):</span>
-                          <p className="text-xs text-slate-800 mt-0.5 whitespace-pre-line">
-                            {viewingRecord.data?.history_of_illness || viewingRecord.data?.present_history}
-                          </p>
-                        </div>
-                      )}
-                      {(viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history) && (
-                        <div>
-                          <span className="font-semibold text-slate-600 text-xs">Past Medical / Surgical Hx:</span>
-                          <p className="text-xs text-slate-800 mt-0.5 whitespace-pre-line">
-                            {viewingRecord.data?.previous_history || viewingRecord.data?.past_medical_history}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Section 2: Vitals & Physical Examination */}
-              {(viewingRecord.data?.vitals || viewingRecord.data?.examination || viewingRecord.data?.cvs_findings || viewingRecord.data?.rs_findings || viewingRecord.data?.cns_findings) && (
-                <div className="pt-4 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <HeartPulse className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Objective &amp; Examination</span>
-                  </h4>
-                  
-                  {/* Vitals Grid */}
-                  {viewingRecord.data?.vitals && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-rose-50/30 p-3 rounded-lg border border-rose-100">
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">BP</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.bp || '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Heart Rate</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.hr ? `${viewingRecord.data.vitals.hr} bpm` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Resp Rate</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.rr ? `${viewingRecord.data.vitals.rr} /m` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Temp</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.temp ? `${viewingRecord.data.vitals.temp} °F` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">SpO2</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.spo2 ? `${viewingRecord.data.vitals.spo2}%` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Weight</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.weight ? `${viewingRecord.data.vitals.weight} kg` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Height</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.height ? `${viewingRecord.data.vitals.height} cm` : '—'}</span>
-                      </div>
-                      <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">BMI</span>
-                        <span className="text-xs font-bold text-slate-800">{viewingRecord.data.vitals.bmi || '—'}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Physical Examination */}
-                  {viewingRecord.data?.examination && (
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
-                      <span className="font-semibold text-slate-700 text-xs">Physical Examination:</span>
-                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">{viewingRecord.data.examination}</p>
-                    </div>
-                  )}
-
-                  {/* Systemic Examination findings */}
-                  {(viewingRecord.data?.cvs_findings || viewingRecord.data?.rs_findings || viewingRecord.data?.cns_findings) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200/70">
-                      {viewingRecord.data?.cvs_findings && (
-                        <div>
-                          <span className="font-bold text-slate-500 text-[10px] uppercase">CVS</span>
-                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.cvs_findings}</p>
-                        </div>
-                      )}
-                      {viewingRecord.data?.rs_findings && (
-                        <div>
-                          <span className="font-bold text-slate-500 text-[10px] uppercase">RS</span>
-                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.rs_findings}</p>
-                        </div>
-                      )}
-                      {viewingRecord.data?.cns_findings && (
-                        <div>
-                          <span className="font-bold text-slate-500 text-[10px] uppercase">CNS</span>
-                          <p className="text-slate-800 mt-0.5">{viewingRecord.data.cns_findings}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Section 3: Assessment & Diagnostics */}
-              <div className="pt-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Stethoscope className="w-3.5 h-3.5 text-primary" />
-                  <span>Assessment &amp; Diagnosis</span>
-                </h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/70 space-y-3">
-                  <div>
-                    <span className="font-semibold text-slate-700 text-xs">Provisional / Final Diagnosis:</span>
-                    <p className="text-sm font-bold text-text-main mt-0.5">
-                      {viewingRecord.data?.provisional_diagnosis || viewingRecord.data?.diagnosis || 'Clinical Review'}
-                    </p>
-                  </div>
-                  {(viewingRecord.data?.investigations_to_be_advised || viewingRecord.data?.investigations_ordered || viewingRecord.data?.previous_investigations) && (
-                    <div className="pt-2 border-t border-slate-200/60">
-                      <span className="font-semibold text-slate-700 text-xs flex items-center gap-1">
-                        <FlaskConical className="w-3.5 h-3.5 text-primary" />
-                        <span>Investigations:</span>
-                      </span>
-                      <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">
-                        {viewingRecord.data?.investigations_to_be_advised || viewingRecord.data?.investigations_ordered || viewingRecord.data?.previous_investigations}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Section 4: Treatment & Medications */}
-              <div className="pt-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Pill className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Treatment Plan &amp; Regimen</span>
-                </h4>
-
-                {/* Structured Medications Table */}
-                {Array.isArray(viewingRecord.data?.medications) && viewingRecord.data.medications.length > 0 ? (
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                        <tr>
-                          <th className="p-2.5">#</th>
-                          <th className="p-2.5">Drug / Medicine Name</th>
-                          <th className="p-2.5">Dose</th>
-                          <th className="p-2.5">Frequency</th>
-                          <th className="p-2.5">Duration</th>
-                          <th className="p-2.5">Instructions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {viewingRecord.data.medications.map((m: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50/60">
-                            <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
-                            <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
-                            <td className="p-2.5 font-semibold text-slate-700">{m.dose || '—'}</td>
-                            <td className="p-2.5">
-                              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 text-[11px] font-bold">
-                                {m.frequency || m.freq || 'OD'}
-                              </span>
-                            </td>
-                            <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
-                            <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-
-                {/* Treatment Notes / Plan */}
-                {(viewingRecord.data?.treatment_notes || viewingRecord.data?.plan) && (
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
-                    <span className="font-semibold text-slate-700 text-xs">Treatment &amp; Dietary Advice:</span>
-                    <p className="text-xs text-slate-800 mt-1 whitespace-pre-line">
-                      {viewingRecord.data?.treatment_notes || viewingRecord.data?.plan}
-                    </p>
-                  </div>
-                )}
-
-                {/* Notes for Future Consultation Reference */}
-                {viewingRecord.data?.future_consultation_notes && (
-                  <div className="bg-amber-50 p-4 rounded-md border border-amber-200">
-                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Notes for Future Consultation Reference</span>
-                    </h4>
-                    <p className="text-xs text-amber-950 whitespace-pre-line font-medium">
-                      {viewingRecord.data.future_consultation_notes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Follow-up */}
-                {viewingRecord.data?.follow_up && (
-                  <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
-                    <span className="font-bold text-slate-500">Next Follow-Up:</span>
-                    <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                      {viewingRecord.data.follow_up.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    handleLoadConsultationForEdit(viewingRecord);
-                    setViewingRecord(null);
-                  }}
-                  className="text-amber-800 border-amber-300 hover:bg-amber-50 rounded-md font-bold px-4 flex items-center gap-1.5"
-                >
-                  <span>Load into Workbench (Edit)</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    handlePrintPrevious(viewingRecord);
-                  }}
-                  className="text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] rounded-md font-semibold px-4 flex items-center gap-1.5"
-                >
-                  <Printer className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
-                  <span>Print Prescription (Rx)</span>
-                </Button>
-              </div>
-              <Button onClick={() => setViewingRecord(null)} className="bg-primary hover:bg-primary-mid text-white rounded-md font-bold px-6">
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConsultationRecordModal
+        record={viewingRecord}
+        onClose={() => setViewingRecord(null)}
+        onLoadForEdit={(rec) => handleLoadConsultationForEdit(rec)}
+        onPrintRx={(rec) => handlePrintPrevious(rec)}
+      />
 
       {/* Printable Prescription Modal */}
       {printablePrescription && (
@@ -2211,143 +1339,13 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         }}
       />
 
-      {/* 8-Point Counselor Notes Case Sheet Modal */}
-      {/* 8-Point Counselor Notes Case Sheet Modal */}
-      {viewingCounselingNote && (
-        <div className="fixed inset-0 bg-rail-bg/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs print:p-0 print:static print:bg-white print:overflow-visible">
-          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 print:border-none print:shadow-none print:max-w-none print:w-full print:p-0 print:m-0 print:max-h-none print:overflow-visible">
-            {/* Modal Header */}
-            <div className="p-4 border-b border-slate-100 bg-violet-50/80 flex items-center justify-between print:hidden">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-md bg-violet-600 text-white flex items-center justify-center">
-                  <HeartHandshake className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-sm sm:text-base">Pre-ART Clinical Counseling Case Sheet</h3>
-                    <Badge className="bg-violet-600 text-white text-[10px] px-1.5 py-0">
-                      {viewingCounselingNote.procedure || 'Procedure Note'}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Patient: <strong className="text-slate-800">{patient?.name || viewingCounselingNote.patient_name || 'Patient'}</strong> ({patient?.vid || viewingCounselingNote.patient_vid || '—'}) · Session: {formatDateTime(viewingCounselingNote.created_at)}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingCounselingNote(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body: The 8 Clinical Columns */}
-            <div className="printable-document p-4 sm:p-6 overflow-y-auto space-y-4 text-xs print:overflow-visible print:p-0">
-              <PrintableReportHeader
-                title="PRE-ART CLINICAL COUNSELING RECORD"
-                subtitle="VaidyaMD Reproductive Medicine • Patient Counseling & Informed Dialogue"
-                patient={{
-                  name: patient?.name || viewingCounselingNote.patient_name,
-                  vid: patient?.vid || viewingCounselingNote.patient_vid,
-                  age: patient?.age,
-                  gender: patient?.gender || 'Female',
-                  partner_name: patient?.partner_name,
-                }}
-                metaFields={[
-                  { label: 'Procedure', value: viewingCounselingNote.procedure || '—' },
-                  { label: 'Date', value: formatDateTime(viewingCounselingNote.created_at) },
-                  { label: 'Source', value: viewingCounselingNote.source || 'OPD' },
-                  { label: 'Counselor', value: viewingCounselingNote.counselor_name || 'Counselor Specialist' },
-                ]}
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">1. Source</span>
-                  <p className="font-bold text-slate-800 text-sm">{viewingCounselingNote.source || '—'}</p>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">2. Procedure</span>
-                  <p className="font-bold text-violet-800 text-sm">{viewingCounselingNote.procedure || '—'}</p>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">3. Egg Pick Up</span>
-                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
-                  {viewingCounselingNote.egg_pick_up || '—'}
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">4. Discussion</span>
-                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
-                  {viewingCounselingNote.discussion || '—'}
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">5. Laparoscopy / Hysteroscopy / Etc</span>
-                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
-                  {viewingCounselingNote.laparoscopy_hysteroscopy || '—'}
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">6. Egg Transfer</span>
-                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
-                  {viewingCounselingNote.egg_transfer || '—'}
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">7. Remarks</span>
-                <p className="text-slate-800 whitespace-pre-line font-medium leading-relaxed">
-                  {viewingCounselingNote.remarks || '—'}
-                </p>
-              </div>
-
-              {/* Signature & Counselor Sign-off Card */}
-              <div className="p-3 bg-violet-50/70 border border-violet-200 rounded-lg flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-violet-700 block">8. Counselor Signature &amp; Attestation</span>
-                  <p className="text-sm font-bold font-serif italic text-slate-900 mt-0.5">
-                    {viewingCounselingNote.signature || 'Digital Sign-off'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-800">{viewingCounselingNote.counselor_name || 'Counselor Specialist'}</p>
-                  <p className="text-[10px] text-slate-500">Reproductive Counselor · VaidyaMD</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-                className="gap-1.5 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Case Sheet</span>
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setViewingCounselingNote(null)}
-                className="bg-primary hover:bg-primary-mid text-white text-xs font-bold px-5"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Pre-ART Clinical Counseling Sheet Modal */}
+      <PrintableCounselingSheetModal
+        isOpen={!!viewingCounselingNote}
+        onClose={() => setViewingCounselingNote(null)}
+        note={viewingCounselingNote}
+        patient={patient}
+      />
 
     </div>
   );

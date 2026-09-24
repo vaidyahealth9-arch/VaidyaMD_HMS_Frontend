@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { appointmentsApi, patientsApi, treatmentCyclesApi, billingApi } from '@/lib/api';
 import { formatDateTime, statusColors, statusLabels, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
+import PageLayout from '@/components/common/PageLayout';
 import { CalendarDays, Users, Activity, CreditCard, UserPlus, Calendar, Receipt, Microscope } from 'lucide-react';
 import { Badge } from '@/shared/ui/badge';
 
@@ -77,7 +78,7 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
   return (
-    <div className="w-full px-4 sm:px-6 py-6 space-y-6 max-w-7xl">
+    <PageLayout className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -204,6 +205,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 }

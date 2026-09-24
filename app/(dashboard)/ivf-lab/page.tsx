@@ -30,6 +30,8 @@ import IUIDonorModal from '@/components/fertility/IUIDonorModal';
 import AndrologyDataEntry from '@/components/fertility/AndrologyDataEntry';
 import CryoVitrifyModal from '@/components/ivf/CryoVitrifyModal';
 import CryoThawModal from '@/components/ivf/CryoThawModal';
+import PageLayout from '@/components/common/PageLayout';
+import TabBar from '@/components/common/TabBar';
 import { Scissors, Baby, Microscope, FlaskConical, Dna, Snowflake, ShieldCheck, Printer, Save, Flame, X, AlertTriangle, Sparkles, HeartHandshake, AlertCircle } from 'lucide-react';
 
 export default function IvfLabPage() {
@@ -286,7 +288,7 @@ export default function IvfLabPage() {
   const malePatients = patients.filter(p => p.gender === 'male');
 
   return (
-    <div className="w-full px-3 sm:px-6 py-6 space-y-6">
+    <PageLayout className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -299,33 +301,20 @@ export default function IvfLabPage() {
               <p className="text-xs text-slate-500">Embryology suite, CASA semen analysis, cryobank coordinates &amp; QC monitors</p>
             </div>
           </div>
-          <p className="text-slate-500 text-sm mt-1">CASA diagnostics, Day 0–7 embryology matrix with dual-witnessing gates & cryobank coordinates</p>
+          <p className="text-slate-500 text-sm mt-1">CASA diagnostics, Day 0–7 embryology matrix with dual-witnessing gates &amp; cryobank coordinates</p>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 overflow-x-auto shadow-inner">
-          {[
+        <TabBar
+          tabs={[
             { id: 'embryology', label: 'Embryology Suite', icon: FlaskConical },
             { id: 'andrology', label: 'Andrology & CASA', icon: Microscope },
             { id: 'cryopreservation', label: 'Cryobank LN2 Storage', icon: Snowflake },
             { id: 'qc', label: 'Lab QC & Calibration', icon: AlertCircle },
-          ].map(t => {
-            const TabIcon = t.icon;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id as any)}
-                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md transition-all ${activeTab === t.id
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                  }`}
-              >
-                <TabIcon className="w-3.5 h-3.5" />
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
+          ]}
+          activeTab={activeTab}
+          onChange={(id) => setActiveTab(id as any)}
+        />
       </div>
 
       {/* === TAB 1: ANDROLOGY === */}
@@ -1035,6 +1024,6 @@ export default function IvfLabPage() {
           }}
         />
       )}
-    </div>
+    </PageLayout>
   );
 }

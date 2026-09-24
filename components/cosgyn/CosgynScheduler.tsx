@@ -9,9 +9,10 @@ import { Label } from '@/shared/ui/label';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Calendar, Stethoscope, Clock, Zap, Loader2 } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function CosgynScheduler({ patientId, onPlanCreated }: { patientId: string, onPlanCreated: () => void }) {
-
+  const { toast } = useToast();
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string>('');
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [frequency, setFrequency] = useState<string>('weekly');
@@ -24,17 +25,17 @@ export default function CosgynScheduler({ patientId, onPlanCreated }: { patientI
   const createPlanMutation = useMutation({
     mutationFn: (data: any) => cosgynApi.createPlan(data),
     onSuccess: () => {
-      alert('Success: Treatment plan and schedule generated successfully.');
+      toast.success('Treatment plan and schedule generated successfully.');
       onPlanCreated();
     },
     onError: (error: any) => {
-      alert(`Error: ${error.message || 'Failed to create plan'}`);
+      toast.error(`Error: ${error.message || 'Failed to create plan'}`);
     }
   });
 
   const handleGenerate = () => {
     if (!selectedTreatmentId || !startDate) {
-      alert('Validation Error: Please select a treatment and start date.');
+      toast.error('Validation Error: Please select a treatment and start date.');
       return;
     }
     

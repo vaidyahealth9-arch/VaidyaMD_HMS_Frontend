@@ -25,331 +25,23 @@ import {
   Layers,
   Edit3,
 } from 'lucide-react';
-import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import { patientsApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
 
-export interface ClinicalHistoryProformaModalProps {
-  patient: any;
-  partner?: any;
-  onClose?: () => void;
-  onSaved?: () => void;
-  initialType?: 'fertility' | 'gynaecology' | 'obstetric';
-  inline?: boolean;
-  onDataChange?: (
-    data: any,
-    summary: { complaints: string; history: string; exam: string; pastHistory: string }
-  ) => void;
-  initialData?: any;
-}
+import {
+  generateProformaNarrative,
+  ProformaSentenceView,
+  ProformaPrintView,
+} from './proforma';
+import type {
+  ClinicalHistoryProformaModalProps,
+  ObstetricRow,
+  MedicationRow,
+} from './proforma';
 
-interface ObstetricRow {
-  year: string;
-  place: string;
-  details: string;
-  outcome: string;
-  gestation?: string;
-  mode?: string;
-  babySexWeight?: string;
-}
+export { generateProformaNarrative };
+export type { ClinicalHistoryProformaModalProps };
 
-interface MedicationRow {
-  drug: string;
-  dose: string;
-  route: string;
-  frequency: string;
-  duration: string;
-  instructions: string;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NARRATIVE SENTENCE GENERATOR
-// Transforms all structured proforma selections into a readable clinical narrative
-// matching the exact structure requested by reproductive medicine specialists
-// ─────────────────────────────────────────────────────────────────────────────
-export function generateProformaNarrative(data: any): string {
-  const sections: string[] = [];
-
-  // 1. Demographics & Referral
-  const metaLines: string[] = [];
-  if (data.referredBy) metaLines.push(`Referred by: ${data.referredBy}`);
-  if (data.livesIn) metaLines.push(`Lives in: ${data.livesIn}`);
-  if (metaLines.length > 0) sections.push(metaLines.join('\n'));
-
-  const seenLines: string[] = [];
-  if (data.seenByDr) seenLines.push(`Seen by Dr: ${data.seenByDr}`);
-  if (data.staffInAttendance) seenLines.push(`Staff in attendance: ${data.staffInAttendance}`);
-  if (seenLines.length > 0) sections.push(seenLines.join('\n'));
-
-  // 2. Reason for Consultation
-  if (data.reasonForConsultation) {
-    sections.push(`Reason for consultation:\n${data.reasonForConsultation}`);
-  }
-
-  // 3. Couple Infertility Profile
-  if (data.activeTab === 'fertility') {
-    const coupleLines: string[] = [];
-    const infType = data.fertilityType || 'Primary';
-    const infFactor = data.fertilityFactor || 'Couple';
-    coupleLines.push(`${infType} infertility (${infFactor.toLowerCase()} factor)`);
-    if (data.marriedInYear) coupleLines.push(`Married in year: ${data.marriedInYear}`);
-    if (data.tryingForPregnancy) {
-      coupleLines.push(`Been trying for pregnancy for ${data.tryingForPregnancy} years`);
-    } else {
-      coupleLines.push('Been trying for pregnancy');
-    }
-    coupleLines.push(data.consanguinity || 'Non-Consanguineous');
-    sections.push(coupleLines.join('\n'));
-  }
-
-  // 4. Female Partner Profile
-  const femaleHead: string[] = [];
-  femaleHead.push(`Female Name: ${data.femaleName || 'Patient'}`);
-  if (data.femaleProfession) femaleHead.push(`Profession: ${data.femaleProfession}`);
-  if (data.femaleWeight) femaleHead.push(`Weight: ${data.femaleWeight} kg`);
-  if (data.femaleBmi) femaleHead.push(`BMI: ${data.femaleBmi}`);
-  if (femaleHead.length > 0) sections.push(femaleHead.join('\n'));
-
-  // 5. Menstrual History
-  const mensesLines: string[] = ['MENSTRUAL HISTORY:'];
-  mensesLines.push(`• Periods occur every ${data.periodsEvery || '28-30'} days`);
-  mensesLines.push(`• Duration of bleeding: ${data.durationBleeding || '4-5'} days`);
-  mensesLines.push(`• Are your periods painful? ${data.periodsPainful || 'No'}`);
-  mensesLines.push(`• Are your periods heavy? ${data.periodsHeavy || 'No'}`);
-  if (data.ageAtMenarche) mensesLines.push(`• Age at menarche: ${data.ageAtMenarche} years`);
-  if (data.lmp) mensesLines.push(`• LMP: ${data.lmp}`);
-  if (data.menstrualAdditional) mensesLines.push(`• Notes: ${data.menstrualAdditional}`);
-  sections.push(mensesLines.join('\n'));
-
-  // 6. Obstetric History
-  const obLines: string[] = ['OBSTETRIC HISTORY:'];
-  if (data.gpal) obLines.push(`Obstetric Score: ${data.gpal}`);
-  const validObRows = (data.obRows || []).filter(
-    (r: any) => r.year || r.place || r.details || r.outcome
-  );
-  if (validObRows.length > 0) {
-    validObRows.forEach((r: any, idx: number) => {
-      obLines.push(
-        `  ${idx + 1}. Year: ${r.year || '—'} | Place: ${r.place || '—'} | Mode: ${
-          r.details || '—'
-        } | Outcome: ${r.outcome || '—'}`
-      );
-    });
-  } else {
-    obLines.push('Nulligravida (No past pregnancies)');
-  }
-  sections.push(obLines.join('\n'));
-
-  // 7. Contraception History
-  if (data.contraceptionHistory) {
-    sections.push(`CONTRACEPTION HISTORY: ${data.contraceptionHistory}`);
-  }
-
-  // 8. Female Habits
-  const fHabits: string[] = ['HABITS / LIFESTYLE (FEMALE):'];
-  fHabits.push(`• Smoking: ${data.femaleSmoking || 'No'}`);
-  fHabits.push(`• Gutka: ${data.femaleGutka || 'No'}`);
-  fHabits.push(`• Alcohol: ${data.femaleAlcohol || 'No'}`);
-  fHabits.push(`• Toddy: ${data.femaleToddy || 'No'}`);
-  fHabits.push(`• Coffee: ${data.femaleCoffee || 'None'}`);
-  sections.push(fHabits.join('\n'));
-
-  // 9. Female Past Medical History
-  const fMedLines: string[] = ['PAST MEDICAL HISTORY (FEMALE):'];
-  fMedLines.push(`• Hospital admissions (Non-surgical): ${data.femaleAdmissions || 'Nil'}`);
-  fMedLines.push(`• Regular medication: ${data.femaleRegularMed || 'None'}`);
-  fMedLines.push(`• History of TB: ${data.femaleTb || 'No'}`);
-  fMedLines.push(
-    `• H/O any bleeding or clotting disorders: ${data.femaleBleedingDisorders || 'No'}`
-  );
-  fMedLines.push(`• H/O Galactorrhoea: ${data.femaleGalactorrhoea || 'No'}`);
-  fMedLines.push(`• Allergies: ${data.femaleAllergies || 'No known drug allergies (NKDA)'}`);
-  fMedLines.push(`• Cervical smears: ${data.femaleCervicalSmear || 'Not done / Normal'}`);
-  sections.push(fMedLines.join('\n'));
-
-  // 10. Female Past Surgical History
-  sections.push(`PAST SURGICAL HISTORY (FEMALE): ${data.femalePastSurgical || 'Nil'}`);
-
-  // 11. Female Family History
-  const fFam = Array.isArray(data.femaleFamilyHistory)
-    ? data.femaleFamilyHistory.join(', ')
-    : data.femaleFamilyHistory;
-  sections.push(`FAMILY HISTORY OF DM, HTN, CANCERS: ${fFam || 'Non-contributory'}`);
-
-  // 12. Female Physical Examination
-  const fExam: string[] = ['EXAMINATION (FEMALE):'];
-  fExam.push(`O/E ${data.femalePallor === 'Present' ? 'Pallor present' : 'No pallor'}`);
-  fExam.push(`${data.femalePedalEdema === 'Present' ? 'Pedal edema present' : 'No pedal edema'}`);
-  fExam.push(`${data.femaleGoitre === 'Present' ? 'Goitre present' : 'No goitre'}`);
-  fExam.push(`BP: ${data.femaleBp || '—'} mm Hg`);
-  sections.push(fExam.join('\n'));
-
-  // 13. Male Partner Evaluation (Fertility Tab)
-  if (data.activeTab === 'fertility') {
-    const maleHead: string[] = [];
-    maleHead.push(`Male Name: ${data.maleName || 'Partner'}`);
-    if (data.maleProfession) maleHead.push(`Profession: ${data.maleProfession}`);
-    if (data.maleWeight) maleHead.push(`Weight: ${data.maleWeight} kg`);
-    if (data.maleBmi) maleHead.push(`BMI: ${data.maleBmi}`);
-    if (maleHead.length > 0) sections.push(maleHead.join('\n'));
-
-    const mSexual: string[] = ['MALE REPRODUCTIVE & SEXUAL HISTORY:'];
-    mSexual.push(
-      `• Problems with erection or ejaculation? ${data.maleErectileIssues || 'No'}`
-    );
-    mSexual.push(`• Frequency of intercourse per week: ${data.frequencyIntercourse || '2-3 times'}`);
-    mSexual.push(`• Pain during sexual intercourse: ${data.maleDyspareunia || 'No'}`);
-    mSexual.push(`• Last SI: ${data.maleLastSi || '—'}`);
-    mSexual.push(`• Injuries in the groin/scrotum: ${data.maleScrotalInjury || 'No'}`);
-    mSexual.push(`• Mumps in the past/as a child: ${data.maleMumps || 'No'}`);
-    sections.push(mSexual.join('\n'));
-
-    const mHabits: string[] = ['HABITS / LIFESTYLE (MALE):'];
-    mHabits.push(`• Smoking: ${data.maleSmoking || 'No'}`);
-    mHabits.push(`• Gutka: ${data.maleGutka || 'No'}`);
-    mHabits.push(`• Alcohol: ${data.maleAlcohol || 'No'}`);
-    mHabits.push(`• Toddy: ${data.maleToddy || 'No'}`);
-    mHabits.push(`• Coffee: ${data.maleCoffee || 'None'}`);
-    sections.push(mHabits.join('\n'));
-
-    const mMed: string[] = ['PAST MEDICAL HISTORY (MALE):'];
-    mMed.push(`• Hospital admissions: ${data.maleAdmissions || 'Nil'}`);
-    mMed.push(`• Regular medication: ${data.maleRegularMed || 'None'}`);
-    mMed.push(`• History of TB: ${data.maleTb || 'No'}`);
-    mMed.push(`• Allergies: ${data.maleAllergies || 'NKDA'}`);
-    sections.push(mMed.join('\n'));
-
-    sections.push(`PAST SURGICAL HISTORY (MALE): ${data.malePastSurgical || 'Nil'}`);
-
-    const mFam = Array.isArray(data.maleFamilyHistory)
-      ? data.maleFamilyHistory.join(', ')
-      : data.maleFamilyHistory;
-    sections.push(`FAMILY HISTORY OF DM, HTN, CANCERS (MALE): ${mFam || 'Non-contributory'}`);
-
-    const mExam: string[] = ['EXAMINATION (MALE):'];
-    mExam.push(`O/E ${data.malePallor === 'Present' ? 'Pallor present' : 'No pallor'}`);
-    mExam.push(
-      `${data.malePedalEdema === 'Present' ? 'Pedal edema present' : 'No pedal edema'}`
-    );
-    mExam.push(`${data.maleGoitre === 'Present' ? 'Goitre present' : 'No goitre'}`);
-    mExam.push(`BP: ${data.maleBp || '—'} mm Hg`);
-    sections.push(mExam.join('\n'));
-  }
-
-  // 14. Fertility Investigations
-  const invLines: string[] = ['FERTILITY INVESTIGATIONS:'];
-  if (data.invAmh) invLines.push(`• AMH: ${data.invAmh}`);
-  if (data.invFsh) invLines.push(`• FSH: ${data.invFsh}`);
-  if (data.invLh) invLines.push(`• LH: ${data.invLh}`);
-  if (data.invTsh) invLines.push(`• TSH: ${data.invTsh}`);
-  if (data.invTubalPatency) invLines.push(`• Tubal patency: ${data.invTubalPatency}`);
-  if (data.invHysteroLap) invLines.push(`• Hysteroscopy / Laparoscopy: ${data.invHysteroLap}`);
-  if (data.invSemenAnalysis) invLines.push(`• Semen analysis: ${data.invSemenAnalysis}`);
-  if (data.invDfi) invLines.push(`• Sperm DFI: ${data.invDfi}`);
-  if (invLines.length > 1) sections.push(invLines.join('\n'));
-
-  // 15. Fertility Treatments (Past)
-  if (data.fertilityTreatments) {
-    sections.push(`FERTILITY TREATMENTS:\n${data.fertilityTreatments}`);
-  }
-
-  // 16. Consultation Notes & Physical Examination (P/A, P/S, P/V, 3D Scan)
-  const notesLines: string[] = ['CONSULTATION NOTES:'];
-  if (data.fertilityCounselingDone) {
-    notesLines.push(
-      'Fertility explained including hormones, ovulation, tubal patency and semen: Yes'
-    );
-  }
-  notesLines.push(`P/A - Soft: ${data.paFindings || 'Soft'}`);
-  notesLines.push(`Scars: ${data.paScars || 'None'}`);
-
-  const psLines: string[] = [];
-  psLines.push(`P/S - Vulva Vagina: ${data.psVulvaVagina || 'Healthy'}`);
-  psLines.push(
-    `Cervix: ${data.psCervixHealthy !== false ? 'appears healthy' : 'abnormal appearance'}`
-  );
-  if (data.psCervixEctropion) psLines.push('Cervix ectropion noted');
-  if (data.psCervicalSmearDone) psLines.push('Cervical smear done (LBC)');
-  psLines.push(
-    data.psBleedingOnTouch ? 'Bleeding on touch noted' : 'No bleeding noted on touch'
-  );
-  notesLines.push(psLines.join('. '));
-
-  notesLines.push(
-    `P/V - Uterus: ${data.pvUterusPosition || 'Anteverted'} | Size: ${
-      data.pvUterusSize || 'Normal'
-    } | ${data.pvUterusMobility || 'Mobile'}`
-  );
-  notesLines.push(`Fornices: Tenderness: ${data.pvFornicesTenderness || 'Absent'}`);
-
-  if (data.threeDScan) {
-    notesLines.push(`3-D Scan Findings:\n${data.threeDScan}`);
-  }
-  if (data.factorsInFavour) {
-    notesLines.push(`Factors in favour:\n${data.factorsInFavour}`);
-  }
-  if (data.factorsNotInFavour) {
-    notesLines.push(`Factors not in favour:\n${data.factorsNotInFavour}`);
-  }
-  sections.push(notesLines.join('\n'));
-
-  // 17. Recommended Basic Investigations
-  const recLines: string[] = ['RECOMMENDED BASIC INVESTIGATIONS:'];
-  if (data.recommendedWifeTests?.length) {
-    recLines.push(`Wife - ${data.recommendedWifeTests.join(', ')}`);
-  }
-  if (data.recommendedHusbandTests?.length) {
-    recLines.push(`Husband - ${data.recommendedHusbandTests.join(', ')}`);
-  }
-  if (data.recSemenAnalysis) {
-    recLines.push(
-      'Semen analysis (Attend with 3 to 7 days abstinence, BY APPOINTMENT ONLY) Between 9 AM TO 11 AM'
-    );
-  }
-  if (data.recDfi) {
-    recLines.push(
-      'Sperm DNA Fragmentation DFI (Attend with 2 days abstinence, BY APPOINTMENT ONLY) Between 9 AM TO 11 AM'
-    );
-  }
-
-  const hasPending =
-    data.pendingHusbandTests?.length > 0 || data.pendingWifeTests?.length > 0;
-  if (hasPending) {
-    recLines.push('Pending:');
-    if (data.pendingHusbandTests?.length) {
-      recLines.push(`• Husband - ${data.pendingHusbandTests.join(', ')}`);
-    }
-    if (data.pendingWifeTests?.length) {
-      recLines.push(`• Wife - ${data.pendingWifeTests.join(', ')}`);
-    }
-  }
-  if (recLines.length > 1) sections.push(recLines.join('\n'));
-
-  // 18. Advised
-  const advLines: string[] = ['ADVISED:'];
-  if (data.fertilityFoods?.length) {
-    advLines.push(`Fertility foods - ${data.fertilityFoods.join(', ')}`);
-  }
-  if (data.fertilitySupplements) {
-    advLines.push(`Fertility Supplements: ${data.fertilitySupplements}`);
-  }
-  if (data.followUpPlan) {
-    advLines.push(`Review Plan: ${data.followUpPlan}`);
-  }
-  if (advLines.length > 1) sections.push(advLines.join('\n'));
-
-  // 19. Provisional Diagnosis
-  if (data.finalDiagnosis) {
-    sections.push(`Provisional Diagnosis:\n${data.finalDiagnosis}`);
-  }
-
-  // 20. Signature
-  sections.push(
-    `Consultant’s Name: ${data.seenByDr || 'Treating Consultant'}\nSignature: _______________________`
-  );
-
-  return sections.join('\n\n');
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -2729,482 +2421,115 @@ export default function ClinicalHistoryProformaModal({
             MODE 2: READABLE SENTENCE FORM (THE NARRATIVE TEXT VIEW)
             ========================================================================= */}
         {viewMode === 'sentence' && (
-          <div className="max-w-4xl mx-auto space-y-4">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3 text-emerald-900">
-              <div className="space-y-0.5">
-                <h4 className="font-bold text-sm flex items-center gap-1.5 text-emerald-950">
-                  <FileText className="w-4 h-4 text-emerald-600" />
-                  <span>Clinical Narrative (Readable Sentence Form)</span>
-                </h4>
-                <p className="text-xs text-emerald-800">
-                  All filled proforma options compiled as continuous, natural medical sentences.
-                  Directly saved to Consultation Present History.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyNarrative}
-                  className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-900 rounded-md text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
-                >
-                  {copiedNarrative ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" /> Copy Sentence Form
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode('form');
-                    toast.success('Form Mode', 'You can continue modifying any template fields.');
-                  }}
-                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit Options</span>
-                </button>
-              </div>
-            </div>
-
-            {/* The Clean Printable / Readable Text Area */}
-            <div className="bg-white border border-slate-300 rounded-lg p-6 sm:p-8 shadow-xs font-mono text-xs leading-relaxed text-slate-800 whitespace-pre-wrap selection:bg-[#2878a8]/20 selection:text-slate-900 border-l-4 border-l-[#2878a8]">
-              {narrativeText}
-            </div>
-          </div>
+          <ProformaSentenceView
+            copiedNarrative={copiedNarrative}
+            handleCopyNarrative={handleCopyNarrative}
+            setViewMode={setViewMode}
+            narrativeText={narrativeText}
+          />
         )}
 
         {/* =========================================================================
             MODE 3: PRINT SHEET PREVIEW (EXHAUSTIVE PROFORMA SHEET)
             ========================================================================= */}
         {viewMode === 'preview' && (
-          <div className="printable-document max-w-4xl mx-auto bg-white p-6 sm:p-8 border border-slate-300 rounded-lg shadow-sm space-y-5 text-slate-800 print:border-none print:shadow-none print:p-0 print:m-0">
-            {/* Header */}
-            <PrintableReportHeader
-              title={
-                activeTab === 'fertility'
-                  ? 'COUPLE FERTILITY ASSESSMENT & CLINICAL PROFORMA'
-                  : activeTab === 'gynaecology'
-                  ? 'GYNAECOLOGY CLINICAL CASE HISTORY & PROFORMA'
-                  : 'OBSTETRIC ANTENATAL CONSULTATION RECORD'
-              }
-              subtitle="Department of Reproductive Medicine, Obstetrics & Gynaecology"
-              hideHospitalHeader={usePrePrintedPad}
-              onTogglePrePrintedPad={() => setUsePrePrintedPad(!usePrePrintedPad)}
-              patient={{
-                name: femaleName || patient?.name,
-                vid: patient?.vid,
-                age: patient?.age,
-                gender: 'Female',
-                partner_name: maleName || partner?.name || patient?.partner_name,
-              }}
-              metaFields={[
-                { label: 'Date', value: new Date().toISOString().split('T')[0] },
-                { label: 'Consultant', value: seenByDr || 'Treating Specialist' },
-                { label: 'Proforma Type', value: `${activeTab.toUpperCase()} CONSULTATION` },
-                { label: 'Referred By', value: referredBy || 'Self / Direct Walk-in' },
-              ]}
-            />
-
-            {/* Demographics / Referral Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-md text-xs">
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                  Referred by
-                </span>
-                <strong>{referredBy || 'Direct Walk-in'}</strong>
-              </div>
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                  Lives in
-                </span>
-                <strong>{livesIn || '—'}</strong>
-              </div>
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                  Seen by Dr
-                </span>
-                <strong>{seenByDr || 'Treating Specialist'}</strong>
-              </div>
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                  Staff in attendance
-                </span>
-                <strong>{staffInAttendance || '—'}</strong>
-              </div>
-            </div>
-
-            {/* Reason for consultation */}
-            <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50">
-              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider mb-0.5">
-                Reason for consultation
-              </span>
-              <p className="text-xs font-semibold text-slate-900 leading-snug">
-                {reasonForConsultation}
-              </p>
-            </div>
-
-            {/* Couple Fertility Profile */}
-            {activeTab === 'fertility' && (
-              <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-                <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
-                  Couple Fertility Profile
-                </div>
-                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Type / Factor
-                    </span>
-                    <strong>
-                      {fertilityType} Infertility ({fertilityFactor})
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Married in year
-                    </span>
-                    <strong>{marriedInYear || '—'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Trying for pregnancy
-                    </span>
-                    <strong>{tryingForPregnancy ? `${tryingForPregnancy} years` : '—'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Consanguinity
-                    </span>
-                    <strong>{consanguinity}</strong>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Female Assessment */}
-            <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-              <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
-                Female Partner Assessment
-              </div>
-              <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                <div className="p-1">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                    Female Name
-                  </span>
-                  <strong>
-                    {femaleName || patient?.name} {femaleProfession && `(${femaleProfession})`}
-                  </strong>
-                </div>
-                <div className="p-1 sm:pl-3">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                    Weight / BMI
-                  </span>
-                  <strong>
-                    {femaleWeight || '—'} kg {femaleBmi && `/ ${femaleBmi}`}
-                  </strong>
-                </div>
-                <div className="p-1 sm:pl-3">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                    Examination
-                  </span>
-                  <strong>
-                    {femalePallor === 'No' ? 'No pallor' : 'Pallor'},{' '}
-                    {femalePedalEdema === 'No' ? 'No pedal edema' : 'Edema'},{' '}
-                    {femaleGoitre === 'No' ? 'No goitre' : 'Goitre'}, BP {femaleBp}
-                  </strong>
-                </div>
-                <div className="p-1 sm:pl-3">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                    Menstrual Cycle
-                  </span>
-                  <strong>
-                    Every {periodsEvery}d / {durationBleeding}d (LMP: {lmp})
-                  </strong>
-                </div>
-              </div>
-
-              {/* Menstrual Details */}
-              <div className="px-3 pb-2.5 pt-1.5 text-[11px] text-slate-700 border-t border-slate-100 flex flex-wrap gap-4">
-                <span>
-                  Painful: <strong>{periodsPainful}</strong>
-                </span>
-                <span>
-                  Heavy: <strong>{periodsHeavy}</strong>
-                </span>
-                <span>
-                  Menarche: <strong>{ageAtMenarche}y</strong>
-                </span>
-                {menstrualAdditional && <span>Notes: {menstrualAdditional}</span>}
-              </div>
-
-              {/* Habits */}
-              <div className="px-3 py-2 bg-slate-50/70 border-t border-slate-100 text-[11px] grid grid-cols-5 gap-2">
-                <span>
-                  Smoking: <strong>{femaleSmoking}</strong>
-                </span>
-                <span>
-                  Gutka: <strong>{femaleGutka}</strong>
-                </span>
-                <span>
-                  Alcohol: <strong>{femaleAlcohol}</strong>
-                </span>
-                <span>
-                  Toddy: <strong>{femaleToddy}</strong>
-                </span>
-                <span>
-                  Coffee: <strong>{femaleCoffee}</strong>
-                </span>
-              </div>
-
-              {/* Past Medical / Surgical */}
-              <div className="p-3 border-t border-slate-100 text-xs space-y-1">
-                <p>
-                  <strong>Past Medical:</strong> Admissions: {femaleAdmissions} | Regular Meds:{' '}
-                  {femaleRegularMed} | TB: {femaleTb} | Bleeding Disorders:{' '}
-                  {femaleBleedingDisorders} | Galactorrhoea: {femaleGalactorrhoea}
-                </p>
-                <p>
-                  <strong>Allergies:</strong> {femaleAllergies} | <strong>Smears:</strong>{' '}
-                  {femaleCervicalSmear}
-                </p>
-                <p>
-                  <strong>Past Surgical:</strong> {femalePastSurgical} |{' '}
-                  <strong>Family History:</strong> {femaleFamilyHistory.join(', ')}
-                </p>
-              </div>
-            </div>
-
-            {/* Obstetric History */}
-            <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-              <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider flex justify-between">
-                <span>Obstetric History</span>
-                <span className="font-mono">{gpal}</span>
-              </div>
-              <div className="p-2">
-                {obRows.some((r) => r.year || r.outcome) ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 font-bold">
-                        <th className="p-1 text-left">Year</th>
-                        <th className="p-1 text-left">Place</th>
-                        <th className="p-1 text-left">Details / Mode</th>
-                        <th className="p-1 text-left">Outcome</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {obRows
-                        .filter((r) => r.year || r.outcome)
-                        .map((r, i) => (
-                          <tr key={i} className="border-b border-slate-100">
-                            <td className="p-1">{r.year}</td>
-                            <td className="p-1">{r.place}</td>
-                            <td className="p-1">{r.details}</td>
-                            <td className="p-1 font-bold">{r.outcome}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-slate-500 italic p-1">Nulligravida / G0</p>
-                )}
-              </div>
-            </div>
-
-            {/* Male Assessment */}
-            {activeTab === 'fertility' && (
-              <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-                <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
-                  Male Partner Assessment
-                </div>
-                <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                  <div className="p-1">
-                    <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                      Male Name
-                    </span>
-                    <strong>
-                      {maleName || partner?.name || '—'} {maleProfession && `(${maleProfession})`}
-                    </strong>
-                  </div>
-                  <div className="p-1 sm:pl-3">
-                    <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                      Weight / BMI
-                    </span>
-                    <strong>
-                      {maleWeight || '—'} kg {maleBmi && `/ ${maleBmi}`}
-                    </strong>
-                  </div>
-                  <div className="p-1 sm:pl-3">
-                    <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                      Examination
-                    </span>
-                    <strong>
-                      {malePallor === 'No' ? 'No pallor' : 'Pallor'},{' '}
-                      {malePedalEdema === 'No' ? 'No pedal edema' : 'Edema'}, BP {maleBp}
-                    </strong>
-                  </div>
-                  <div className="p-1 sm:pl-3">
-                    <span className="text-[9px] text-slate-400 uppercase font-bold block">
-                      Sexual History
-                    </span>
-                    <strong>
-                      Intercourse: {frequencyIntercourse} | Last SI: {maleLastSi}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="px-3 pb-2 pt-1 text-[11px] text-slate-700 border-t border-slate-100 flex flex-wrap gap-4">
-                  <span>
-                    Erection/Ejaculation: <strong>{maleErectileIssues}</strong>
-                  </span>
-                  <span>
-                    Pain during SI: <strong>{maleDyspareunia}</strong>
-                  </span>
-                  <span>
-                    Groin injury: <strong>{maleScrotalInjury}</strong>
-                  </span>
-                  <span>
-                    Mumps: <strong>{maleMumps}</strong>
-                  </span>
-                </div>
-
-                <div className="px-3 py-2 bg-slate-50/70 border-t border-slate-100 text-[11px] grid grid-cols-5 gap-2">
-                  <span>
-                    Smoking: <strong>{maleSmoking}</strong>
-                  </span>
-                  <span>
-                    Gutka: <strong>{maleGutka}</strong>
-                  </span>
-                  <span>
-                    Alcohol: <strong>{maleAlcohol}</strong>
-                  </span>
-                  <span>
-                    Toddy: <strong>{maleToddy}</strong>
-                  </span>
-                  <span>
-                    Coffee: <strong>{maleCoffee}</strong>
-                  </span>
-                </div>
-
-                <div className="p-3 border-t border-slate-100 text-xs">
-                  <p>
-                    <strong>Medical:</strong> Admissions: {maleAdmissions} | Regular Meds:{' '}
-                    {maleRegularMed} | TB: {maleTb} | Allergies: {maleAllergies} | Surgeries:{' '}
-                    {malePastSurgical}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Investigations & Consultation Notes */}
-            <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-              <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
-                Clinical Pelvic Examination &amp; Diagnostics
-              </div>
-              <div className="p-3 space-y-2">
-                <p>
-                  <strong>P/A:</strong> Soft: {paFindings} | Scars: {paScars}
-                </p>
-                <p>
-                  <strong>P/S:</strong> Vulva Vagina: {psVulvaVagina} | Cervix:{' '}
-                  {psCervixHealthy ? 'Healthy' : 'Abnormal'}{' '}
-                  {psCervixEctropion && '(Ectropion noted)'}{' '}
-                  {psCervicalSmearDone && '(Smear done LBC)'} |{' '}
-                  {psBleedingOnTouch ? 'Bleeding on touch noted' : 'No bleeding noted on touch'}
-                </p>
-                <p>
-                  <strong>P/V:</strong> Uterus: {pvUterusPosition}, Size: {pvUterusSize},{' '}
-                  {pvUterusMobility} | Fornices: Tenderness: {pvFornicesTenderness}
-                </p>
-                {threeDScan && (
-                  <p>
-                    <strong>3-D Scan Findings:</strong> {threeDScan}
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <strong>Factors in favour:</strong> {factorsInFavour}
-                  </div>
-                  <div>
-                    <strong>Factors not in favour:</strong> {factorsNotInFavour}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recommended Investigations */}
-            <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-              <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
-                Recommended Basic Investigations &amp; Instructions
-              </div>
-              <div className="p-3 space-y-2">
-                <p>
-                  <strong>Wife:</strong> {recommendedWifeTests.join(', ')}
-                </p>
-                <p>
-                  <strong>Husband:</strong> {recommendedHusbandTests.join(', ')}
-                </p>
-                {recSemenAnalysis && (
-                  <p className="text-slate-800">
-                    • <strong>Semen analysis</strong> (Attend with 3 to 7 days abstinence, BY
-                    APPOINTMENT ONLY) Between 9 AM TO 11 AM
-                  </p>
-                )}
-                {recDfi && (
-                  <p className="text-slate-800">
-                    • <strong>Sperm DNA Fragmentation DFI</strong> (Attend with 2 days abstinence,
-                    BY APPOINTMENT ONLY) Between 9 AM TO 11 AM
-                  </p>
-                )}
-                <div className="pt-1 border-t border-slate-100">
-                  <p>
-                    <strong>Pending Husband:</strong> {pendingHusbandTests.join(', ')}
-                  </p>
-                  <p>
-                    <strong>Pending Wife:</strong> {pendingWifeTests.join(', ')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Advised & Diagnosis */}
-            <div className="border border-slate-200 rounded-md p-3.5 bg-slate-50 space-y-2 text-xs">
-              <p>
-                <strong>Advised Fertility Foods:</strong> {fertilityFoods.join(', ')}
-              </p>
-              <p>
-                <strong>Fertility Supplements:</strong> {fertilitySupplements}
-              </p>
-              <p>
-                <strong>Review Plan:</strong> {followUpPlan}
-              </p>
-              <div className="pt-2 border-t border-slate-200">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">
-                  Provisional Diagnosis
-                </span>
-                <strong className="text-sm text-slate-900">{finalDiagnosis}</strong>
-              </div>
-            </div>
-
-            {/* Signatures */}
-            <div className="pt-6 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs avoid-break">
-              <div>
-                <div className="border-b border-slate-400 w-48 mb-1" />
-                <p className="font-bold text-slate-800">{femaleName || patient?.name}</p>
-                <p className="text-slate-500">Patient Attestation</p>
-              </div>
-              <div className="text-right flex flex-col items-end">
-                <div className="border-b border-slate-400 w-48 mb-1" />
-                <p className="font-bold text-slate-800">{seenByDr || 'Treating Consultant'}</p>
-                <p className="text-slate-500">Consultant Infertility Specialist</p>
-              </div>
-            </div>
-          </div>
+          <ProformaPrintView
+            patient={patient}
+            partner={partner}
+            activeTab={activeTab}
+            usePrePrintedPad={usePrePrintedPad}
+            setUsePrePrintedPad={setUsePrePrintedPad}
+            data={{
+              femaleName,
+              maleName,
+              referredBy,
+              livesIn,
+              seenByDr,
+              staffInAttendance,
+              reasonForConsultation,
+              fertilityType,
+              fertilityFactor,
+              marriedInYear,
+              tryingForPregnancy,
+              consanguinity,
+              femaleProfession,
+              femaleWeight,
+              femaleBmi,
+              femalePallor,
+              femalePedalEdema,
+              femaleGoitre,
+              femaleBp,
+              periodsEvery,
+              durationBleeding,
+              lmp,
+              periodsPainful,
+              periodsHeavy,
+              ageAtMenarche,
+              menstrualAdditional,
+              femaleSmoking,
+              femaleGutka,
+              femaleAlcohol,
+              femaleToddy,
+              femaleCoffee,
+              femaleAdmissions,
+              femaleRegularMed,
+              femaleTb,
+              femaleBleedingDisorders,
+              femaleGalactorrhoea,
+              femaleAllergies,
+              femaleCervicalSmear,
+              femalePastSurgical,
+              femaleFamilyHistory,
+              gpal,
+              obRows,
+              maleProfession,
+              maleWeight,
+              maleBmi,
+              malePallor,
+              malePedalEdema,
+              maleBp,
+              frequencyIntercourse,
+              maleLastSi,
+              maleErectileIssues,
+              maleDyspareunia,
+              maleScrotalInjury,
+              maleMumps,
+              maleSmoking,
+              maleGutka,
+              maleAlcohol,
+              maleToddy,
+              maleCoffee,
+              maleAdmissions,
+              maleRegularMed,
+              maleTb,
+              maleAllergies,
+              malePastSurgical,
+              paFindings,
+              paScars,
+              psVulvaVagina,
+              psCervixHealthy,
+              psCervixEctropion,
+              psCervicalSmearDone,
+              psBleedingOnTouch,
+              pvUterusPosition,
+              pvUterusSize,
+              pvUterusMobility,
+              pvFornicesTenderness,
+              threeDScan,
+              factorsInFavour,
+              factorsNotInFavour,
+              recommendedWifeTests,
+              recommendedHusbandTests,
+              recSemenAnalysis,
+              recDfi,
+              pendingHusbandTests,
+              pendingWifeTests,
+              fertilityFoods,
+              fertilitySupplements,
+              followUpPlan,
+              finalDiagnosis,
+            }}
+          />
         )}
       </div>
 

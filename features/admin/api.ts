@@ -55,12 +55,38 @@ export const adminApi = {
     window.URL.revokeObjectURL(url);
   },
 
-  importCsv: async (domain: string, file: File, conflictMode: 'overwrite' | 'skip') => {
+  previewCsv: async (domain: string, file: File | Blob, conflictMode: 'overwrite' | 'skip') => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
     const apiBase = getApiBase();
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file, file instanceof File ? file.name : `${domain}.csv`);
     formData.append('conflict_mode', conflictMode);
+
+    const res = await fetch(`${apiBase}/core/admin/preview-csv/${domain}`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'CSV preview failed' }));
+      throw new ApiError(res.status, err.detail || 'CSV preview failed');
+    }
+
+    return res.json();
+  },
+
+  importCsv: async (domain: string, file: File | Blob, conflictMode: 'overwrite' | 'skip', dryRun: boolean = false) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
+    const apiBase = getApiBase();
+    const formData = new FormData();
+    formData.append('file', file, file instanceof File ? file.name : `${domain}.csv`);
+    formData.append('conflict_mode', conflictMode);
+    if (dryRun) {
+      formData.append('dry_run', 'true');
+    }
 
     const res = await fetch(`${apiBase}/core/admin/import-csv/${domain}`, {
       method: 'POST',

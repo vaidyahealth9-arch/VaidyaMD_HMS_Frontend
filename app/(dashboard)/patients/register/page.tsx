@@ -5,6 +5,7 @@ import { patientsApi, authApi, documentsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import PageLayout from '@/components/common/PageLayout';
 import { toast } from '@/contexts/ToastContext';
 import { Building2, Building, User, Users, AlertTriangle, X, Check, Camera, FileText, UploadCloud, Trash2, Barcode } from 'lucide-react';
 import PatientBarcodeModal from '@/components/common/PatientBarcodeModal';
@@ -288,7 +289,7 @@ export default function RegisterPatientPage() {
   const cardHeader = getPrimaryCardTitle();
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -870,6 +871,6 @@ export default function RegisterPatientPage() {
           initialSampleType="Case File"
         />
       )}
-    </div>
+    </PageLayout>
   );
 }

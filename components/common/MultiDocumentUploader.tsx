@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { documentsApi } from '@/lib/api';
 import { UploadCloud, ChevronUp, ChevronDown, Plus, FileText, Trash2, Upload } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
 export const DOCUMENT_CATEGORIES = [
   { id: 'identity_proof', label: 'Identity Proof (Aadhaar/PAN/Passport)' },
@@ -85,6 +86,7 @@ export default function MultiDocumentUploader({
   partnerName = 'Partner',
   onUploadComplete,
 }: MultiDocumentUploaderProps) {
+  const { toast } = useToast();
   const [isDocUploadExpanded, setIsDocUploadExpanded] = useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [docUploadRows, setDocUploadRows] = useState<MultiDocUploadRow[]>([
@@ -165,7 +167,7 @@ export default function MultiDocumentUploader({
   const handleBatchUploadDocuments = async () => {
     const validRows = docUploadRows.filter((r) => r.file_data);
     if (validRows.length === 0) {
-      alert('Please choose a file to upload for at least one document row.');
+      toast.error('Please choose a file to upload for at least one document row.');
       return;
     }
     setIsUploadingDoc(true);
@@ -201,7 +203,6 @@ export default function MultiDocumentUploader({
         });
       }
 
-
       setDocUploadRows([
         {
           id: 'doc-row-' + Math.random().toString(36).substring(2, 9),
@@ -213,10 +214,10 @@ export default function MultiDocumentUploader({
           file_size: '',
         },
       ]);
-      alert(`Successfully uploaded ${validRows.length} document(s)!`);
+      toast.success(`Successfully uploaded ${validRows.length} document(s)!`);
       if (onUploadComplete) onUploadComplete();
     } catch (err: any) {
-      alert('Upload failed: ' + (err.message || 'Unknown error'));
+      toast.error('Upload failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsUploadingDoc(false);
     }

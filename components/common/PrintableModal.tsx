@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Printer, X } from 'lucide-react';
 import PrintableReportHeader, { PrintableReportHeaderProps } from './PrintableReportHeader';
 import PrintableReportFooter, { PrintableReportFooterProps } from './PrintableReportFooter';
+import A4Sheet from './A4Sheet';
 
 export interface PrintableModalProps {
   isOpen: boolean;
@@ -50,105 +51,114 @@ export default function PrintableModal({
     if (onPrint) {
       onPrint();
     } else {
-      document.body.classList.add('is-printing-modal');
-      const cleanup = () => {
-        document.body.classList.remove('is-printing-modal');
-        window.removeEventListener('afterprint', cleanup);
-      };
-      window.addEventListener('afterprint', cleanup);
       window.print();
     }
   };
 
+  const renderedChildren =
+    typeof children === 'function'
+      ? children({ hideHeader: !includeHeader })
+      : children;
+
   return (
-    <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-16 sm:pt-20 pb-8 px-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:overflow-visible animate-in fade-in duration-150"
-      style={{ background: 'rgba(0,0,0,0.65)' }}
-    >
-      <div
-        className={`bg-white w-full ${maxWidth} shadow-2xl overflow-hidden flex flex-col my-auto sm:my-0 rounded-xl border border-slate-200 print:shadow-none print:rounded-none print:m-0 print:max-w-full print:border-none print:bg-transparent`}
-      >
-        {/* Preview Top Toolbar */}
-        <div className="flex items-center justify-between px-5 py-3 gap-2 print:hidden bg-slate-900 text-white flex-shrink-0">
-          <div>
-            <p className="text-sm font-semibold">{title}</p>
-            {subtitle && <p className="text-xs opacity-60 mt-0.5">{subtitle}</p>}
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-950/85 backdrop-blur-xs overflow-hidden print:static print:bg-transparent print:overflow-visible print:p-0 print:m-0 animate-in fade-in duration-150">
+      {/* Top Preview Toolbar - Fixed at top on screen */}
+      <header className="flex items-center justify-between px-6 py-2.5 shrink-0 z-30 bg-slate-900 border-b border-slate-800 text-white shadow-lg print:hidden">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold tracking-tight">{title}</h3>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+              A4 Sheet Preview
+            </span>
           </div>
-
-          <div className="flex items-center gap-3">
-            {/* Header / Pre-printed Pad Toggle */}
-            {showPrePrintedToggle && (
-              <div className="flex items-center bg-slate-800 p-0.5 rounded-md border border-slate-700 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setIncludeHeader(true)}
-                  className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                    includeHeader
-                      ? 'bg-[rgb(var(--clr-primary))] text-white font-bold'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  With Header
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIncludeHeader(false)}
-                  className={`px-2.5 py-1 rounded transition-colors font-medium ${
-                    !includeHeader
-                      ? 'bg-amber-600 text-white font-bold'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                  title="Use for pre-printed letterhead pads"
-                >
-                  Pre-printed Pad
-                </button>
-              </div>
-            )}
-
-            {/* Print Action Button */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-bold transition-opacity hover:opacity-90 shadow-sm bg-[rgb(var(--clr-primary))] text-white"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print (A4)</span>
-            </button>
-
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 opacity-60 hover:opacity-100 transition-opacity"
-              title="Close Preview (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
 
-        {/* Printable Document Body */}
-        <div
-          className="p-6 sm:p-8 space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs"
-          style={{ fontFamily: 'Inter, Arial, sans-serif' }}
-        >
-          {headerProps && (
-            <PrintableReportHeader
-              {...headerProps}
-              hideHospitalHeader={!includeHeader}
-            />
+        <div className="flex items-center gap-3">
+          {/* Header / Pre-printed Pad Toggle */}
+          {showPrePrintedToggle && (
+            <div className="flex items-center bg-slate-800/90 p-0.5 rounded-lg border border-slate-700 text-xs">
+              <button
+                type="button"
+                onClick={() => setIncludeHeader(true)}
+                className={`px-3 py-1 rounded-md transition-all font-medium cursor-pointer ${
+                  includeHeader
+                    ? 'bg-[rgb(var(--clr-primary))] text-white font-bold shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                With Header
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeHeader(false)}
+                className={`px-3 py-1 rounded-md transition-all font-medium cursor-pointer ${
+                  !includeHeader
+                    ? 'bg-amber-600 text-white font-bold shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="Use when printing on pre-printed hospital stationery"
+              >
+                Pre-printed Pad
+              </button>
+            </div>
           )}
 
-          {typeof children === 'function'
-            ? children({ hideHeader: !includeHeader })
-            : children}
+          {/* Print Action Button */}
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md bg-[rgb(var(--clr-primary))] hover:brightness-110 active:scale-95 text-white cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print (A4)</span>
+          </button>
 
-          {footerProps && <PrintableReportFooter {...footerProps} />}
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Close Preview (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </div>
+      </header>
+
+      {/* Document Canvas — Displays stacked A4 paper cards (Google Docs / Word style) */}
+      <main
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+        className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col items-center gap-8 print:p-0 print:m-0 print:gap-0 print:overflow-visible print:block"
+      >
+        {/* If headerProps or footerProps were passed directly to PrintableModal */}
+        {headerProps || footerProps ? (
+          <A4Sheet
+            header={
+              headerProps ? (
+                <PrintableReportHeader
+                  {...headerProps}
+                  hideHospitalHeader={!includeHeader}
+                />
+              ) : undefined
+            }
+            footer={
+              footerProps ? (
+                <PrintableReportFooter
+                  {...footerProps}
+                  hideHospitalFooter={!includeHeader}
+                />
+              ) : undefined
+            }
+          >
+            {renderedChildren}
+          </A4Sheet>
+        ) : (
+          renderedChildren
+        )}
+      </main>
     </div>
   );
 }

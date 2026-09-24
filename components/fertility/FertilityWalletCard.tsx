@@ -53,6 +53,7 @@ export default function FertilityWalletCard({
   // Pay Invoice Form State
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [payAmount, setPayAmount] = useState('');
+  const [settleDiscount, setSettleDiscount] = useState('');
   const [isSubmittingPay, setIsSubmittingPay] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -128,22 +129,31 @@ export default function FertilityWalletCard({
 
     setIsSubmittingPay(true);
     try {
+      const numDiscount = parseFloat(settleDiscount) || 0;
       await walletApi.payInvoice(patientId, {
         invoice_id: selectedInvoiceId,
         amount: numAmount,
+        discount: numDiscount > 0 ? numDiscount : 0,
       });
 
-      setSuccessMsg(`Deducted ₹${numAmount.toLocaleString('en-IN')} from wallet for invoice payment.`);
+      setSuccessMsg(
+        `Deducted ₹${numAmount.toLocaleString('en-IN')} from wallet for invoice payment${numDiscount > 0 ? ` (with ₹${numDiscount.toLocaleString('en-IN')} concession)` : ''}.`,
+      );
       setShowPayInvoiceModal(false);
       setSelectedInvoiceId('');
       setPayAmount('');
+      setSettleDiscount('');
       await fetchWallet();
       onWalletUpdated?.();
 
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
       console.error('Invoice payment error:', err);
-      alert(err.message || 'Failed to pay invoice from wallet');
+      const errorMsg =
+        err?.response?.data?.detail ||
+        (typeof err?.message === 'string' ? err.message : '') ||
+        'Failed to pay invoice from wallet';
+      alert(errorMsg);
     } finally {
       setIsSubmittingPay(false);
     }
@@ -156,13 +166,19 @@ export default function FertilityWalletCard({
   const transactions = wallet?.transactions || [];
 
   // Lifetime Stats
-  const totalDeposits = transactions
-    .filter((t: any) => t.type === 'deposit')
-    .reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
+  const totalDeposits =
+    wallet?.total_deposited !== undefined
+      ? Number(wallet.total_deposited)
+      : transactions
+          .filter((t: any) => t.type === 'deposit')
+          .reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
 
-  const totalDebits = transactions
-    .filter((t: any) => t.type === 'debit')
-    .reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
+  const totalDebits =
+    wallet?.total_utilized !== undefined
+      ? Number(wallet.total_utilized)
+      : transactions
+          .filter((t: any) => t.type === 'debit' || t.type === 'invoice_debit')
+          .reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
 
   const balance = wallet?.balance ?? 0;
 
@@ -595,6 +611,7 @@ export default function FertilityWalletCard({
                   onChange={(e) => {
                     const invId = e.target.value;
                     setSelectedInvoiceId(invId);
+                    setSettleDiscount('');
                     const found = pendingInvoices.find((i) => i.id === invId);
                     if (found) {
                       setPayAmount(
@@ -614,27 +631,47 @@ export default function FertilityWalletCard({
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Amount to Deduct from Wallet (₹) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-base">
-                    ₹
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Concession / Discount (₹)
+                  </label>
                   <input
                     type="number"
-                    max={balance}
-                    min="1"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value)}
-                    className="vmd-input pl-8 text-lg font-bold text-slate-900 font-mono w-full"
-                    required
+                    min="0"
+                    value={settleDiscount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSettleDiscount(val);
+                      const d = parseFloat(val) || 0;
+                      const found = pendingInvoices.find((i) => i.id === selectedInvoiceId);
+                      const due = found ? parseFloat(found.pending_due || '0') : 0;
+                      const netDue = Math.max(0, due - d);
+                      setPayAmount(String(Math.min(balance, netDue)));
+                    }}
+                    placeholder="Optional waiver"
+                    className="vmd-input text-xs font-semibold text-rose-600 w-full"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Deduction will automatically be applied against invoice balance.
-                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Amount to Deduct (₹) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      max={balance}
+                      min="0"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="vmd-input pl-7 text-sm font-bold text-slate-900 font-mono w-full"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 pt-2">

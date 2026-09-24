@@ -54,10 +54,23 @@ export const fertilityApi = {
   getSchema: (recordType?: string) =>
     request<any>(recordType && recordType !== 'fertility' ? `/plugins/fertility/schemas/${recordType}` : '/plugins/fertility/schemas'),
   getDues: (patientId: string) => request<any>(`/plugins/fertility/patient-dues/${patientId}`),
-  getRecords: (patientId: string, pluginId?: string) =>
-    request<any[]>(`/core/clinical-records/${patientId}${toQueryString({ plugin_id: pluginId || 'fertility' })}`),
+  getRecords: (patientId: string, recordTypeOrPluginId?: string) => {
+    const isPlugin = recordTypeOrPluginId === 'fertility' || recordTypeOrPluginId === 'opd';
+    const query = isPlugin
+      ? { plugin_id: recordTypeOrPluginId }
+      : recordTypeOrPluginId
+      ? { record_type: recordTypeOrPluginId }
+      : { plugin_id: 'fertility' };
+    return request<any[]>(`/core/clinical-records/${patientId}${toQueryString(query)}`);
+  },
   saveRecord: (data: Record<string, unknown>) =>
-    request<any>('/core/clinical-records', { method: 'POST', body: JSON.stringify(data) }),
+    request<any>('/core/clinical-records', {
+      method: 'POST',
+      body: JSON.stringify({
+        plugin_id: 'fertility',
+        ...data,
+      }),
+    }),
 };
 
 export const andrologyApi = {

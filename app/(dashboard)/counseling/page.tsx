@@ -6,6 +6,7 @@ import { counselingApi, patientsApi, treatmentCyclesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
 import { formatDate } from '@/lib/utils';
+import PageLayout from '@/components/common/PageLayout';
 import {
   HeartHandshake,
   Plus,
@@ -29,9 +30,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
-import PrintableModal from '@/components/common/PrintableModal';
-import PrintableReportHeader from '@/components/common/PrintableReportHeader';
-import PrintableReportFooter from '@/components/common/PrintableReportFooter';
+import PrintableCounselingSheetModal from '@/components/common/PrintableCounselingSheetModal';
 
 const SOURCES_LIST = [
   'OP Consultation',
@@ -217,7 +216,7 @@ export default function CounselingPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -863,99 +862,11 @@ export default function CounselingPage() {
       {/* ========================================================= */}
       {/* PRINTABLE A4 COUNSELING CASE SHEET */}
       {/* ========================================================= */}
-      {printingNote && (
-        <PrintableModal
-          isOpen={true}
-          onClose={() => setPrintingNote(null)}
-          title="Counseling Sheet Preview"
-          subtitle={`Pre-ART counseling documentation for ${printingNote.patient_name || 'Patient'}`}
-          maxWidth="max-w-2xl"
-        >
-          {({ hideHeader }: { hideHeader: boolean }) => (
-            <div className="space-y-4 text-xs text-slate-900" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
-              {/* Dynamic Branch Header */}
-              <PrintableReportHeader
-                title="PRE-ART COUNSELING RECORD"
-                department="Department of Reproductive Medicine & ART Counseling"
-                hideHospitalHeader={hideHeader}
-                extraHeaderRight={
-                  <div className="text-right">
-                    <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-widest text-[#0B4F6C] border-[#0B4F6C]">
-                      Pre-ART Counseling
-                    </Badge>
-                    <p className="text-[10px] font-mono text-slate-500 mt-1">Date: {formatDate(printingNote.created_at)}</p>
-                  </div>
-                }
-              />
-
-              {/* Patient Banner */}
-              <div className="grid grid-cols-2 gap-4 p-3 rounded bg-slate-50 border border-slate-200">
-                <div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Patient Name</p>
-                  <p className="font-bold text-sm text-slate-900">{printingNote.patient_name || 'Patient'}</p>
-                  <p className="font-mono text-xs text-slate-600">VID: {printingNote.patient_vid || '—'} · Age: {printingNote.patient_age || '—'}y</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Planned Procedure</p>
-                  <p className="font-bold text-xs text-text-main">{printingNote.procedure || 'ART Counseling'}</p>
-                  <p className="text-[10px] text-slate-500">Source: {printingNote.source || 'OP'}</p>
-                </div>
-              </div>
-
-              {/* 8 Columns Formatted Table */}
-              <table className="w-full text-left text-xs border border-slate-200 border-collapse">
-                <tbody>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50 w-1/3">1. Source</td>
-                    <td className="p-2.5 text-slate-900">
-                      <span className="font-semibold">{printingNote.source || 'OP Consultation'}</span>
-                      {printingNote.comments && (
-                        <p className="text-slate-600 text-[11px] mt-0.5 italic">Comments: {printingNote.comments}</p>
-                      )}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">2. Procedure</td>
-                    <td className="p-2.5 font-bold text-text-main">{printingNote.procedure || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">3. Egg pick up (OPU)</td>
-                    <td className="p-2.5 text-slate-800 leading-relaxed">{printingNote.egg_pick_up || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">4. Discussion</td>
-                    <td className="p-2.5 text-slate-900 leading-relaxed font-medium">{printingNote.discussion || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">5. Laparoscopy / Hysteroscopy / etc</td>
-                    <td className="p-2.5 text-slate-800 leading-relaxed">{printingNote.laparoscopy_hysteroscopy || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">6. Egg transfer</td>
-                    <td className="p-2.5 text-slate-800 leading-relaxed">{printingNote.egg_transfer || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">7. Remarks</td>
-                    <td className="p-2.5 text-slate-800 leading-relaxed">{printingNote.remarks || '—'}</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-bold text-slate-600 bg-slate-50">8. Counselor Sign-off</td>
-                    <td className="p-2.5 font-bold text-slate-900 font-mono">{printingNote.signature || 'Counselor Signed'}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* Dynamic Branch Footer */}
-              <PrintableReportFooter
-                signatoryTitle={printingNote.signature || 'ART Counselor'}
-                signatorySubtitle="Authorized ART Counselor Signature"
-                showSignatory={true}
-                showComputerGeneratedNotice={true}
-              />
-            </div>
-          )}
-        </PrintableModal>
-      )}
-    </div>
+      <PrintableCounselingSheetModal
+        isOpen={!!printingNote}
+        onClose={() => setPrintingNote(null)}
+        note={printingNote}
+      />
+    </PageLayout>
   );
 }

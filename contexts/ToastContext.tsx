@@ -17,6 +17,11 @@ interface ToastContextValue {
   toasts: ToastItem[];
   showToast: (toast: Omit<ToastItem, 'id'>) => void;
   removeToast: (id: string) => void;
+  toast: {
+    success: (title: string, description?: string) => void;
+    error: (title: string, description?: string) => void;
+    info: (title: string, description?: string) => void;
+  };
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -63,7 +68,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   globalShowToast = showToast;
 
   return (
-    <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
+    <ToastContext.Provider value={{ toasts, showToast, removeToast, toast }}>
       {children}
 
       {/* Floating Toast Notification Container */}

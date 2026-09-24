@@ -7,6 +7,8 @@ export * from './auth/types';
 export * from './patients/types';
 export * from './billing/types';
 export * from './fertility/types';
+export * from './cosgyn/types';
+export * from './ipd/types';
 
 // Feature APIs
 export * from './auth/api';

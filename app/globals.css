@@ -216,7 +216,7 @@
 
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
+    margin: 0 !important;
   }
 
   @page landscape {
@@ -243,19 +243,33 @@
     width: 100% !important;
   }
 
-  /* Completely remove navigation, sidebar, header, toolbars, and no-print wrappers from print */
-  header, nav, aside, [data-sidebar], .no-print, .print\:hidden,
-  [role="dialog"] > div.fixed.inset-0:not(:has(.printable-document)):not(:has(.barcode-sticker-print)) {
+  /* Completely remove navigation, sidebar, app layout header, toolbars, and no-print wrappers from print */
+  header:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.printable-document *),
+  nav:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.printable-document *),
+  aside, [data-sidebar], .no-print, .print\:hidden,
+  [role="dialog"] > div.fixed.inset-0:not(:has(.printable-document)):not(:has(.a4-print-sheet)):not(:has(.barcode-sticker-print)) {
     display: none !important;
   }
 
+  /* Ensure printable headers & footers are visible during print */
+  .printable-header-container,
+  .printable-report-header,
+  .print-header-anchor,
+  .printable-footer-container,
+  .printable-report-footer,
+  .print-footer-anchor {
+    display: block !important;
+    visibility: visible !important;
+  }
+
   /* ─────────────────────────────────────────────────────────────
-     Tree Pruning for Printable Documents & Barcode Labels:
-     When a .printable-document or .barcode-sticker-print is in DOM,
+     Tree Pruning for Printable Documents, A4 Sheets & Barcode Labels:
+     When a .printable-document, .a4-print-sheet, or .barcode-sticker-print is in DOM,
      completely collapse (display: none) all sibling branches to guarantee
      0 leading and trailing blank sheets!
   ───────────────────────────────────────────────────────────── */
-  body:has(.printable-document) *:not(:has(.printable-document)):not(.printable-document):not(.printable-document *) {
+  body:has(.printable-document) *:not(:has(.printable-document)):not(.printable-document):not(.printable-document *),
+  body:has(.a4-print-sheet) *:not(:has(.a4-print-sheet)):not(.a4-print-sheet):not(.a4-print-sheet *) {
     display: none !important;
   }
 
@@ -263,8 +277,9 @@
     display: none !important;
   }
 
-  /* Completely unconstrain and neutralize all ancestors of .printable-document and .barcode-sticker-print */
+  /* Completely unconstrain and neutralize all ancestors of .printable-document, .a4-print-sheet, and .barcode-sticker-print */
   body:has(.printable-document) *:has(.printable-document),
+  body:has(.a4-print-sheet) *:has(.a4-print-sheet),
   body:has(.barcode-sticker-print) *:has(.barcode-sticker-print) {
     display: block !important;
     position: static !important;
@@ -405,6 +420,102 @@
     border: none !important;
     background: white !important;
     color: black !important;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   A4 Page Sheet Architecture (Screen Preview & Physical Print)
+   • Each sheet is an authentic A4 page (210mm x 297mm)
+   • Strict flex layout: Header at top, Content in middle, Footer at bottom
+   • Content CANNOT overlap Header or Footer
+   • Zero margin @page enables full-bleed stripes touching paper edges
+───────────────────────────────────────────────────────────── */
+
+/* Screen Preview Styling */
+.a4-print-sheet {
+  width: 100%;
+  max-width: 210mm;
+  min-height: 297mm;
+  background: white;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0 !important; /* Zero margin enables 100% full-bleed edge-to-edge printing */
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Physical Print: Exact A4 Sheet Page Break */
+  .a4-print-sheet {
+    width: 210mm !important;
+    min-height: 296mm !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    background: white !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Suppress trailing empty page on last sheet */
+  .a4-print-sheet:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Sheet content sits strictly in middle */
+  .a4-sheet-content {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+  }
+
+  /* Watermark repeats centered on each printed page */
+  .a4-print-sheet .print-watermark {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 }
 

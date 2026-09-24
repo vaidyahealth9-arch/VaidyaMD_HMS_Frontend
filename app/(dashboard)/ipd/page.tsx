@@ -34,6 +34,7 @@ import {
   SheetFooter,
 } from '@/shared/ui/sheet';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import PageLayout from '@/components/common/PageLayout';
 
 export default function IPDBedboardPage() {
   const { user } = useAuth();
@@ -108,6 +109,7 @@ export default function IPDBedboardPage() {
         package_name: packageName,
         notes,
       });
+    console.log('Fetched beds:', beds?.length, beds);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
@@ -182,7 +184,7 @@ export default function IPDBedboardPage() {
   const cleaningCount = beds.filter((b: any) => b.status === 'Cleaning' || b.status === 'Maintenance').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <PageLayout className="space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -601,6 +603,6 @@ export default function IPDBedboardPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </div>
+    </PageLayout>
   );
 }

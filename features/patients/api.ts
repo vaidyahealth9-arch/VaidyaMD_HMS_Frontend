@@ -24,5 +24,13 @@ export const patientsApi = {
   saveConsent: (id: string, data: { title: string; signature: string }) =>
     request<any>(`/core/patients/${id}/consents`, { method: 'POST', body: JSON.stringify(data) }),
   createClinicalRecord: (id: string, data: Record<string, unknown>) =>
-    request<any>(`/core/patients/${id}/clinical-records`, { method: 'POST', body: JSON.stringify(data) }),
+    request<any>('/core/clinical-records/', {
+      method: 'POST',
+      body: JSON.stringify({
+        patient_id: id,
+        plugin_id: data.plugin_id || 'opd',
+        record_type: data.record_type || 'clinical_proforma',
+        data: data.data || data,
+      }),
+    }),
 };
