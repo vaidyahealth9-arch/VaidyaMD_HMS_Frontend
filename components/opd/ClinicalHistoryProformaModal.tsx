@@ -24,12 +24,16 @@ import {
   Info,
   Layers,
   Edit3,
+  FlaskConical,
 } from 'lucide-react';
 import { patientsApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
 
 import {
   generateProformaNarrative,
+  generatePresentHistoryNarrative,
+  generatePastHistoryNarrative,
+  generateExaminationNarrative,
   ProformaSentenceView,
   ProformaPrintView,
 } from './proforma';
@@ -78,16 +82,16 @@ export default function ClinicalHistoryProformaModal({
   const [seenByDr, setSeenByDr] = useState(initialData?.seenByDr || '');
   const [staffInAttendance, setStaffInAttendance] = useState(initialData?.staffInAttendance || '');
   const [reasonForConsultation, setReasonForConsultation] = useState(
-    initialData?.reasonForConsultation || 'Primary infertility evaluation, seeking fertility consultation.'
+    initialData?.reasonForConsultation || ''
   );
 
   // 2. Couple Fertility Profile
-  const [fertilityType, setFertilityType] = useState(initialData?.fertilityType || 'Primary');
-  const [fertilityFactor, setFertilityFactor] = useState(initialData?.fertilityFactor || 'Couple');
+  const [fertilityType, setFertilityType] = useState(initialData?.fertilityType || '');
+  const [fertilityFactor, setFertilityFactor] = useState(initialData?.fertilityFactor || '');
   const [marriedInYear, setMarriedInYear] = useState(initialData?.marriedInYear || '');
   const [tryingForPregnancy, setTryingForPregnancy] = useState(initialData?.tryingForPregnancy || '');
   const [consanguinity, setConsanguinity] = useState(
-    initialData?.consanguinity || 'Non-Consanguineous'
+    initialData?.consanguinity || ''
   );
 
   // 3. Female Partner
@@ -101,68 +105,66 @@ export default function ClinicalHistoryProformaModal({
   );
 
   // Menstrual History
-  const [periodsEvery, setPeriodsEvery] = useState(initialData?.periodsEvery || '28-30');
-  const [durationBleeding, setDurationBleeding] = useState(initialData?.durationBleeding || '4-5');
-  const [periodsPainful, setPeriodsPainful] = useState(initialData?.periodsPainful || 'No');
-  const [periodsHeavy, setPeriodsHeavy] = useState(initialData?.periodsHeavy || 'No');
-  const [ageAtMenarche, setAgeAtMenarche] = useState(initialData?.ageAtMenarche || '13');
-  const [lmp, setLmp] = useState(initialData?.lmp || new Date().toISOString().split('T')[0]);
+  const [periodsEvery, setPeriodsEvery] = useState(initialData?.periodsEvery || '');
+  const [durationBleeding, setDurationBleeding] = useState(initialData?.durationBleeding || '');
+  const [periodsPainful, setPeriodsPainful] = useState(initialData?.periodsPainful || '');
+  const [periodsHeavy, setPeriodsHeavy] = useState(initialData?.periodsHeavy || '');
+  const [ageAtMenarche, setAgeAtMenarche] = useState(initialData?.ageAtMenarche || '');
+  const [lmp, setLmp] = useState(initialData?.lmp || '');
   const [menstrualAdditional, setMenstrualAdditional] = useState(
     initialData?.menstrualAdditional || ''
   );
 
   // Obstetric History
-  const [gpal, setGpal] = useState(initialData?.gpal || 'G0 P0 L0 A0');
+  const [gpal, setGpal] = useState(initialData?.gpal || '');
   const [obRows, setObRows] = useState<ObstetricRow[]>(
-    initialData?.obRows || [
-      { year: '', place: '', details: '', outcome: '', gestation: '', mode: '', babySexWeight: '' },
-    ]
+    initialData?.obRows || []
   );
 
   // Contraception History
   const [contraceptionHistory, setContraceptionHistory] = useState(
-    initialData?.contraceptionHistory || 'None'
+    initialData?.contraceptionHistory || ''
   );
 
   // Female Habits
-  const [femaleSmoking, setFemaleSmoking] = useState(initialData?.femaleSmoking || 'No');
-  const [femaleGutka, setFemaleGutka] = useState(initialData?.femaleGutka || 'No');
-  const [femaleAlcohol, setFemaleAlcohol] = useState(initialData?.femaleAlcohol || 'No');
-  const [femaleToddy, setFemaleToddy] = useState(initialData?.femaleToddy || 'No');
-  const [femaleCoffee, setFemaleCoffee] = useState(initialData?.femaleCoffee || '1 cup/day');
+  const [femaleSmoking, setFemaleSmoking] = useState(initialData?.femaleSmoking || '');
+  const [femaleGutka, setFemaleGutka] = useState(initialData?.femaleGutka || '');
+  const [femaleAlcohol, setFemaleAlcohol] = useState(initialData?.femaleAlcohol || '');
+  const [femaleToddy, setFemaleToddy] = useState(initialData?.femaleToddy || '');
+  const [femaleCoffee, setFemaleCoffee] = useState(initialData?.femaleCoffee || '');
 
   // Female Past Medical History
-  const [femaleAdmissions, setFemaleAdmissions] = useState(initialData?.femaleAdmissions || 'Nil');
-  const [femaleRegularMed, setFemaleRegularMed] = useState(initialData?.femaleRegularMed || 'None');
-  const [femaleTb, setFemaleTb] = useState(initialData?.femaleTb || 'No');
+  const [femaleAdmissions, setFemaleAdmissions] = useState(initialData?.femaleAdmissions || '');
+  const [femaleRegularMed, setFemaleRegularMed] = useState(initialData?.femaleRegularMed || '');
+  const [femaleTb, setFemaleTb] = useState(initialData?.femaleTb || '');
   const [femaleBleedingDisorders, setFemaleBleedingDisorders] = useState(
-    initialData?.femaleBleedingDisorders || 'No'
+    initialData?.femaleBleedingDisorders || ''
   );
   const [femaleGalactorrhoea, setFemaleGalactorrhoea] = useState(
-    initialData?.femaleGalactorrhoea || 'No'
+    initialData?.femaleGalactorrhoea || ''
   );
   const [femaleAllergies, setFemaleAllergies] = useState(
-    initialData?.femaleAllergies || 'No known drug allergies (NKDA)'
+    initialData?.femaleAllergies || ''
   );
   const [femaleCervicalSmear, setFemaleCervicalSmear] = useState(
-    initialData?.femaleCervicalSmear || 'Not done'
+    initialData?.femaleCervicalSmear || ''
   );
 
   // Female Past Surgical History
   const [femalePastSurgical, setFemalePastSurgical] = useState(
-    initialData?.femalePastSurgical || 'Nil'
+    initialData?.femalePastSurgical || ''
   );
 
   // Female Family History
   const [femaleFamilyHistory, setFemaleFamilyHistory] = useState<string[]>(
-    initialData?.femaleFamilyHistory || ['No family history of DM/HTN/Cancers']
+    initialData?.femaleFamilyHistory || []
   );
 
   // Female Examination
-  const [femalePallor, setFemalePallor] = useState(initialData?.femalePallor || 'No');
-  const [femalePedalEdema, setFemalePedalEdema] = useState(initialData?.femalePedalEdema || 'No');
-  const [femaleGoitre, setFemaleGoitre] = useState(initialData?.femaleGoitre || 'No');
-  const [femaleBp, setFemaleBp] = useState(initialData?.femaleBp || '120/80');
+  const [femalePallor, setFemalePallor] = useState(initialData?.femalePallor || '');
+  const [femalePedalEdema, setFemalePedalEdema] = useState(initialData?.femalePedalEdema || '');
+  const [femaleGoitre, setFemaleGoitre] = useState(initialData?.femaleGoitre || '');
+  const [femaleBp, setFemaleBp] = useState(initialData?.femaleBp || '');
 
   // 4. Male Partner Details
   const [maleName, setMaleName] = useState(
@@ -172,42 +174,42 @@ export default function ClinicalHistoryProformaModal({
   const [maleWeight, setMaleWeight] = useState(initialData?.maleWeight || '');
   const [maleBmi, setMaleBmi] = useState(initialData?.maleBmi || '');
   const [maleErectileIssues, setMaleErectileIssues] = useState(
-    initialData?.maleErectileIssues || 'No'
+    initialData?.maleErectileIssues || ''
   );
   const [frequencyIntercourse, setFrequencyIntercourse] = useState(
-    initialData?.frequencyIntercourse || '2-3 times/week'
+    initialData?.frequencyIntercourse || ''
   );
-  const [maleDyspareunia, setMaleDyspareunia] = useState(initialData?.maleDyspareunia || 'No');
-  const [maleLastSi, setMaleLastSi] = useState(initialData?.maleLastSi || '3 days ago');
-  const [maleScrotalInjury, setMaleScrotalInjury] = useState(initialData?.maleScrotalInjury || 'No');
-  const [maleMumps, setMaleMumps] = useState(initialData?.maleMumps || 'No');
+  const [maleDyspareunia, setMaleDyspareunia] = useState(initialData?.maleDyspareunia || '');
+  const [maleLastSi, setMaleLastSi] = useState(initialData?.maleLastSi || '');
+  const [maleScrotalInjury, setMaleScrotalInjury] = useState(initialData?.maleScrotalInjury || '');
+  const [maleMumps, setMaleMumps] = useState(initialData?.maleMumps || '');
 
   // Male Habits
-  const [maleSmoking, setMaleSmoking] = useState(initialData?.maleSmoking || 'No');
-  const [maleGutka, setMaleGutka] = useState(initialData?.maleGutka || 'No');
-  const [maleAlcohol, setMaleAlcohol] = useState(initialData?.maleAlcohol || 'No');
-  const [maleToddy, setMaleToddy] = useState(initialData?.maleToddy || 'No');
-  const [maleCoffee, setMaleCoffee] = useState(initialData?.maleCoffee || '1 cup/day');
+  const [maleSmoking, setMaleSmoking] = useState(initialData?.maleSmoking || '');
+  const [maleGutka, setMaleGutka] = useState(initialData?.maleGutka || '');
+  const [maleAlcohol, setMaleAlcohol] = useState(initialData?.maleAlcohol || '');
+  const [maleToddy, setMaleToddy] = useState(initialData?.maleToddy || '');
+  const [maleCoffee, setMaleCoffee] = useState(initialData?.maleCoffee || '');
 
   // Male Past Medical History
-  const [maleAdmissions, setMaleAdmissions] = useState(initialData?.maleAdmissions || 'Nil');
-  const [maleRegularMed, setMaleRegularMed] = useState(initialData?.maleRegularMed || 'None');
-  const [maleTb, setMaleTb] = useState(initialData?.maleTb || 'No');
-  const [maleAllergies, setMaleAllergies] = useState(initialData?.maleAllergies || 'None');
+  const [maleAdmissions, setMaleAdmissions] = useState(initialData?.maleAdmissions || '');
+  const [maleRegularMed, setMaleRegularMed] = useState(initialData?.maleRegularMed || '');
+  const [maleTb, setMaleTb] = useState(initialData?.maleTb || '');
+  const [maleAllergies, setMaleAllergies] = useState(initialData?.maleAllergies || '');
 
   // Male Past Surgical History
-  const [malePastSurgical, setMalePastSurgical] = useState(initialData?.malePastSurgical || 'Nil');
+  const [malePastSurgical, setMalePastSurgical] = useState(initialData?.malePastSurgical || '');
 
   // Male Family History
   const [maleFamilyHistory, setMaleFamilyHistory] = useState<string[]>(
-    initialData?.maleFamilyHistory || ['No family history of DM/HTN/Cancers']
+    initialData?.maleFamilyHistory || []
   );
 
   // Male Examination
-  const [malePallor, setMalePallor] = useState(initialData?.malePallor || 'No');
-  const [malePedalEdema, setMalePedalEdema] = useState(initialData?.malePedalEdema || 'No');
-  const [maleGoitre, setMaleGoitre] = useState(initialData?.maleGoitre || 'No');
-  const [maleBp, setMaleBp] = useState(initialData?.maleBp || '120/80');
+  const [malePallor, setMalePallor] = useState(initialData?.malePallor || '');
+  const [malePedalEdema, setMalePedalEdema] = useState(initialData?.malePedalEdema || '');
+  const [maleGoitre, setMaleGoitre] = useState(initialData?.maleGoitre || '');
+  const [maleBp, setMaleBp] = useState(initialData?.maleBp || '');
 
   // 5. Fertility Investigations
   const [invAmh, setInvAmh] = useState(initialData?.invAmh || '');
@@ -221,17 +223,19 @@ export default function ClinicalHistoryProformaModal({
 
   // 6. Fertility Treatments (Past)
   const [fertilityTreatments, setFertilityTreatments] = useState(
-    initialData?.fertilityTreatments || 'Nil prior fertility treatments'
+    initialData?.fertilityTreatments || ''
   );
 
   // 7. Consultation Notes & Examination
   const [fertilityCounselingDone, setFertilityCounselingDone] = useState(
-    initialData?.fertilityCounselingDone ?? true
+    initialData?.fertilityCounselingDone ?? false
   );
-  const [paFindings, setPaFindings] = useState(initialData?.paFindings || 'Soft');
-  const [paScars, setPaScars] = useState(initialData?.paScars || 'None');
-  const [psVulvaVagina, setPsVulvaVagina] = useState(initialData?.psVulvaVagina || 'Healthy');
-  const [psCervixHealthy, setPsCervixHealthy] = useState(initialData?.psCervixHealthy ?? true);
+  const [paFindings, setPaFindings] = useState(initialData?.paFindings || '');
+  const [paScars, setPaScars] = useState(initialData?.paScars || '');
+  const [psVulvaVagina, setPsVulvaVagina] = useState(initialData?.psVulvaVagina || '');
+  const [psCervixHealthy, setPsCervixHealthy] = useState<boolean | null>(
+    initialData?.psCervixHealthy ?? null
+  );
   const [psCervixEctropion, setPsCervixEctropion] = useState(
     initialData?.psCervixEctropion ?? false
   );
@@ -243,25 +247,24 @@ export default function ClinicalHistoryProformaModal({
   );
 
   const [pvUterusPosition, setPvUterusPosition] = useState(
-    initialData?.pvUterusPosition || 'Anteverted'
+    initialData?.pvUterusPosition || ''
   );
-  const [pvUterusSize, setPvUterusSize] = useState(initialData?.pvUterusSize || 'Normal');
+  const [pvUterusSize, setPvUterusSize] = useState(initialData?.pvUterusSize || '');
   const [pvUterusMobility, setPvUterusMobility] = useState(
-    initialData?.pvUterusMobility || 'Mobile'
+    initialData?.pvUterusMobility || ''
   );
   const [pvFornicesTenderness, setPvFornicesTenderness] = useState(
-    initialData?.pvFornicesTenderness || 'Absent'
+    initialData?.pvFornicesTenderness || ''
   );
 
   const [threeDScan, setThreeDScan] = useState(
-    initialData?.threeDScan ||
-      'Normal anteverted uterus, regular endo-myometrial junction. Bilateral ovaries normal with good follicle count. No adnexal masses.'
+    initialData?.threeDScan || ''
   );
   const [factorsInFavour, setFactorsInFavour] = useState(
-    initialData?.factorsInFavour || 'Normal ovulatory cycles, bilateral tubal patency suspected, young age.'
+    initialData?.factorsInFavour || ''
   );
   const [factorsNotInFavour, setFactorsNotInFavour] = useState(
-    initialData?.factorsNotInFavour || 'Duration of trying, borderline semen parameters.'
+    initialData?.factorsNotInFavour || ''
   );
 
   // 8. Recommended Basic Investigations Checklists
@@ -303,20 +306,20 @@ export default function ClinicalHistoryProformaModal({
   ];
 
   const [recommendedWifeTests, setRecommendedWifeTests] = useState<string[]>(
-    initialData?.recommendedWifeTests || defaultWifeTests
+    initialData?.recommendedWifeTests || []
   );
   const [recommendedHusbandTests, setRecommendedHusbandTests] = useState<string[]>(
-    initialData?.recommendedHusbandTests || defaultHusbandTests
+    initialData?.recommendedHusbandTests || []
   );
   const [recSemenAnalysis, setRecSemenAnalysis] = useState(
-    initialData?.recSemenAnalysis ?? true
+    initialData?.recSemenAnalysis ?? false
   );
-  const [recDfi, setRecDfi] = useState(initialData?.recDfi ?? true);
+  const [recDfi, setRecDfi] = useState(initialData?.recDfi ?? false);
   const [pendingHusbandTests, setPendingHusbandTests] = useState<string[]>(
-    initialData?.pendingHusbandTests || defaultPendingHusband
+    initialData?.pendingHusbandTests || []
   );
   const [pendingWifeTests, setPendingWifeTests] = useState<string[]>(
-    initialData?.pendingWifeTests || defaultPendingWife
+    initialData?.pendingWifeTests || []
   );
 
   // 9. Advised Foods & Plan
@@ -332,16 +335,16 @@ export default function ClinicalHistoryProformaModal({
     'Dark chocolate',
   ];
   const [fertilityFoods, setFertilityFoods] = useState<string[]>(
-    initialData?.fertilityFoods || defaultFoods
+    initialData?.fertilityFoods || []
   );
   const [fertilitySupplements, setFertilitySupplements] = useState(
-    initialData?.fertilitySupplements || 'Antioxidants, CoQ10, Folic Acid, Vitamin D3'
+    initialData?.fertilitySupplements || ''
   );
   const [followUpPlan, setFollowUpPlan] = useState(
-    initialData?.followUpPlan || 'See with reports for and 3D scan + Smear/Speculum'
+    initialData?.followUpPlan || ''
   );
   const [finalDiagnosis, setFinalDiagnosis] = useState(
-    initialData?.finalDiagnosis || 'Primary Infertility - Evaluation & Diagnostic Workup'
+    initialData?.finalDiagnosis || ''
   );
 
   // Gynaecology Specific
@@ -352,7 +355,7 @@ export default function ClinicalHistoryProformaModal({
   const [edd, setEdd] = useState(initialData?.edd || '');
   const [gestationalAge, setGestationalAge] = useState(initialData?.gestationalAge || '');
   const [conceptionMode, setConceptionMode] = useState(
-    initialData?.conceptionMode || 'Spontaneous'
+    initialData?.conceptionMode || ''
   );
   const [currentPregnancyNotes, setCurrentPregnancyNotes] = useState(
     initialData?.currentPregnancyNotes || ''
@@ -601,24 +604,23 @@ export default function ClinicalHistoryProformaModal({
   useEffect(() => {
     if (!onDataChange) return;
 
-    const complaints = reasonForConsultation || `${fertilityType} Infertility Consultation`;
-    const examSummary = `O/E: ${
-      femalePallor === 'No' ? 'No pallor' : 'Pallor'
-    }, ${femalePedalEdema === 'No' ? 'No pedal edema' : 'Pedal edema'}, ${
-      femaleGoitre === 'No' ? 'No goitre' : 'Goitre'
-    }, BP ${femaleBp} mmHg | P/A: ${paFindings} | P/S: ${psVulvaVagina}, Cervix: ${
-      psCervixHealthy ? 'Healthy' : 'Abnormal'
-    } | P/V: ${pvUterusPosition} ${pvUterusSize}, ${pvUterusMobility}`;
+    const complaints = reasonForConsultation?.trim()
+      ? reasonForConsultation.trim()
+      : fertilityType?.trim()
+      ? `${fertilityType.trim()} Infertility Consultation`
+      : '';
 
-    const pastSummary = `Medical: ${femaleAdmissions} | Regular Meds: ${femaleRegularMed} | TB: ${femaleTb} | Allergies: ${femaleAllergies} | Surgeries: ${femalePastSurgical}`;
+    const presentNarrative = generatePresentHistoryNarrative(currentPayload);
+    const pastNarrative = generatePastHistoryNarrative(currentPayload);
+    const examNarrative = generateExaminationNarrative(currentPayload);
 
     onDataChange(currentPayload, {
       complaints,
-      history: narrativeText,
-      exam: examSummary,
-      pastHistory: pastSummary,
+      history: presentNarrative,
+      exam: examNarrative,
+      pastHistory: pastNarrative,
     });
-  }, [currentPayload, narrativeText, onDataChange, reasonForConsultation, fertilityType, femalePallor, femalePedalEdema, femaleGoitre, femaleBp, paFindings, psVulvaVagina, psCervixHealthy, pvUterusPosition, pvUterusSize, pvUterusMobility, femaleAdmissions, femaleRegularMed, femaleTb, femaleAllergies, femalePastSurgical]);
+  }, [currentPayload, onDataChange, reasonForConsultation, fertilityType]);
 
   // Save to patient clinical record
   const handleSave = async () => {
@@ -715,18 +717,6 @@ export default function ClinicalHistoryProformaModal({
                 <FileText className="w-3.5 h-3.5" />
                 <span>Sentence Narrative</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('preview')}
-                className={`px-3 py-1 rounded transition-all flex items-center gap-1.5 ${
-                  viewMode === 'preview'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5 text-slate-600" />
-                <span>Print Sheet</span>
-              </button>
             </div>
           </div>
 
@@ -739,16 +729,6 @@ export default function ClinicalHistoryProformaModal({
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>{copiedNarrative ? 'Copied!' : 'Copy Sentence Form'}</span>
-              </button>
-            )}
-            {viewMode === 'preview' && (
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-3 py-1 bg-slate-900 hover:bg-black text-white rounded-md text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Sheet</span>
               </button>
             )}
           </div>
@@ -776,44 +756,47 @@ export default function ClinicalHistoryProformaModal({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveTab('fertility')}
-                className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-                  activeTab === 'fertility'
-                    ? 'bg-[#2878a8] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Heart className="w-3.5 h-3.5" />
-                <span>Fertility</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('gynaecology')}
-                className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-                  activeTab === 'gynaecology'
-                    ? 'bg-[#2878a8] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Gynaecology</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('obstetric')}
-                className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
-                  activeTab === 'obstetric'
-                    ? 'bg-[#2878a8] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Baby className="w-3.5 h-3.5" />
-                <span>Obstetric</span>
-              </button>
-            </div>
+            {/* Proforma Type Switcher: Only displayed in standalone modal mode; in inline workbench mode, top toolbar is the single source */}
+            {!inline && (
+              <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('fertility')}
+                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                    activeTab === 'fertility'
+                      ? 'bg-[#2878a8] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  <span>Fertility</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('gynaecology')}
+                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                    activeTab === 'gynaecology'
+                      ? 'bg-[#2878a8] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Gynaecology</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('obstetric')}
+                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                    activeTab === 'obstetric'
+                      ? 'bg-[#2878a8] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Baby className="w-3.5 h-3.5" />
+                  <span>Obstetric</span>
+                </button>
+              </div>
+            )}
 
             <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-semibold">
               <button
@@ -841,24 +824,15 @@ export default function ClinicalHistoryProformaModal({
                 <FileText className="w-3.5 h-3.5" />
                 <span>Sentence Form</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('preview')}
-                className={`px-3 py-1 rounded-md transition-all flex items-center gap-1 ${
-                  viewMode === 'preview'
-                    ? 'bg-white text-slate-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Print Sheet</span>
-              </button>
             </div>
 
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
+                title={inline ? "Switch back to standard free-text notes" : "Close proforma"}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors ml-1"
+                aria-label={inline ? "Switch to standard free-text" : "Close"}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -996,6 +970,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFertilityType(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select Infertility Type...</option>
                       <option value="Primary">Primary Infertility</option>
                       <option value="Secondary">Secondary Infertility</option>
                     </select>
@@ -1009,6 +984,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFertilityFactor(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select Infertility Factor...</option>
                       <option value="Couple">Couple Factor</option>
                       <option value="Female">Female Factor</option>
                       <option value="Male">Male Factor</option>
@@ -1048,6 +1024,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setConsanguinity(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select Consanguinity...</option>
                       <option value="Non-Consanguineous">Non-Consanguineous</option>
                       <option value="Consanguineous (1st Degree)">Consanguineous (1st Degree)</option>
                       <option value="Consanguineous (2nd Degree)">Consanguineous (2nd Degree)</option>
@@ -1152,6 +1129,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setPeriodsPainful(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes (Dysmenorrhea)</option>
                     </select>
@@ -1165,6 +1143,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setPeriodsHeavy(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes (Menorrhagia)</option>
                     </select>
@@ -1324,6 +1303,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleSmoking(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                       <option value="Ex-smoker">Ex-smoker</option>
@@ -1336,6 +1316,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleGutka(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
@@ -1347,6 +1328,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleAlcohol(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Social">Social</option>
                       <option value="Regular">Regular</option>
@@ -1359,6 +1341,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleToddy(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
@@ -1370,6 +1353,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleCoffee(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="None">None</option>
                       <option value="1 cup/day">1 cup/day</option>
                       <option value="2 cups/day">2 cups/day</option>
@@ -1416,6 +1400,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleTb(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
@@ -1429,6 +1414,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleBleedingDisorders(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
@@ -1442,6 +1428,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleGalactorrhoea(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
@@ -1526,6 +1513,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemalePallor(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No pallor</option>
                       <option value="Present">Pallor present</option>
                     </select>
@@ -1537,6 +1525,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemalePedalEdema(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No pedal edema</option>
                       <option value="Present">Pedal edema present</option>
                     </select>
@@ -1548,6 +1537,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setFemaleGoitre(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select...</option>
                       <option value="No">No goitre</option>
                       <option value="Present">Goitre present</option>
                     </select>
@@ -1637,6 +1627,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleErectileIssues(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Erection Issues">Erection Issues</option>
                         <option value="Premature Ejaculation">Premature Ejaculation</option>
@@ -1664,6 +1655,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleDyspareunia(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1687,6 +1679,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleScrotalInjury(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1700,6 +1693,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleMumps(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1720,6 +1714,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleSmoking(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1731,6 +1726,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleGutka(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1742,6 +1738,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleAlcohol(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Social">Social</option>
                         <option value="Regular">Regular</option>
@@ -1754,6 +1751,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleToddy(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1765,6 +1763,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleCoffee(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="None">None</option>
                         <option value="1 cup/day">1 cup/day</option>
                         <option value="2 cups/day">2 cups/day</option>
@@ -1813,6 +1812,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMaleTb(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
@@ -1846,19 +1846,21 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setMalePallor(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No pallor</option>
                         <option value="Present">Pallor present</option>
                       </select>
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-500 block mb-0.5">
-                        No pedal edema
+                        Pedal edema
                       </label>
                       <select
                         value={malePedalEdema}
                         onChange={(e) => setMalePedalEdema(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select...</option>
                         <option value="No">No pedal edema</option>
                         <option value="Present">Pedal edema</option>
                       </select>
@@ -2059,7 +2061,7 @@ export default function ClinicalHistoryProformaModal({
                     <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={psCervixHealthy}
+                        checked={Boolean(psCervixHealthy)}
                         onChange={(e) => setPsCervixHealthy(e.target.checked)}
                         className="rounded text-[#2878a8]"
                       />
@@ -2109,6 +2111,7 @@ export default function ClinicalHistoryProformaModal({
                       onChange={(e) => setPvUterusPosition(e.target.value)}
                       className="vmd-input text-xs"
                     >
+                      <option value="">Select Position...</option>
                       <option value="Anteverted">Anteverted</option>
                       <option value="Retroverted">Retroverted</option>
                       <option value="Midposition">Midposition</option>
@@ -2121,7 +2124,7 @@ export default function ClinicalHistoryProformaModal({
                         type="text"
                         value={pvUterusSize}
                         onChange={(e) => setPvUterusSize(e.target.value)}
-                        placeholder="Normal"
+                        placeholder="Normal / Bulky"
                         className="vmd-input text-xs"
                       />
                     </div>
@@ -2132,6 +2135,7 @@ export default function ClinicalHistoryProformaModal({
                         onChange={(e) => setPvUterusMobility(e.target.value)}
                         className="vmd-input text-xs"
                       >
+                        <option value="">Select Mobility...</option>
                         <option value="Mobile">Mobile</option>
                         <option value="Fixed">Fixed</option>
                       </select>
@@ -2195,225 +2199,336 @@ export default function ClinicalHistoryProformaModal({
               </div>
             </div>
 
-            {/* Section 7: Recommended Basic Investigations Checklists */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                7. Recommended Basic Investigations Checklist
-              </h3>
-
-              {/* Wife & Husband Checklists */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold text-slate-800 block">
-                    Wife - Recommended Tests
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {defaultWifeTests.map((test) => (
-                      <button
-                        key={test}
-                        type="button"
-                        onClick={() =>
-                          toggleArrayItem(
-                            recommendedWifeTests,
-                            setRecommendedWifeTests,
-                            test
-                          )
-                        }
-                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                          recommendedWifeTests.includes(test)
-                            ? 'bg-[#2878a8] text-white border-[#2878a8]'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {recommendedWifeTests.includes(test) ? '✓ ' : '+ '}
-                        {test}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold text-slate-800 block">
-                    Husband - Recommended Tests
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {defaultHusbandTests.map((test) => (
-                      <button
-                        key={test}
-                        type="button"
-                        onClick={() =>
-                          toggleArrayItem(
-                            recommendedHusbandTests,
-                            setRecommendedHusbandTests,
-                            test
-                          )
-                        }
-                        className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                          recommendedHusbandTests.includes(test)
-                            ? 'bg-[#2878a8] text-white border-[#2878a8]'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {recommendedHusbandTests.includes(test) ? '✓ ' : '+ '}
-                        {test}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Semen & DFI Timings instructions */}
-              <div className="space-y-2 p-3 bg-amber-50/60 border border-amber-200/80 rounded-md">
-                <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={recSemenAnalysis}
-                    onChange={(e) => setRecSemenAnalysis(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
-                  />
+            {/* Section 7 & 8: Investigations & Plan - Consolidated into Section 2 when inline */}
+            {inline ? (
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-[#2878a8] shrink-0" />
                   <span>
-                    Semen analysis (Attend with 3 to 7 days abstinence, BY APPOINTMENT ONLY) Between
-                    9 AM TO 11 AM
+                    <strong>Investigations, Prescriptions &amp; Review Plan:</strong> Managed centrally in <strong>Section 2 (Assessment, Orders &amp; Management Plan)</strong> below to eliminate duplicate inputs.
                   </span>
-                </label>
-                <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={recDfi}
-                    onChange={(e) => setRecDfi(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
-                  />
-                  <span>
-                    Sperm DNA Fragmentation DFI (Attend with 2 days abstinence, BY APPOINTMENT ONLY)
-                    Between 9 AM TO 11 AM
-                  </span>
-                </label>
+                </div>
               </div>
+            ) : (
+              <>
+                {/* Section 7: Recommended Basic Investigations Checklists */}
+                <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
+                    7. Recommended Basic Investigations Checklist
+                  </h3>
 
-              {/* Pending Pre-op / Serology Panels */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold text-slate-800 block">
-                    Pending - Husband Panel
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {defaultPendingHusband.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() =>
-                          toggleArrayItem(
-                            pendingHusbandTests,
-                            setPendingHusbandTests,
-                            p
-                          )
-                        }
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-                          pendingHusbandTests.includes(p)
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                  {/* Wife & Husband Checklists */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
+                      <span className="text-[11px] font-bold text-slate-800 block">
+                        Wife - Recommended Tests
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {defaultWifeTests.map((test) => (
+                          <button
+                            key={test}
+                            type="button"
+                            onClick={() =>
+                              toggleArrayItem(
+                                recommendedWifeTests,
+                                setRecommendedWifeTests,
+                                test
+                              )
+                            }
+                            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                              recommendedWifeTests.includes(test)
+                                ? 'bg-[#2878a8] text-white border-[#2878a8]'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {recommendedWifeTests.includes(test) ? '✓ ' : '+ '}
+                            {test}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
+                      <span className="text-[11px] font-bold text-slate-800 block">
+                        Husband - Recommended Tests
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {defaultHusbandTests.map((test) => (
+                          <button
+                            key={test}
+                            type="button"
+                            onClick={() =>
+                              toggleArrayItem(
+                                recommendedHusbandTests,
+                                setRecommendedHusbandTests,
+                                test
+                              )
+                            }
+                            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                              recommendedHusbandTests.includes(test)
+                                ? 'bg-[#2878a8] text-white border-[#2878a8]'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {recommendedHusbandTests.includes(test) ? '✓ ' : '+ '}
+                            {test}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Semen & DFI Timings instructions */}
+                  <div className="space-y-2 p-3 bg-amber-50/60 border border-amber-200/80 rounded-md">
+                    <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={recSemenAnalysis}
+                        onChange={(e) => setRecSemenAnalysis(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
+                      />
+                      <span>
+                        Semen analysis (Attend with 3 to 7 days abstinence, BY APPOINTMENT ONLY) Between
+                        9 AM TO 11 AM
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={recDfi}
+                        onChange={(e) => setRecDfi(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
+                      />
+                      <span>
+                        Sperm DNA Fragmentation DFI (Attend with 2 days abstinence, BY APPOINTMENT ONLY)
+                        Between 9 AM TO 11 AM
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Pending Pre-op / Serology Panels */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
+                      <span className="text-[11px] font-bold text-slate-800 block">
+                        Pending - Husband Panel
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {defaultPendingHusband.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() =>
+                              toggleArrayItem(
+                                pendingHusbandTests,
+                                setPendingHusbandTests,
+                                p
+                              )
+                            }
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+                              pendingHusbandTests.includes(p)
+                                ? 'bg-slate-800 text-white border-slate-800'
+                                : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
+                      <span className="text-[11px] font-bold text-slate-800 block">
+                        Pending - Wife Panel
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {defaultPendingWife.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() =>
+                              toggleArrayItem(pendingWifeTests, setPendingWifeTests, p)
+                            }
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+                              pendingWifeTests.includes(p)
+                                ? 'bg-slate-800 text-white border-slate-800'
+                                : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold text-slate-800 block">
-                    Pending - Wife Panel
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {defaultPendingWife.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() =>
-                          toggleArrayItem(pendingWifeTests, setPendingWifeTests, p)
-                        }
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-                          pendingWifeTests.includes(p)
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                {/* Section 8: Advised Fertility Foods, Supplements & Follow-up */}
+                <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
+                    8. Advised Regimen, Foods &amp; Review Plan
+                  </h3>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
+                    <span className="text-[11px] font-bold text-slate-700 block">
+                      Fertility Foods
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {defaultFoods.map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => toggleArrayItem(fertilityFoods, setFertilityFoods, f)}
+                          className={`px-2 py-1 rounded text-[10px] font-semibold border ${
+                            fertilityFoods.includes(f)
+                              ? 'bg-emerald-700 text-white border-emerald-700'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {fertilityFoods.includes(f) ? '✓ ' : '+ '}
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Fertility Supplements
+                      </label>
+                      <input
+                        type="text"
+                        value={fertilitySupplements}
+                        onChange={(e) => setFertilitySupplements(e.target.value)}
+                        placeholder="Antioxidants, CoQ10, Folic Acid, Vitamin D3"
+                        className="vmd-input text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Review Plan
+                      </label>
+                      <input
+                        type="text"
+                        value={followUpPlan}
+                        onChange={(e) => setFollowUpPlan(e.target.value)}
+                        placeholder="See with reports for and 3D scan + Smear/Speculum"
+                        className="vmd-input text-xs"
+                      />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Provisional Diagnosis <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={finalDiagnosis}
+                        onChange={(e) => setFinalDiagnosis(e.target.value)}
+                        placeholder="Provisional Diagnosis"
+                        className="vmd-input text-xs font-bold text-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Gynaecology Specific Form Card */}
+            {activeTab === 'gynaecology' && (
+              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
+                  9. Gynaecology Screening &amp; Findings
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      Cervical Smear Result
+                    </label>
+                    <input
+                      type="text"
+                      value={gynaeSmearResult}
+                      onChange={(e) => setGynaeSmearResult(e.target.value)}
+                      placeholder="e.g. NILM (Negative for intraepithelial lesion or malignancy)"
+                      className="vmd-input text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      HPV Screening Status
+                    </label>
+                    <input
+                      type="text"
+                      value={gynaeHpv}
+                      onChange={(e) => setGynaeHpv(e.target.value)}
+                      placeholder="e.g. High Risk HPV Negative"
+                      className="vmd-input text-xs"
+                    />
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Section 8: Advised Fertility Foods, Supplements & Follow-up */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                8. Advised Regimen, Foods &amp; Review Plan
-              </h3>
-
-              <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                <span className="text-[11px] font-bold text-slate-700 block">
-                  Fertility Foods
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {defaultFoods.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => toggleArrayItem(fertilityFoods, setFertilityFoods, f)}
-                      className={`px-2 py-1 rounded text-[10px] font-semibold border ${
-                        fertilityFoods.includes(f)
-                          ? 'bg-emerald-700 text-white border-emerald-700'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
+            {/* Obstetric Specific Form Card */}
+            {activeTab === 'obstetric' && (
+              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
+                  9. Obstetric &amp; Antenatal Details
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      Expected Date of Delivery (EDD)
+                    </label>
+                    <input
+                      type="date"
+                      value={edd}
+                      onChange={(e) => setEdd(e.target.value)}
+                      className="vmd-input text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      Gestational Age
+                    </label>
+                    <input
+                      type="text"
+                      value={gestationalAge}
+                      onChange={(e) => setGestationalAge(e.target.value)}
+                      placeholder="e.g. 12 weeks 3 days"
+                      className="vmd-input text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      Mode of Conception
+                    </label>
+                    <select
+                      value={conceptionMode}
+                      onChange={(e) => setConceptionMode(e.target.value)}
+                      className="vmd-input text-xs"
                     >
-                      {fertilityFoods.includes(f) ? '✓ ' : '+ '}
-                      {f}
-                    </button>
-                  ))}
+                      <option value="">Select Mode...</option>
+                      <option value="Spontaneous">Spontaneous</option>
+                      <option value="IVF-ET">IVF-ET (In Vitro Fertilization)</option>
+                      <option value="IUI">IUI (Intrauterine Insemination)</option>
+                      <option value="Ovulation Induction">Ovulation Induction</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      Current Pregnancy Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={currentPregnancyNotes}
+                      onChange={(e) => setCurrentPregnancyNotes(e.target.value)}
+                      placeholder="e.g. Single intrauterine viable gestation, dating scan concordant, mild morning nausea..."
+                      className="vmd-input text-xs"
+                    />
+                  </div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Fertility Supplements
-                  </label>
-                  <input
-                    type="text"
-                    value={fertilitySupplements}
-                    onChange={(e) => setFertilitySupplements(e.target.value)}
-                    placeholder="Antioxidants, CoQ10, Folic Acid, Vitamin D3"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Review Plan
-                  </label>
-                  <input
-                    type="text"
-                    value={followUpPlan}
-                    onChange={(e) => setFollowUpPlan(e.target.value)}
-                    placeholder="See with reports for and 3D scan + Smear/Speculum"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div className="col-span-1 sm:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Provisional Diagnosis <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={finalDiagnosis}
-                    onChange={(e) => setFinalDiagnosis(e.target.value)}
-                    placeholder="Provisional Diagnosis"
-                    className="vmd-input text-xs font-bold text-slate-900"
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 

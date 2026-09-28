@@ -62,19 +62,33 @@ export default function PrintableReportFooter({
     : '22mm';
 
   const address =
+    customBranchDetails ||
     currentBranch?.address ||
-    'Indravati Prime, Opposite Vijaya Diagnostic Center, High Tension Road, Kondapur - 500084';
+    (currentBranch as any)?.receipt_header?.address ||
+    user?.hospital_address ||
+    '';
 
-  const phone = currentBranch?.phone || '77806 12539';
-  const email = currentBranch?.email || 'matrikafertilityhyd@gmail.com';
+  const phone =
+    currentBranch?.phone ||
+    (currentBranch as any)?.receipt_header?.phone ||
+    user?.hospital_phone ||
+    '';
+
+  const email =
+    currentBranch?.email ||
+    (currentBranch as any)?.receipt_header?.email ||
+    user?.hospital_email ||
+    '';
+
   const website =
     (currentBranch as any)?.website ||
     (currentBranch as any)?.receipt_header?.website ||
-    'www.matrikafertility.in';
+    '';
+
   const timings =
     (currentBranch as any)?.timings ||
     (currentBranch as any)?.receipt_header?.timings ||
-    'Mon-Sat: 9:00 AM - 6:00 PM';
+    '';
 
   return (
     <div

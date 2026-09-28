@@ -11,12 +11,18 @@ export interface VaidyaMdUser {
   role: string;
   is_doctor?: boolean;
   departments: string[];
+  department?: string;
   specialization?: string;
+  qualification?: string;
+  registration_number?: string;
   avatar_url?: string;
   phone?: string;
   tenant_id: string;
   hospital_name?: string;
   hospital_logo_url?: string;
+  hospital_address?: string;
+  hospital_phone?: string;
+  hospital_email?: string;
   active_plugins?: string[];
   permission_profile_id?: string;
   branch_id?: string;
@@ -60,13 +66,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentBranch, setCurrentBranch] = useState<BranchItem | null>(null);
   const [menuPermissions, setMenuPermissions] = useState<Record<string, boolean>>({});
 
+  const handleSetCurrentBranch = (branch: BranchItem) => {
+    setCurrentBranch(branch);
+    if (branch?.id) {
+      localStorage.setItem('vaidya_md_branch_id', branch.id);
+    }
+  };
+
   useEffect(() => {
-    // Fetch branches
+    // Fetch branches and resolve active branch
     branchesApi.list()
       .then((b: any) => {
         if (Array.isArray(b) && b.length > 0) {
           setBranches(b);
-          setCurrentBranch(b[0]);
+          const savedBranchId = localStorage.getItem('vaidya_md_branch_id');
+          const savedUser = localStorage.getItem('vaidya_md_user');
+          let parsedUserBranchId = '';
+          if (savedUser) {
+            try { parsedUserBranchId = JSON.parse(savedUser)?.branch_id || ''; } catch (e) {}
+          }
+          const matched =
+            (savedBranchId ? b.find((x: any) => x.id === savedBranchId) : null) ||
+            (parsedUserBranchId ? b.find((x: any) => x.id === parsedUserBranchId) : null) ||
+            b.find((x: any) => x.is_main_branch) ||
+            b[0];
+          setCurrentBranch(matched);
         }
       })
       .catch(() => {});
@@ -198,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         branches,
         currentBranch,
-        setCurrentBranch,
+        setCurrentBranch: handleSetCurrentBranch,
         can,
         login,
         logout,

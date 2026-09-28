@@ -32,6 +32,7 @@ interface PrescriptionProps {
   doctor: {
     name: string;
     qualification?: string;
+    specialization?: string;
     reg_number?: string;
     department?: string;
   };
@@ -313,77 +314,84 @@ export default function PrintablePrescription({
               <tr>
                 <td className="p-0 m-0 border-none">
                   <div className="px-6 sm:px-8 print:px-[12mm] py-2 space-y-2.5">
-                    {/* Doctor Demographics (Only when hospital header is visible) */}
-                    {!hideHeader && doctor.name && (
-                      <div className="flex justify-between items-center py-1 border-b border-slate-200 text-xs break-inside-avoid">
+                    {/* Patient & Consultation Details Strip */}
+                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-2.5 break-inside-avoid">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         <div>
-                          <p className="font-bold text-sm text-slate-900">{doctor.name}</p>
-                          {doctor.qualification && (
-                            <p className="text-[10px] text-slate-600">{doctor.qualification}</p>
-                          )}
+                          <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                            Patient Name
+                          </span>
+                          <span className="font-bold text-xs text-slate-900">{patient.name}</span>
                         </div>
-                        <div className="text-right">
-                          {doctor.reg_number && (
-                            <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                              Reg. No: {doctor.reg_number}
-                            </p>
-                          )}
-                          {doctor.department && (
-                            <p className="text-[10px] text-slate-700">{doctor.department}</p>
-                          )}
+                        <div>
+                          <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                            Patient ID / MRN
+                          </span>
+                          <span className="font-bold text-xs font-mono text-[#4A2E2B]">
+                            {patient.vid || patient.mrn || '—'}
+                          </span>
                         </div>
+                        <div>
+                          <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                            Age / Gender
+                          </span>
+                          <span className="font-bold text-xs text-slate-900">
+                            {patient.age ? patient.age + 'y' : '—'} / {patient.gender || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                            Visit Date
+                          </span>
+                          <span className="font-bold text-xs text-slate-900">{formatDate(visitDate)}</span>
+                        </div>
+                        {(patient.blood_group || patient.phone) && (
+                          <>
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                                Blood Group
+                              </span>
+                              <span className="font-bold text-xs text-slate-900">
+                                {patient.blood_group || '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
+                                Phone
+                              </span>
+                              <span className="font-mono text-xs text-slate-800">
+                                {patient.phone || '—'}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    )}
 
-                    {/* Patient Details Strip */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200 break-inside-avoid">
-                      <div>
-                        <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                          Patient Name
-                        </span>
-                        <span className="font-bold text-xs text-slate-900">{patient.name}</span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                          Patient ID / MRN
-                        </span>
-                        <span className="font-bold text-xs font-mono text-[#4A2E2B]">
-                          {patient.vid || patient.mrn || '—'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                          Age / Gender
-                        </span>
-                        <span className="font-bold text-xs text-slate-900">
-                          {patient.age ? patient.age + 'y' : '—'} / {patient.gender || '—'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                          Date
-                        </span>
-                        <span className="font-bold text-xs text-slate-900">{formatDate(visitDate)}</span>
-                      </div>
-                      {(patient.blood_group || patient.phone) && (
-                        <>
-                          <div>
-                            <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                              Blood Group
+                      {/* Treating Doctor Details Strip (Directly under patient info) */}
+                      {doctor.name && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/90 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                              Treating Doctor:
                             </span>
-                            <span className="font-bold text-xs text-slate-900">
-                              {patient.blood_group || '—'}
+                            <span className="font-bold text-slate-900">
+                              {doctor.name.startsWith('Dr') ? doctor.name : `Dr. ${doctor.name}`}
                             </span>
+                            {doctor.qualification && (
+                              <span className="text-[10px] text-slate-600 font-medium">
+                                ({doctor.qualification})
+                              </span>
+                            )}
                           </div>
-                          <div>
-                            <span className="block text-[9px] font-bold uppercase tracking-wider mb-0.5 text-slate-400">
-                              Phone
-                            </span>
-                            <span className="font-mono text-xs text-slate-800">
-                              {patient.phone || '—'}
-                            </span>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                            {(doctor.specialization || doctor.department) && (
+                              <span>{doctor.specialization || doctor.department}</span>
+                            )}
+                            {doctor.reg_number && (
+                              <span className="font-mono text-slate-400">· Reg. No: {doctor.reg_number}</span>
+                            )}
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
 
@@ -525,15 +533,22 @@ export default function PrintablePrescription({
 
                     {/* Doctor Signatory Box */}
                     <div className="pt-4 mt-auto flex justify-end break-inside-avoid">
-                      <div className="text-center min-w-[200px]">
+                      <div className="text-center min-w-[220px]">
                         <div className="h-8" />
-                        <div className="border-t border-slate-400 pt-1">
-                          <p className="font-bold text-xs text-slate-900">{doctor.name}</p>
+                        <div className="border-t border-slate-400 pt-1.5 space-y-0.5">
+                          <p className="font-bold text-xs text-slate-900">
+                            {doctor.name ? (doctor.name.startsWith('Dr') ? doctor.name : `Dr. ${doctor.name}`) : 'Doctor Signature'}
+                          </p>
                           {doctor.qualification && (
-                            <p className="text-[10px] text-slate-600">{doctor.qualification}</p>
+                            <p className="text-[10px] text-slate-700 font-semibold">{doctor.qualification}</p>
+                          )}
+                          {(doctor.specialization || doctor.department) && (
+                            <p className="text-[9.5px] text-slate-600">
+                              {doctor.specialization || doctor.department}
+                            </p>
                           )}
                           {doctor.reg_number && (
-                            <p className="text-[9px] text-slate-500">Reg. No: {doctor.reg_number}</p>
+                            <p className="text-[9px] text-slate-400 font-mono">Reg. No: {doctor.reg_number}</p>
                           )}
                         </div>
                       </div>
@@ -554,7 +569,11 @@ export default function PrintablePrescription({
                     : `Dr. ${doctor.name}`
                   : 'Treating Consultant'
               }
-              signatorySubtitle="Authorized Medical Practitioner"
+              signatoryQualification={doctor.qualification}
+              signatorySubtitle={
+                [doctor.specialization || doctor.department, doctor.reg_number ? `Reg. No: ${doctor.reg_number}` : ''].filter(Boolean).join(' · ') ||
+                'Authorized Medical Practitioner'
+              }
               showSignatory={false}
               showComputerGeneratedNotice={true}
               hideHospitalFooter={hideHeader}

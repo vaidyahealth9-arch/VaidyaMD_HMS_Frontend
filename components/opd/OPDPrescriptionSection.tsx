@@ -20,6 +20,7 @@ import {
   Trash2,
   Plus,
   FileText,
+  Stethoscope,
 } from 'lucide-react';
 import type { RxTemplateItem } from './TemplateManagementDialog';
 
@@ -79,7 +80,16 @@ export default function OPDPrescriptionSection({
             <Sparkles className="w-3 h-3" />
             <span>Insert Order Set</span>
           </Button>
-          <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPlanSectionExpanded(!isPlanSectionExpanded);
+            }}
+            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200/80 active:scale-95 rounded-md transition-all cursor-pointer focus:outline-none"
+            aria-label={isPlanSectionExpanded ? 'Collapse prescription section' : 'Expand prescription section'}
+            title={isPlanSectionExpanded ? 'Collapse section' : 'Expand section'}
+          >
             {isPlanSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
@@ -87,6 +97,31 @@ export default function OPDPrescriptionSection({
 
       {isPlanSectionExpanded && (
         <CardContent className="p-4 space-y-4">
+          {/* Assessment & Clinical Diagnosis */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2 border-b border-slate-100">
+            <div>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                <Stethoscope className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" />
+                <span>Provisional / Primary Diagnosis <span className="text-red-500">*</span></span>
+              </label>
+              <Input
+                {...register('provisional_diagnosis')}
+                placeholder="e.g. Primary Infertility - Female Factor (PCOS) / Ovulatory Dysfunction"
+                className="h-8 text-xs bg-slate-50 border-slate-300 focus:bg-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                <span>Differential Diagnosis (Optional)</span>
+              </label>
+              <Input
+                {...register('differential_diagnosis')}
+                placeholder="e.g. Hypothyroidism, Hyperprolactinemia"
+                className="h-8 text-xs bg-slate-50 border-slate-300 focus:bg-white"
+              />
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">

@@ -1,9 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 export interface ToastItem {
   id: string;
@@ -20,6 +20,7 @@ interface ToastContextValue {
   toast: {
     success: (title: string, description?: string) => void;
     error: (title: string, description?: string) => void;
+    warning: (title: string, description?: string) => void;
     info: (title: string, description?: string) => void;
   };
 }
@@ -38,6 +39,11 @@ export const toast = {
   error: (title: string, description?: string) => {
     if (globalShowToast) {
       globalShowToast({ type: 'error', title, description });
+    }
+  },
+  warning: (title: string, description?: string) => {
+    if (globalShowToast) {
+      globalShowToast({ type: 'warning', title, description });
     }
   },
   info: (title: string, description?: string) => {
@@ -81,11 +87,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 ? 'bg-emerald-900/95 text-white border-emerald-700/60'
                 : t.type === 'error'
                 ? 'bg-red-900/95 text-white border-red-700/60'
+                : t.type === 'warning'
+                ? 'bg-amber-900/95 text-white border-amber-700/60'
                 : 'bg-slate-900/95 text-white border-slate-700/60'
             }`}
           >
             {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />}
             {t.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
+            {t.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />}
             {t.type === 'info' && <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />}
 
             <div className="flex-1 text-xs">

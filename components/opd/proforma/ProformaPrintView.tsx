@@ -50,55 +50,61 @@ interface ProformaPrintViewProps {
     femaleAllergies: string;
     femaleCervicalSmear: string;
     femalePastSurgical: string;
-    femaleFamilyHistory: string[];
-    gpal: string;
-    obRows: ObstetricRow[];
-    maleProfession: string;
-    maleWeight: string;
-    maleBmi: string;
-    malePallor: string;
-    malePedalEdema: string;
-    maleBp: string;
-    frequencyIntercourse: string;
-    maleLastSi: string;
-    maleErectileIssues: string;
-    maleDyspareunia: string;
-    maleScrotalInjury: string;
-    maleMumps: string;
-    maleSmoking: string;
-    maleGutka: string;
-    maleAlcohol: string;
-    maleToddy: string;
-    maleCoffee: string;
-    maleAdmissions: string;
-    maleRegularMed: string;
-    maleTb: string;
-    maleAllergies: string;
-    malePastSurgical: string;
-    paFindings: string;
-    paScars: string;
-    psVulvaVagina: string;
-    psCervixHealthy: boolean;
-    psCervixEctropion: boolean;
-    psCervicalSmearDone: boolean;
-    psBleedingOnTouch: boolean;
-    pvUterusPosition: string;
-    pvUterusSize: string;
-    pvUterusMobility: string;
-    pvFornicesTenderness: string;
-    threeDScan: string;
-    factorsInFavour: string;
-    factorsNotInFavour: string;
-    recommendedWifeTests: string[];
-    recommendedHusbandTests: string[];
-    recSemenAnalysis: boolean;
-    recDfi: boolean;
-    pendingHusbandTests: string[];
-    pendingWifeTests: string[];
-    fertilityFoods: string[];
-    fertilitySupplements: string;
-    followUpPlan: string;
-    finalDiagnosis: string;
+    femaleFamilyHistory?: string[];
+    gpal?: string;
+    obRows?: ObstetricRow[];
+    maleProfession?: string;
+    maleWeight?: string;
+    maleBmi?: string;
+    malePallor?: string;
+    malePedalEdema?: string;
+    maleBp?: string;
+    frequencyIntercourse?: string;
+    maleLastSi?: string;
+    maleErectileIssues?: string;
+    maleDyspareunia?: string;
+    maleScrotalInjury?: string;
+    maleMumps?: string;
+    maleSmoking?: string;
+    maleGutka?: string;
+    maleAlcohol?: string;
+    maleToddy?: string;
+    maleCoffee?: string;
+    maleAdmissions?: string;
+    maleRegularMed?: string;
+    maleTb?: string;
+    maleAllergies?: string;
+    malePastSurgical?: string;
+    paFindings?: string;
+    paScars?: string;
+    psVulvaVagina?: string;
+    psCervixHealthy?: boolean | null;
+    psCervixEctropion?: boolean;
+    psCervicalSmearDone?: boolean;
+    psBleedingOnTouch?: boolean;
+    pvUterusPosition?: string;
+    pvUterusSize?: string;
+    pvUterusMobility?: string;
+    pvFornicesTenderness?: string;
+    threeDScan?: string;
+    factorsInFavour?: string;
+    factorsNotInFavour?: string;
+    recommendedWifeTests?: string[];
+    recommendedHusbandTests?: string[];
+    recSemenAnalysis?: boolean;
+    recDfi?: boolean;
+    pendingHusbandTests?: string[];
+    pendingWifeTests?: string[];
+    fertilityFoods?: string[];
+    fertilitySupplements?: string;
+    followUpPlan?: string;
+    finalDiagnosis?: string;
+    gynaeSmearResult?: string;
+    gynaeHpv?: string;
+    edd?: string;
+    gestationalAge?: string;
+    conceptionMode?: string;
+    currentPregnancyNotes?: string;
   };
 }
 
@@ -241,9 +247,12 @@ export default function ProformaPrintView({
               Examination
             </span>
             <strong>
-              {data.femalePallor === 'No' ? 'No pallor' : 'Pallor'},{' '}
-              {data.femalePedalEdema === 'No' ? 'No pedal edema' : 'Edema'},{' '}
-              {data.femaleGoitre === 'No' ? 'No goitre' : 'Goitre'}, BP {data.femaleBp}
+              {[
+                data.femalePallor ? (['No', 'Absent'].includes(data.femalePallor) ? 'No pallor' : 'Pallor') : null,
+                data.femalePedalEdema ? (['No', 'Absent'].includes(data.femalePedalEdema) ? 'No pedal edema' : 'Pedal edema') : null,
+                data.femaleGoitre ? (['No', 'Absent'].includes(data.femaleGoitre) ? 'No goitre' : 'Goitre') : null,
+                data.femaleBp ? `BP ${data.femaleBp}` : null,
+              ].filter(Boolean).join(', ') || '—'}
             </strong>
           </div>
           <div className="p-1 sm:pl-3">
@@ -251,7 +260,9 @@ export default function ProformaPrintView({
               Menstrual Cycle
             </span>
             <strong>
-              Every {data.periodsEvery}d / {data.durationBleeding}d (LMP: {data.lmp})
+              {data.periodsEvery || data.durationBleeding || data.lmp
+                ? `Every ${data.periodsEvery || '—'}d / ${data.durationBleeding || '—'}d (LMP: ${data.lmp || '—'})`
+                : '—'}
             </strong>
           </div>
         </div>
@@ -259,13 +270,13 @@ export default function ProformaPrintView({
         {/* Menstrual Details */}
         <div className="px-3 pb-2.5 pt-1.5 text-[11px] text-slate-700 border-t border-slate-100 flex flex-wrap gap-4">
           <span>
-            Painful: <strong>{data.periodsPainful}</strong>
+            Painful: <strong>{data.periodsPainful || '—'}</strong>
           </span>
           <span>
-            Heavy: <strong>{data.periodsHeavy}</strong>
+            Heavy: <strong>{data.periodsHeavy || '—'}</strong>
           </span>
           <span>
-            Menarche: <strong>{data.ageAtMenarche}y</strong>
+            Menarche: <strong>{data.ageAtMenarche ? `${data.ageAtMenarche}y` : '—'}</strong>
           </span>
           {data.menstrualAdditional && <span>Notes: {data.menstrualAdditional}</span>}
         </div>
@@ -273,36 +284,39 @@ export default function ProformaPrintView({
         {/* Habits */}
         <div className="px-3 py-2 bg-slate-50/70 border-t border-slate-100 text-[11px] grid grid-cols-5 gap-2">
           <span>
-            Smoking: <strong>{data.femaleSmoking}</strong>
+            Smoking: <strong>{data.femaleSmoking || '—'}</strong>
           </span>
           <span>
-            Gutka: <strong>{data.femaleGutka}</strong>
+            Gutka: <strong>{data.femaleGutka || '—'}</strong>
           </span>
           <span>
-            Alcohol: <strong>{data.femaleAlcohol}</strong>
+            Alcohol: <strong>{data.femaleAlcohol || '—'}</strong>
           </span>
           <span>
-            Toddy: <strong>{data.femaleToddy}</strong>
+            Toddy: <strong>{data.femaleToddy || '—'}</strong>
           </span>
           <span>
-            Coffee: <strong>{data.femaleCoffee}</strong>
+            Coffee: <strong>{data.femaleCoffee || '—'}</strong>
           </span>
         </div>
 
         {/* Past Medical / Surgical */}
         <div className="p-3 border-t border-slate-100 text-xs space-y-1">
           <p>
-            <strong>Past Medical:</strong> Admissions: {data.femaleAdmissions} | Regular Meds:{' '}
-            {data.femaleRegularMed} | TB: {data.femaleTb} | Bleeding Disorders:{' '}
-            {data.femaleBleedingDisorders} | Galactorrhoea: {data.femaleGalactorrhoea}
+            <strong>Past Medical:</strong> Admissions: {data.femaleAdmissions || '—'} | Regular Meds:{' '}
+            {data.femaleRegularMed || '—'} | TB: {data.femaleTb || '—'} | Bleeding Disorders:{' '}
+            {data.femaleBleedingDisorders || '—'} | Galactorrhoea: {data.femaleGalactorrhoea || '—'}
           </p>
           <p>
-            <strong>Allergies:</strong> {data.femaleAllergies} | <strong>Smears:</strong>{' '}
-            {data.femaleCervicalSmear}
+            <strong>Allergies:</strong> {data.femaleAllergies || '—'} | <strong>Smears:</strong>{' '}
+            {data.femaleCervicalSmear || '—'}
           </p>
           <p>
-            <strong>Past Surgical:</strong> {data.femalePastSurgical} |{' '}
-            <strong>Family History:</strong> {data.femaleFamilyHistory.join(', ')}
+            <strong>Past Surgical:</strong> {data.femalePastSurgical || '—'} |{' '}
+            <strong>Family History:</strong>{' '}
+            {Array.isArray(data.femaleFamilyHistory) && data.femaleFamilyHistory.length > 0
+              ? data.femaleFamilyHistory.join(', ')
+              : '—'}
           </p>
         </div>
       </div>
@@ -314,7 +328,7 @@ export default function ProformaPrintView({
           <span className="font-mono">{data.gpal}</span>
         </div>
         <div className="p-2">
-          {data.obRows.some((r) => r.year || r.outcome) ? (
+          {Array.isArray(data.obRows) && data.obRows.some((r) => r.year || r.outcome) ? (
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 font-bold">
@@ -338,10 +352,79 @@ export default function ProformaPrintView({
               </tbody>
             </table>
           ) : (
-            <p className="text-slate-500 italic p-1">Nulligravida / G0</p>
+            <p className="text-slate-500 italic p-1">No prior obstetric events recorded / G0</p>
           )}
         </div>
       </div>
+
+      {/* Gynaecology Specific Diagnostics */}
+      {activeTab === 'gynaecology' && (data.gynaeSmearResult || data.gynaeHpv) && (
+        <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
+          <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
+            Gynaecology Diagnostics &amp; Screening
+          </div>
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.gynaeSmearResult && (
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Cervical Smear (LBC) Result
+                </span>
+                <strong>{data.gynaeSmearResult}</strong>
+              </div>
+            )}
+            {data.gynaeHpv && (
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  High-Risk HPV DNA Status
+                </span>
+                <strong>{data.gynaeHpv}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Obstetric Specific Antenatal Record */}
+      {activeTab === 'obstetric' &&
+        (data.edd || data.gestationalAge || data.conceptionMode || data.currentPregnancyNotes) && (
+          <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
+            <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
+              Current Antenatal Pregnancy Details
+            </div>
+            <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {data.edd && (
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">EDD</span>
+                  <strong>{data.edd}</strong>
+                </div>
+              )}
+              {data.gestationalAge && (
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                    Gestational Age
+                  </span>
+                  <strong>{data.gestationalAge}</strong>
+                </div>
+              )}
+              {data.conceptionMode && (
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                    Conception Mode
+                  </span>
+                  <strong>{data.conceptionMode}</strong>
+                </div>
+              )}
+              {data.currentPregnancyNotes && (
+                <div className="col-span-2 sm:col-span-3 pt-1 border-t border-slate-100">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                    Antenatal Notes &amp; Risk Stratification
+                  </span>
+                  <p className="text-slate-800">{data.currentPregnancyNotes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       {/* Male Assessment */}
       {activeTab === 'fertility' && (
@@ -371,8 +454,11 @@ export default function ProformaPrintView({
                 Examination
               </span>
               <strong>
-                {data.malePallor === 'No' ? 'No pallor' : 'Pallor'},{' '}
-                {data.malePedalEdema === 'No' ? 'No pedal edema' : 'Edema'}, BP {data.maleBp}
+                {[
+                  data.malePallor ? (['No', 'Absent'].includes(data.malePallor) ? 'No pallor' : 'Pallor') : null,
+                  data.malePedalEdema ? (['No', 'Absent'].includes(data.malePedalEdema) ? 'No pedal edema' : 'Pedal edema') : null,
+                  data.maleBp ? `BP ${data.maleBp}` : null,
+                ].filter(Boolean).join(', ') || '—'}
               </strong>
             </div>
             <div className="p-1 sm:pl-3">
@@ -380,49 +466,51 @@ export default function ProformaPrintView({
                 Sexual History
               </span>
               <strong>
-                Intercourse: {data.frequencyIntercourse} | Last SI: {data.maleLastSi}
+                {data.frequencyIntercourse || data.maleLastSi
+                  ? `Intercourse: ${data.frequencyIntercourse || '—'} | Last SI: ${data.maleLastSi || '—'}`
+                  : '—'}
               </strong>
             </div>
           </div>
 
           <div className="px-3 pb-2 pt-1 text-[11px] text-slate-700 border-t border-slate-100 flex flex-wrap gap-4">
             <span>
-              Erection/Ejaculation: <strong>{data.maleErectileIssues}</strong>
+              Erection/Ejaculation: <strong>{data.maleErectileIssues || '—'}</strong>
             </span>
             <span>
-              Pain during SI: <strong>{data.maleDyspareunia}</strong>
+              Pain during SI: <strong>{data.maleDyspareunia || '—'}</strong>
             </span>
             <span>
-              Groin injury: <strong>{data.maleScrotalInjury}</strong>
+              Groin injury: <strong>{data.maleScrotalInjury || '—'}</strong>
             </span>
             <span>
-              Mumps: <strong>{data.maleMumps}</strong>
+              Mumps: <strong>{data.maleMumps || '—'}</strong>
             </span>
           </div>
 
           <div className="px-3 py-2 bg-slate-50/70 border-t border-slate-100 text-[11px] grid grid-cols-5 gap-2">
             <span>
-              Smoking: <strong>{data.maleSmoking}</strong>
+              Smoking: <strong>{data.maleSmoking || '—'}</strong>
             </span>
             <span>
-              Gutka: <strong>{data.maleGutka}</strong>
+              Gutka: <strong>{data.maleGutka || '—'}</strong>
             </span>
             <span>
-              Alcohol: <strong>{data.maleAlcohol}</strong>
+              Alcohol: <strong>{data.maleAlcohol || '—'}</strong>
             </span>
             <span>
-              Toddy: <strong>{data.maleToddy}</strong>
+              Toddy: <strong>{data.maleToddy || '—'}</strong>
             </span>
             <span>
-              Coffee: <strong>{data.maleCoffee}</strong>
+              Coffee: <strong>{data.maleCoffee || '—'}</strong>
             </span>
           </div>
 
           <div className="p-3 border-t border-slate-100 text-xs">
             <p>
-              <strong>Medical:</strong> Admissions: {data.maleAdmissions} | Regular Meds:{' '}
-              {data.maleRegularMed} | TB: {data.maleTb} | Allergies: {data.maleAllergies} | Surgeries:{' '}
-              {data.malePastSurgical}
+              <strong>Medical:</strong> Admissions: {data.maleAdmissions || '—'} | Regular Meds:{' '}
+              {data.maleRegularMed || '—'} | TB: {data.maleTb || '—'} | Allergies:{' '}
+              {data.maleAllergies || '—'} | Surgeries: {data.malePastSurgical || '—'}
             </p>
           </div>
         </div>
@@ -434,33 +522,49 @@ export default function ProformaPrintView({
           Clinical Pelvic Examination &amp; Diagnostics
         </div>
         <div className="p-3 space-y-2">
-          <p>
-            <strong>P/A:</strong> Soft: {data.paFindings} | Scars: {data.paScars}
-          </p>
-          <p>
-            <strong>P/S:</strong> Vulva Vagina: {data.psVulvaVagina} | Cervix:{' '}
-            {data.psCervixHealthy ? 'Healthy' : 'Abnormal'}{' '}
-            {data.psCervixEctropion && '(Ectropion noted)'}{' '}
-            {data.psCervicalSmearDone && '(Smear done LBC)'} |{' '}
-            {data.psBleedingOnTouch ? 'Bleeding on touch noted' : 'No bleeding noted on touch'}
-          </p>
-          <p>
-            <strong>P/V:</strong> Uterus: {data.pvUterusPosition}, Size: {data.pvUterusSize},{' '}
-            {data.pvUterusMobility} | Fornices: Tenderness: {data.pvFornicesTenderness}
-          </p>
+          {(data.paFindings || data.paScars) && (
+            <p>
+              <strong>P/A:</strong> {data.paFindings ? `Soft: ${data.paFindings}` : ''}{' '}
+              {data.paScars ? `| Scars: ${data.paScars}` : ''}
+            </p>
+          )}
+          {(data.psVulvaVagina || (data.psCervixHealthy !== undefined && data.psCervixHealthy !== null) || data.psCervixEctropion || data.psCervicalSmearDone || data.psBleedingOnTouch) && (
+            <p>
+              <strong>P/S:</strong> {data.psVulvaVagina ? `Vulva Vagina: ${data.psVulvaVagina} | ` : ''}
+              {data.psCervixHealthy !== undefined && data.psCervixHealthy !== null
+                ? `Cervix: ${data.psCervixHealthy ? 'Healthy' : 'Abnormal'} `
+                : ''}
+              {data.psCervixEctropion && '(Ectropion noted) '}
+              {data.psCervicalSmearDone && '(Smear done LBC) '}
+              {data.psBleedingOnTouch ? '| Bleeding on touch noted' : ''}
+            </p>
+          )}
+          {(data.pvUterusPosition || data.pvUterusSize || data.pvUterusMobility || data.pvFornicesTenderness) && (
+            <p>
+              <strong>P/V:</strong>{' '}
+              {[
+                data.pvUterusPosition ? `Position: ${data.pvUterusPosition}` : null,
+                data.pvUterusSize ? `Size: ${data.pvUterusSize}` : null,
+                data.pvUterusMobility ? `Mobility: ${data.pvUterusMobility}` : null,
+                data.pvFornicesTenderness ? `Fornices: ${data.pvFornicesTenderness}` : null,
+              ].filter(Boolean).join(', ')}
+            </p>
+          )}
           {data.threeDScan && (
             <p>
               <strong>3-D Scan Findings:</strong> {data.threeDScan}
             </p>
           )}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <div>
-              <strong>Factors in favour:</strong> {data.factorsInFavour}
+          {(data.factorsInFavour || data.factorsNotInFavour) && (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <strong>Factors in favour:</strong> {data.factorsInFavour || '—'}
+              </div>
+              <div>
+                <strong>Factors not in favour:</strong> {data.factorsNotInFavour || '—'}
+              </div>
             </div>
-            <div>
-              <strong>Factors not in favour:</strong> {data.factorsNotInFavour}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -470,12 +574,16 @@ export default function ProformaPrintView({
           Recommended Basic Investigations &amp; Instructions
         </div>
         <div className="p-3 space-y-2">
-          <p>
-            <strong>Wife:</strong> {data.recommendedWifeTests.join(', ')}
-          </p>
-          <p>
-            <strong>Husband:</strong> {data.recommendedHusbandTests.join(', ')}
-          </p>
+          {Array.isArray(data.recommendedWifeTests) && data.recommendedWifeTests.length > 0 && (
+            <p>
+              <strong>Wife:</strong> {data.recommendedWifeTests.join(', ')}
+            </p>
+          )}
+          {Array.isArray(data.recommendedHusbandTests) && data.recommendedHusbandTests.length > 0 && (
+            <p>
+              <strong>Husband:</strong> {data.recommendedHusbandTests.join(', ')}
+            </p>
+          )}
           {data.recSemenAnalysis && (
             <p className="text-slate-800">
               • <strong>Semen analysis</strong> (Attend with 3 to 7 days abstinence, BY
@@ -488,34 +596,49 @@ export default function ProformaPrintView({
               BY APPOINTMENT ONLY) Between 9 AM TO 11 AM
             </p>
           )}
-          <div className="pt-1 border-t border-slate-100">
-            <p>
-              <strong>Pending Husband:</strong> {data.pendingHusbandTests.join(', ')}
-            </p>
-            <p>
-              <strong>Pending Wife:</strong> {data.pendingWifeTests.join(', ')}
-            </p>
-          </div>
+          {((Array.isArray(data.pendingHusbandTests) && data.pendingHusbandTests.length > 0) ||
+            (Array.isArray(data.pendingWifeTests) && data.pendingWifeTests.length > 0)) && (
+            <div className="pt-1 border-t border-slate-100">
+              {Array.isArray(data.pendingHusbandTests) && data.pendingHusbandTests.length > 0 && (
+                <p>
+                  <strong>Pending Husband:</strong> {data.pendingHusbandTests.join(', ')}
+                </p>
+              )}
+              {Array.isArray(data.pendingWifeTests) && data.pendingWifeTests.length > 0 && (
+                <p>
+                  <strong>Pending Wife:</strong> {data.pendingWifeTests.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Advised & Diagnosis */}
       <div className="border border-slate-200 rounded-md p-3.5 bg-slate-50 space-y-2 text-xs">
-        <p>
-          <strong>Advised Fertility Foods:</strong> {data.fertilityFoods.join(', ')}
-        </p>
-        <p>
-          <strong>Fertility Supplements:</strong> {data.fertilitySupplements}
-        </p>
-        <p>
-          <strong>Review Plan:</strong> {data.followUpPlan}
-        </p>
-        <div className="pt-2 border-t border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase font-bold block">
-            Provisional Diagnosis
-          </span>
-          <strong className="text-sm text-slate-900">{data.finalDiagnosis}</strong>
-        </div>
+        {Array.isArray(data.fertilityFoods) && data.fertilityFoods.length > 0 && (
+          <p>
+            <strong>Advised Fertility Foods:</strong> {data.fertilityFoods.join(', ')}
+          </p>
+        )}
+        {data.fertilitySupplements && (
+          <p>
+            <strong>Fertility Supplements:</strong> {data.fertilitySupplements}
+          </p>
+        )}
+        {data.followUpPlan && (
+          <p>
+            <strong>Review Plan:</strong> {data.followUpPlan}
+          </p>
+        )}
+        {data.finalDiagnosis && (
+          <div className="pt-2 border-t border-slate-200">
+            <span className="text-[10px] text-slate-500 uppercase font-bold block">
+              Provisional Diagnosis
+            </span>
+            <strong className="text-sm text-slate-900">{data.finalDiagnosis}</strong>
+          </div>
+        )}
       </div>
 
       {/* Signatures */}

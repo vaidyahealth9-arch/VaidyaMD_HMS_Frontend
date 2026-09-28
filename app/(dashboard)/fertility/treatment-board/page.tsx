@@ -601,21 +601,8 @@ export default function TreatmentBoardPage() {
 
       {/* Modal 1: Treatment Cycle Wizard */}
       {showWizard && (
-        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-              <h2 className="text-xl font-bold text-slate-900">
-                Initiate New ART Treatment Cycle
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowWizard(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="max-w-4xl w-full my-auto shadow-2xl rounded-lg">
             <TreatmentCycleWizard
               patientId=""
               userId={user?.id || ''}

@@ -17,6 +17,8 @@ export default function ProformaSentenceView({
   setViewMode,
   narrativeText,
 }: ProformaSentenceViewProps) {
+  const hasContent = Boolean(narrativeText && narrativeText.trim().length > 0);
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3 text-emerald-900">
@@ -32,21 +34,23 @@ export default function ProformaSentenceView({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopyNarrative}
-            className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-900 rounded-md text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-          >
-            {copiedNarrative ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" /> Copy Sentence Form
-              </>
-            )}
-          </button>
+          {hasContent && (
+            <button
+              type="button"
+              onClick={handleCopyNarrative}
+              className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-900 rounded-md text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            >
+              {copiedNarrative ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" /> Copy Sentence Form
+                </>
+              )}
+            </button>
+          )}
 
           <button
             type="button"
@@ -64,7 +68,13 @@ export default function ProformaSentenceView({
 
       {/* The Clean Printable / Readable Text Area */}
       <div className="bg-white border border-slate-300 rounded-lg p-6 sm:p-8 shadow-xs font-mono text-xs leading-relaxed text-slate-800 whitespace-pre-wrap selection:bg-[#2878a8]/20 selection:text-slate-900 border-l-4 border-l-[#2878a8]">
-        {narrativeText}
+        {hasContent ? (
+          narrativeText
+        ) : (
+          <div className="text-slate-400 font-sans italic text-center py-6">
+            No fields recorded yet. Fill in any field in the form to generate clinical sentences.
+          </div>
+        )}
       </div>
     </div>
   );

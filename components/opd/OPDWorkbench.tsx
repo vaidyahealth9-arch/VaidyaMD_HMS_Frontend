@@ -34,6 +34,7 @@ import {
   Heart,
   Baby,
   Activity,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -50,10 +51,57 @@ import OPDSidebar from './OPDSidebar';
 import OPDVitalsSection from './OPDVitalsSection';
 import OPDPrescriptionSection from './OPDPrescriptionSection';
 import ConsultationRecordModal from './ConsultationRecordModal';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { toast } from '@/contexts/ToastContext';
 import { calculateBMI, formatDateTime } from '@/lib/utils';
 
-const CLINICAL_TEMPLATES: ClinicalTemplateItem[] = [];
+const CLINICAL_TEMPLATES: ClinicalTemplateItem[] = [
+  {
+    id: 'clinical_fertility_proforma',
+    name: 'Fertility Consultation Proforma (WHO/ART)',
+    complaint: 'Fertility Consultation. Couple evaluation for planned conception.',
+    hopi: '[Couple Fertility Consultation]\n- Duration trying for pregnancy: \n- Factors identified: \n- Menstrual cycle history: \n- Coital history: \n- Prior investigations & interventions: ',
+    diagnosis: 'Primary / Secondary Infertility (Couple Workup)',
+    investigations: 'Pelvic USG TVS, Serum AMH, Day 2/3 FSH/LH/E2, Semen Analysis (WHO 6th), Viral Markers (HIV, HBsAg, HCV)',
+    plan: '1. Review baseline investigation reports\n2. Plan treatment protocol (OI / IUI / IVF-ICSI)\n3. Pre-ART statutory screening and counsel couple',
+  },
+  {
+    id: 'clinical_follicular_scan',
+    name: 'Ovulation Induction & Follicular Scan',
+    complaint: 'Follow-up for follicle tracking / stimulation cycle.',
+    hopi: 'Patient on ovarian stimulation cycle monitoring. Serial folliculometry tracking follicular development and endometrial lining.',
+    diagnosis: 'Stimulated Ovulatory Cycle / Folliculometry',
+    investigations: 'Serial Follicular Ultrasound (TVS), Serum E2/P4 if indicated',
+    plan: '1. Continue ongoing stimulation protocol as directed\n2. Schedule repeat follicular tracking scan in 48 hours\n3. Timed intercourse instructions explained to couple',
+  },
+  {
+    id: 'clinical_pcos_review',
+    name: 'PCOS Metabolic & Lifestyle Review',
+    complaint: 'Oligomenorrhea, weight gain, hirsutism, irregular menstrual cycles.',
+    hopi: 'Irregular cycles with delayed periods. History of acne and difficulty managing weight. Evaluating metabolic and ovulatory status.',
+    diagnosis: 'Polycystic Ovarian Syndrome (PCOS Phenotype)',
+    investigations: 'Fasting Insulin, Fasting Glucose (HOMA-IR), Lipid Profile, Serum Total Testosterone, Pelvic USG TVS',
+    plan: '1. Low glycemic index diet, regular aerobic exercise 45 mins/day\n2. Tab Myo-inositol + D-Chiro-Inositol 2g BD\n3. Tab Gluformin 500 SR (Metformin) OD post-dinner if insulin resistance confirmed\n4. Review after 6 weeks',
+  },
+  {
+    id: 'clinical_anc_1st_tri',
+    name: 'Antenatal Checkup (ANC) - 1st Trimester',
+    complaint: 'Confirmed pregnancy (UPT +ve). Routine first trimester antenatal care.',
+    hopi: 'Spontaneous / ART conception. Mild nausea, no spotting, no abnormal discharge, no abdominal cramps.',
+    diagnosis: 'Intrauterine Gestation - 1st Trimester (Antenatal Care)',
+    investigations: 'Dating / Viability USG, Complete Blood Count, Blood Group & Rh, Thyroid Profile (TSH), HbA1c, Rubella IgG, Double Marker (11-13 weeks)',
+    plan: '1. Tab Folvite 5mg (Folic Acid) OD morning\n2. Tab Doxylamine + Pyridoxine SOS for nausea\n3. Balanced nutrition and hydration (>2.5L/day)\n4. Viability scan review at next visit',
+  },
+  {
+    id: 'clinical_general_opd',
+    name: 'General OPD / Medical Review',
+    complaint: 'General health checkup / symptomatic evaluation.',
+    hopi: 'Patient presenting for routine outpatient clinical evaluation and supportive management.',
+    diagnosis: 'General Clinical Review',
+    investigations: 'Complete Blood Count (CBC), Urine Routine & Microscopy',
+    plan: '1. Symptomatic medical management\n2. Adequate hydration and balanced nutrition\n3. Review SOS or in 1 week if symptoms persist',
+  },
+];
 
 interface RxTemplate {
   id: string;
@@ -496,6 +544,12 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   const [sidebarTab, setSidebarTab] = useState<'consultations' | 'counseling'>('consultations');
   const [viewingCounselingNote, setViewingCounselingNote] = useState<CounselingNote | null>(null);
   const [clinicalHistoryTemplate, setClinicalHistoryTemplate] = useState<'standard' | 'fertility' | 'gynaecology' | 'obstetric'>('standard');
+  const [activeNoteTemplateId, setActiveNoteTemplateId] = useState<string | null>(null);
+  const [pendingTemplateChange, setPendingTemplateChange] = useState<{
+    type: 'mode' | 'template';
+    targetValue: string;
+    targetName: string;
+  } | null>(null);
 
   // Fetch Counselor Notes for selected patient
   const { data: counselingNotes = [] } = useQuery<CounselingNote[]>({
@@ -747,27 +801,9 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     }
   }, [effectiveTriage, setValue]);
 
-  // Auto-apply template based on visit type if appointment is passed
-  useEffect(() => {
-    if (currentAppointment?.visit_type) {
-      const typeMap: Record<string, string> = {
-        consultation: 'general_opd',
-        procedure: 'infertility_workup',
-        scan: 'follicular_monitoring',
-        follow_up: 'pcos_metabolic',
-      };
-      const templateIdToApply = typeMap[currentAppointment.visit_type] || 'general_opd';
-      const tmpl = CLINICAL_TEMPLATES.find((t) => t.id === templateIdToApply);
-
-      if (tmpl) {
-        if (!watch('chief_complaints')) setValue('chief_complaints', tmpl.complaint);
-        if (!watch('present_history')) setValue('present_history', tmpl.hopi);
-        if (!watch('examination')) setValue('examination', tmpl.diagnosis);
-        if (!watch('investigations_to_be_advised')) setValue('investigations_to_be_advised', tmpl.investigations);
-        if (!watch('treatment_notes')) setValue('treatment_notes', tmpl.plan);
-      }
-    }
-  }, [currentAppointment]);
+  // Clean Non-Assumed Defaults:
+  // Form starts clean without pre-filling unverified clinical narrative defaults.
+  // Clinicians can deliberately apply structured proformas or note templates from the single top selector.
 
   const weight = watch('weight');
   const height = watch('height');
@@ -844,8 +880,11 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         blood_group: patient?.blood_group,
       },
       doctor: {
-        name: user?.name || 'Dr. Consultant Specialist',
-        department: 'Reproductive Medicine & Infertility',
+        name: user?.name ? (user.name.startsWith('Dr') ? user.name : `Dr. ${user.name}`) : 'Dr. Consultant Specialist',
+        department: user?.department || user?.departments?.[0] || 'Reproductive Medicine & Infertility',
+        qualification: user?.qualification || 'MBBS, MS (OBG), DRM',
+        specialization: user?.specialization || user?.department || user?.departments?.[0] || 'Consultant Gynecologist & Fertility Specialist',
+        reg_number: user?.registration_number || undefined,
       },
       visitDate: new Date().toISOString().split('T')[0],
       chiefComplaint: formVals.chief_complaints,
@@ -1113,10 +1152,77 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     if (!tmpl) return;
     setValue('chief_complaints', tmpl.complaint);
     setValue('present_history', tmpl.hopi);
-    setValue('examination', tmpl.diagnosis);
+    setValue('provisional_diagnosis', tmpl.diagnosis);
     setValue('investigations_to_be_advised', tmpl.investigations);
     setValue('treatment_notes', tmpl.plan);
     toast.success('Clinical Template Applied', `Loaded "${tmpl.name}"`);
+  };
+
+  const handleSelectUnifiedTemplate = (targetKey: string) => {
+    if (!targetKey) return;
+
+    const currentComplaints = getValues('chief_complaints')?.trim();
+    const currentHopi = (getValues('present_history') || getValues('history_of_illness'))?.trim();
+    const hasUnsavedContent = !!(currentComplaints || currentHopi);
+
+    if (targetKey.startsWith('mode:')) {
+      const mode = targetKey.replace('mode:', '') as 'standard' | 'fertility' | 'gynaecology' | 'obstetric';
+      if (mode === clinicalHistoryTemplate && !activeNoteTemplateId) return;
+
+      const modeNames: Record<string, string> = {
+        standard: 'Standard Free-Text Notes',
+        fertility: 'Fertility Couple Proforma',
+        gynaecology: 'Gynaecology Case Proforma',
+        obstetric: 'Obstetric Antenatal Proforma',
+      };
+
+      if (hasUnsavedContent && clinicalHistoryTemplate !== mode) {
+        setPendingTemplateChange({
+          type: 'mode',
+          targetValue: mode,
+          targetName: modeNames[mode] || mode,
+        });
+        return;
+      }
+
+      setClinicalHistoryTemplate(mode);
+      setActiveNoteTemplateId(null);
+      toast.info('Assessment Mode Switched', `Active: ${modeNames[mode] || mode}`);
+    } else if (targetKey.startsWith('tmpl:')) {
+      const tmplId = targetKey.replace('tmpl:', '');
+      const tmpl = allClinicalTemplates.find((t) => t.id === tmplId);
+      if (!tmpl) return;
+
+      if (hasUnsavedContent) {
+        setPendingTemplateChange({
+          type: 'template',
+          targetValue: tmplId,
+          targetName: tmpl.name,
+        });
+        return;
+      }
+
+      setClinicalHistoryTemplate('standard');
+      setActiveNoteTemplateId(tmplId);
+      handleApplyTemplate(tmplId);
+    }
+  };
+
+  const handleConfirmTemplateChange = () => {
+    if (!pendingTemplateChange) return;
+
+    if (pendingTemplateChange.type === 'mode') {
+      const mode = pendingTemplateChange.targetValue as 'standard' | 'fertility' | 'gynaecology' | 'obstetric';
+      setClinicalHistoryTemplate(mode);
+      setActiveNoteTemplateId(null);
+      toast.info('Assessment Mode Switched', `Active: ${pendingTemplateChange.targetName}`);
+    } else if (pendingTemplateChange.type === 'template') {
+      setClinicalHistoryTemplate('standard');
+      setActiveNoteTemplateId(pendingTemplateChange.targetValue);
+      handleApplyTemplate(pendingTemplateChange.targetValue);
+    }
+
+    setPendingTemplateChange(null);
   };
 
   // Populate from Ambient Scribe
@@ -1182,8 +1288,11 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         blood_group: patient?.blood_group,
       },
       doctor: {
-        name: rec.created_by_name || user?.name || 'Dr. Treating Specialist',
-        department: 'Reproductive Medicine & Infertility',
+        name: rec.created_by_name || (user?.name ? (user.name.startsWith('Dr') ? user.name : `Dr. ${user.name}`) : 'Dr. Treating Specialist'),
+        department: rec.data?.doctor_department || user?.department || user?.departments?.[0] || 'Reproductive Medicine & Infertility',
+        qualification: rec.data?.doctor_qualification || user?.qualification || 'MBBS, MS (OBG), DRM',
+        specialization: rec.data?.doctor_specialization || user?.specialization || user?.department || user?.departments?.[0] || 'Consultant Gynecologist & Fertility Specialist',
+        reg_number: rec.data?.doctor_reg_number || user?.registration_number || undefined,
       },
       visitDate: rec.created_at ? rec.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
       chiefComplaint: rec.data?.chief_complaints,
@@ -1275,27 +1384,38 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
           {workbenchMode === 'doctor' && (
             <>
-              {/* Quick Template Selector */}
-              <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                <FileText className="w-3.5 h-3.5 text-slate-500" />
+              {/* Unified Single-Source Clinical Template & Proforma Selector */}
+              <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/90 px-2.5 py-1 rounded-md border border-slate-300 shadow-2xs transition-colors">
+                <Layers className="w-3.5 h-3.5 text-[#2878a8]" />
+                <label htmlFor="unified-clinical-template-select" className="sr-only">
+                  Clinical Template &amp; Proforma
+                </label>
                 <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleApplyTemplate(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  defaultValue=""
-                  className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[180px] truncate"
+                  id="unified-clinical-template-select"
+                  value={
+                    clinicalHistoryTemplate !== 'standard'
+                      ? `mode:${clinicalHistoryTemplate}`
+                      : activeNoteTemplateId
+                      ? `tmpl:${activeNoteTemplateId}`
+                      : 'mode:standard'
+                  }
+                  onChange={(e) => handleSelectUnifiedTemplate(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[210px] truncate"
+                  title="Single-source template selector: Select Proforma Mode or Note Template"
                 >
-                  <option value="" disabled>
-                    — Clinical Template —
-                  </option>
-                  {allClinicalTemplates.map((tmpl) => (
-                    <option key={tmpl.id} value={tmpl.id}>
-                      {tmpl.isCustom ? `★ ${tmpl.name}` : tmpl.name}
-                    </option>
-                  ))}
+                  <optgroup label="📋 Clinical Proformas & Assessment Modes">
+                    <option value="mode:standard">Standard Free-Text Notes</option>
+                    <option value="mode:fertility">Fertility Couple Proforma</option>
+                    <option value="mode:gynaecology">Gynaecology Case Proforma</option>
+                    <option value="mode:obstetric">Obstetric Antenatal Proforma</option>
+                  </optgroup>
+                  <optgroup label="📝 Clinical Note Templates">
+                    {allClinicalTemplates.map((tmpl) => (
+                      <option key={tmpl.id} value={`tmpl:${tmpl.id}`}>
+                        {tmpl.isCustom ? `★ ${tmpl.name}` : tmpl.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
                 <button
                   type="button"
@@ -1304,7 +1424,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     setTemplateDialogOpen(true);
                   }}
                   className="p-1 text-slate-400 hover:text-primary rounded hover:bg-slate-200 transition-colors"
-                  title="Manage & Edit Clinical Templates"
+                  title="Manage & Edit Clinical Templates in Studio"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                 </button>
@@ -1483,70 +1603,65 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                       Clinical History &amp; Subjective Assessment
                     </CardTitle>
-                    {clinicalHistoryTemplate !== 'standard' && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2878a8]/10 text-[#2878a8] border border-[#2878a8]/20 capitalize">
-                        {clinicalHistoryTemplate} Template Active
+                    {clinicalHistoryTemplate !== 'standard' ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2878a8]/10 text-[#2878a8] border border-[#2878a8]/20 capitalize flex items-center gap-1">
+                        {clinicalHistoryTemplate === 'fertility' && <Heart className="w-3 h-3 text-rose-500" />}
+                        {clinicalHistoryTemplate === 'gynaecology' && <Activity className="w-3 h-3 text-violet-500" />}
+                        {clinicalHistoryTemplate === 'obstetric' && <Baby className="w-3 h-3 text-emerald-500" />}
+                        <span>{clinicalHistoryTemplate} Proforma Active</span>
                       </span>
-                    )}
+                    ) : activeNoteTemplateId ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Template Active
+                      </span>
+                    ) : null}
                   </div>
 
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {/* Template Mode Switcher right on Section 1 */}
-                    <div className="flex items-center bg-slate-200/80 p-0.5 rounded-md text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => setClinicalHistoryTemplate('standard')}
-                        className={`px-2.5 py-1 rounded transition-all ${
-                          clinicalHistoryTemplate === 'standard'
-                            ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Free-text Chief Complaints & Present History"
-                      >
-                        Free-text
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setClinicalHistoryTemplate('fertility')}
-                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
-                          clinicalHistoryTemplate === 'fertility'
-                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Structured Fertility Assessment & Couple Proforma"
-                      >
-                        <Heart className="w-3 h-3 text-rose-500" />
-                        <span>Fertility</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setClinicalHistoryTemplate('gynaecology')}
-                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
-                          clinicalHistoryTemplate === 'gynaecology'
-                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Structured Gynaecology Clinical History"
-                      >
-                        <Activity className="w-3 h-3 text-violet-500" />
-                        <span>Gynaecology</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setClinicalHistoryTemplate('obstetric')}
-                        className={`px-2.5 py-1 rounded transition-all flex items-center gap-1 ${
-                          clinicalHistoryTemplate === 'obstetric'
-                            ? 'bg-[#2878a8] text-white shadow-2xs font-bold'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Structured Obstetric Antenatal Record"
-                      >
-                        <Baby className="w-3 h-3 text-emerald-500" />
-                        <span>Obstetric</span>
-                      </button>
+                  <div className="flex items-center gap-2">
+                    {/* Active Mode Indicator - single source is in the top toolbar */}
+                    <div
+                      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-slate-200 bg-white shadow-2xs cursor-default"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {clinicalHistoryTemplate === 'standard' && (
+                        <>
+                          <FileText className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-slate-700 font-semibold">Standard Free-Text Active</span>
+                        </>
+                      )}
+                      {clinicalHistoryTemplate === 'fertility' && (
+                        <>
+                          <Heart className="w-3.5 h-3.5 text-rose-500" />
+                          <span className="text-[#2878a8] font-bold">Couple Fertility Proforma</span>
+                        </>
+                      )}
+                      {clinicalHistoryTemplate === 'gynaecology' && (
+                        <>
+                          <Activity className="w-3.5 h-3.5 text-violet-500" />
+                          <span className="text-violet-700 font-bold">Gynaecology Case Proforma</span>
+                        </>
+                      )}
+                      {clinicalHistoryTemplate === 'obstetric' && (
+                        <>
+                          <Baby className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-emerald-700 font-bold">Obstetric Antenatal Proforma</span>
+                        </>
+                      )}
+                      <span className="text-[10px] text-slate-400 pl-1 border-l border-slate-200">
+                        Top Toolbar
+                      </span>
                     </div>
 
-                    <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsHistorySectionExpanded((prev) => !prev);
+                      }}
+                      className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200/80 active:scale-95 rounded-md transition-all cursor-pointer focus:outline-none"
+                      aria-label={isHistorySectionExpanded ? 'Collapse clinical history section' : 'Expand clinical history section'}
+                      title={isHistorySectionExpanded ? 'Collapse section' : 'Expand section'}
+                    >
                       {isHistorySectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </div>
@@ -1574,18 +1689,28 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                             <label className="text-xs font-bold text-slate-700 block mb-1">Present History</label>
                             <textarea
                               {...register('present_history')}
-                              rows={12}
+                              rows={10}
                               placeholder="Detailed chronological history of present illness..."
                               className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                             />
                           </div>
 
                           <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">Previous History</label>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Previous / Past History</label>
                             <textarea
                               {...register('previous_history')}
-                              rows={5}
-                              placeholder="Previous hospitalizations, surgeries, drug allergies..."
+                              rows={4}
+                              placeholder="Previous hospitalizations, medical illnesses, surgeries, drug allergies, family history..."
+                              className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">Clinical Examination Findings</label>
+                            <textarea
+                              {...register('examination')}
+                              rows={4}
+                              placeholder="General examination (O/E, BP, Pallor, Pedal edema), P/A, P/S, P/V, USG findings..."
                               className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                             />
                           </div>
@@ -1609,7 +1734,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                           partner={patient?.partner}
                           inline={true}
                           initialType={clinicalHistoryTemplate}
-                          onClose={() => setClinicalHistoryTemplate('standard')}
+                          onClose={() => handleSelectUnifiedTemplate('mode:standard')}
                           onDataChange={(proformaData, summary) => {
                             if (summary.complaints) setValue('chief_complaints', summary.complaints);
                             if (summary.history) setValue('present_history', summary.history);
@@ -1734,6 +1859,27 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         onClose={() => setViewingCounselingNote(null)}
         note={viewingCounselingNote}
         patient={patient}
+      />
+
+      {/* Template Switch Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!pendingTemplateChange}
+        onClose={() => setPendingTemplateChange(null)}
+        onCancel={() => setPendingTemplateChange(null)}
+        onConfirm={handleConfirmTemplateChange}
+        title={
+          pendingTemplateChange?.type === 'mode'
+            ? 'Switch Assessment Mode?'
+            : 'Apply Note Template?'
+        }
+        description={
+          pendingTemplateChange?.type === 'mode'
+            ? `You have entered notes in the current consultation. Switching to "${pendingTemplateChange?.targetName}" will change the view. Your entered text will remain preserved in the form.`
+            : `Applying "${pendingTemplateChange?.targetName}" will populate your clinical notes with this template. Do you want to proceed?`
+        }
+        confirmLabel={pendingTemplateChange?.type === 'mode' ? 'Switch Mode' : 'Apply Template'}
+        cancelLabel="Keep Current"
+        variant="warning"
       />
 
     </div>

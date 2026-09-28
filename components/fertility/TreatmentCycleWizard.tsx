@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { treatmentCyclesApi, protocolsApi, authApi } from '@/lib/api';
 import { formatDate, isUserDoctor } from '@/lib/utils';
+import { toast } from '@/contexts/ToastContext';
 import StimulationCalendarGrid from '@/components/fertility/StimulationCalendarGrid';
 import {
   Target,
@@ -23,7 +24,32 @@ import {
   Play,
   Clock,
   Activity,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
+
+export interface TreatmentTypeItem {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  description?: string;
+}
+
+export const DEFAULT_TREATMENT_TYPES: TreatmentTypeItem[] = [
+  { id: 'ICSI', name: 'ICSI', code: 'ICSI', category: 'ART', description: 'Intracytoplasmic Sperm Injection' },
+  { id: 'IVF', name: 'Conventional IVF', code: 'IVF', category: 'ART', description: 'In Vitro Fertilization' },
+  { id: 'ICSI_FET', name: 'ICSI + Freeze-All + FET', code: 'ICSI_FET', category: 'ART', description: 'Oocyte retrieval, ICSI, cryopreservation followed by FET' },
+  { id: 'FET', name: 'Frozen Embryo Transfer (FET)', code: 'FET', category: 'Embryo Transfer', description: 'Thaw and transfer of vitrified embryo' },
+  { id: 'IUI_H', name: 'IUI — Husband (IUI-H)', code: 'IUI_H', category: 'IUI', description: 'Intrauterine insemination with partner semen' },
+  { id: 'IUI_D', name: 'IUI — Donor (IUI-D)', code: 'IUI_D', category: 'IUI', description: 'Intrauterine insemination with donor semen' },
+  { id: 'OI_TI', name: 'OI + Timed Intercourse (TI)', code: 'OI_TI', category: 'Ovulation Induction', description: 'Folliculometry tracking with timed natural coitus' },
+  { id: 'EGG_FREEZING', name: 'Social / Medical Oocyte Freezing', code: 'EGG_FREEZING', category: 'Cryopreservation', description: 'Oocyte retrieval and vitrification for fertility preservation' },
+  { id: 'SPERM_FREEZING', name: 'Sperm Cryopreservation', code: 'SPERM_FREEZING', category: 'Cryopreservation', description: 'Semen freezing / surgical sperm banking' },
+  { id: 'SURROGACY', name: 'Surrogacy ART Cycle', code: 'SURROGACY', category: 'Third-Party ART', description: 'Surrogacy ART treatment protocol' },
+  { id: 'DONOR_EGG_IVF', name: 'Donor Oocyte IVF / ICSI', code: 'DONOR_EGG_IVF', category: 'Third-Party ART', description: 'IVF/ICSI using donor oocytes' },
+  { id: 'PGT_CYCLE', name: 'ICSI + PGT-A / PGT-M', code: 'PGT_CYCLE', category: 'Advanced ART', description: 'Embryo biopsy for genetic screening prior to transfer' },
+];
 
 interface TreatmentCycleWizardProps {
   patientId: string;
@@ -105,10 +131,13 @@ export default function TreatmentCycleWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarPreview, setCalendarPreview] = useState<any>(null);
   const [cycleTypes, setCycleTypes] = useState<{id: string; name: string}[]>([]);
-  const [typeSearch, setTypeSearch] = useState('');
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [typeSearchQuery, setTypeSearchQuery] = useState('');
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<CycleFormState>({
-    treatment_type: 'ICSI',
+    treatment_type: '', // Starts blank so clinician can choose without forced ICSI
     attempt_number: 1,
     treating_doctor_id: '',
     female_factors: [],
@@ -139,6 +168,60 @@ export default function TreatmentCycleWizard({
     endometrial_monitoring: [],
     remarks: '',
   });
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allAvailableTypes: TreatmentTypeItem[] = useMemo(() => {
+    const list: TreatmentTypeItem[] = [...DEFAULT_TREATMENT_TYPES];
+    if (Array.isArray(cycleTypes) && cycleTypes.length > 0) {
+      cycleTypes.forEach((ct) => {
+        const exists = list.some(
+          (x) => x.id.toLowerCase() === ct.id?.toLowerCase() || x.name.toLowerCase() === ct.name?.toLowerCase()
+        );
+        if (!exists) {
+          list.push({
+            id: ct.id || ct.name,
+            name: ct.name,
+            code: ct.id,
+            category: (ct as any).category || 'Custom',
+            description: (ct as any).description,
+          });
+        }
+      });
+    }
+    return list;
+  }, [cycleTypes]);
+
+  const filteredTreatmentTypes = useMemo(() => {
+    const q = typeSearchQuery.trim().toLowerCase();
+    if (!q) return allAvailableTypes;
+    return allAvailableTypes.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.id.toLowerCase().includes(q) ||
+        (t.code && t.code.toLowerCase().includes(q)) ||
+        (t.description && t.description.toLowerCase().includes(q)) ||
+        (t.category && t.category.toLowerCase().includes(q))
+    );
+  }, [allAvailableTypes, typeSearchQuery]);
+
+  const currentSelectedType = useMemo(() => {
+    if (!form.treatment_type) return null;
+    return (
+      allAvailableTypes.find(
+        (t) => t.id === form.treatment_type || t.name === form.treatment_type || t.code === form.treatment_type
+      ) || { id: form.treatment_type, name: form.treatment_type, description: 'Custom Treatment Type' }
+    );
+  }, [allAvailableTypes, form.treatment_type]);
 
   useEffect(() => {
     protocolsApi.list().then((p: any) => {
@@ -345,6 +428,14 @@ export default function TreatmentCycleWizard({
     setCalendarPreview({ ...calendarPreview, days: updatedDays });
   };
 
+  const handleNextStep = () => {
+    if (currentStep === 1 && !form.treatment_type?.trim()) {
+      toast.warning('Treatment Type Required', 'Please select an Intended Treatment Type before proceeding to Step 2.');
+      return;
+    }
+    setCurrentStep((prev) => prev + 1);
+  };
+
   const handlePrintCalendar = () => {
     window.print();
   };
@@ -388,7 +479,7 @@ export default function TreatmentCycleWizard({
   };
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden w-full flex flex-col">
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm w-full flex flex-col min-h-[580px]">
       {/* Header & Steps Bar */}
       <div className="bg-primary text-white p-6 border-b border-slate-800 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
@@ -406,7 +497,13 @@ export default function TreatmentCycleWizard({
             return (
               <button
                 key={s.id}
-                onClick={() => setCurrentStep(s.id)}
+                onClick={() => {
+                  if (s.id > 1 && !form.treatment_type?.trim()) {
+                    toast.warning('Treatment Type Required', 'Please select an Intended Treatment Type in Step 1 first.');
+                    return;
+                  }
+                  setCurrentStep(s.id);
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all ${
                   currentStep === s.id
                     ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
@@ -424,82 +521,198 @@ export default function TreatmentCycleWizard({
       </div>
 
       {/* Step Content */}
-      <div className="p-6 overflow-y-auto flex-1 space-y-6">
+      <div className="p-6 overflow-y-auto flex-1 space-y-6 min-h-[480px]">
         {/* Step 1: Intended Treatment */}
         {currentStep === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-4 min-h-[440px] pb-44">
             <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Intended Treatment & Clinical Factors</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Treatment Type</label>
-                {cycleTypes.length > 0 ? (
-                  <>
-                    <input
-                      type="text"
-                      placeholder="Search treatment type…"
-                      value={typeSearch || form.treatment_type}
-                      onChange={(e) => {
-                        setTypeSearch(e.target.value);
+              <div className="relative" ref={typeDropdownRef}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Treatment Type <span className="text-red-500">*</span>
+                  </label>
+                  {form.treatment_type && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, treatment_type: '' }));
+                        setTypeSearchQuery('');
+                        setTypeDropdownOpen(true);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                          typeDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }, 50);
                       }}
-                      list="cycle-type-options"
-                      onBlur={(e) => {
-                        const match = cycleTypes.find((t) => t.name === e.target.value);
-                        if (match) { setForm({ ...form, treatment_type: match.name }); setTypeSearch(''); }
-                      }}
-                      className="vmd-input text-xs"
-                    />
-                    <datalist id="cycle-type-options">
-                      {cycleTypes
-                        .filter((t) => !typeSearch || t.name.toLowerCase().includes(typeSearch.toLowerCase()))
-                        .map((t) => (
-                          <option key={t.id} value={t.name} />
-                        ))}
-                    </datalist>
-                    {form.treatment_type && (
-                      <p className="text-[11px] text-primary font-semibold mt-1">✓ {form.treatment_type}</p>
+                      className="text-[10px] font-semibold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+
+                {/* Combobox Trigger */}
+                <div
+                  onClick={() => {
+                    const nextState = !typeDropdownOpen;
+                    setTypeDropdownOpen(nextState);
+                    if (nextState) {
+                      setTimeout(() => {
+                        searchInputRef.current?.focus();
+                        typeDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 50);
+                    }
+                  }}
+                  className={`w-full bg-slate-50 border rounded-lg p-2.5 text-xs cursor-pointer flex items-center justify-between transition-all select-none ${
+                    typeDropdownOpen
+                      ? 'border-[rgb(var(--clr-primary))] ring-2 ring-[rgb(var(--clr-primary)/0.2)] bg-white shadow-xs'
+                      : form.treatment_type
+                      ? 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50/70'
+                      : 'border-slate-300 hover:border-slate-400 hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Target className={`w-4 h-4 shrink-0 ${form.treatment_type ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    {currentSelectedType ? (
+                      <div className="min-w-0 truncate">
+                        <span className="font-bold text-slate-900 block truncate">{currentSelectedType.name}</span>
+                        {currentSelectedType.description && (
+                          <span className="text-[10px] text-slate-500 block truncate">{currentSelectedType.description}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 font-normal">Select Treatment Type (Click to search ICSI, IVF, FET, IUI...)</span>
                     )}
-                  </>
-                ) : (
-                  <select
-                    value={form.treatment_type}
-                    onChange={(e) => setForm({ ...form, treatment_type: e.target.value })}
-                    className="vmd-input"
-                  >
-                    <option value="ICSI">ICSI (Intracytoplasmic Sperm Injection)</option>
-                    <option value="IVF">Conventional IVF</option>
-                    <option value="ICSI_FET">ICSI + Freeze-All + FET</option>
-                    <option value="FET">Frozen Embryo Transfer (FET)</option>
-                    <option value="IUI_H">IUI — Husband (IUI-H)</option>
-                    <option value="IUI_D">IUI — Donor (IUI-D)</option>
-                    <option value="EGG_FREEZING">Social / Medical Oocyte Freezing</option>
-                    <option value="SURROGACY">Surrogacy ART Cycle</option>
-                  </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {form.treatment_type && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setForm((prev) => ({ ...prev, treatment_type: '' }));
+                          setTypeSearchQuery('');
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-full hover:bg-rose-50 transition-colors"
+                        title="Clear treatment type"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${typeDropdownOpen ? 'rotate-180 text-[rgb(var(--clr-primary))]' : ''}`} />
+                  </div>
+                </div>
+
+                {/* Searchable Dropdown Popover */}
+                {typeDropdownOpen && (
+                  <div className="absolute z-[99] top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-100 ring-1 ring-black/5">
+                    {/* Search Input Filter */}
+                    <div className="p-2 border-b border-slate-100 bg-slate-50/70 relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={typeSearchQuery}
+                        onChange={(e) => setTypeSearchQuery(e.target.value)}
+                        placeholder="Search type (e.g. ICSI, IVF, FET, IUI, Freeze)..."
+                        className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-7 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        autoFocus
+                      />
+                      {typeSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setTypeSearchQuery('')}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Options List */}
+                    <div className="max-h-56 sm:max-h-60 overflow-y-auto p-1 divide-y divide-slate-100/60 custom-scrollbar">
+                      {filteredTreatmentTypes.length > 0 ? (
+                        filteredTreatmentTypes.map((t) => {
+                          const isSelected = form.treatment_type === t.name || form.treatment_type === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev, treatment_type: t.name }));
+                                setTypeSearchQuery('');
+                                setTypeDropdownOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left transition-colors flex items-center justify-between rounded-lg cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] font-bold'
+                                  : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900">{t.name}</span>
+                                  {t.category && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                      {t.category}
+                                    </span>
+                                  )}
+                                </div>
+                                {t.description && (
+                                  <p className="text-[10.5px] text-slate-500 font-normal leading-tight mt-0.5 truncate">
+                                    {t.description}
+                                  </p>
+                                )}
+                              </div>
+                              {isSelected && <CheckCircle2 className="w-4 h-4 text-[rgb(var(--clr-primary))] shrink-0" />}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="py-4 px-3 text-center">
+                          <p className="text-xs text-slate-500 mb-2">No matching standard treatment types found for "{typeSearchQuery}"</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, treatment_type: typeSearchQuery.trim() }));
+                              setTypeSearchQuery('');
+                              setTypeDropdownOpen(false);
+                            }}
+                            className="px-3 py-1 bg-[rgb(var(--clr-primary))] text-white text-xs font-bold rounded-md hover:bg-primary-mid transition-colors shadow-2xs cursor-pointer"
+                          >
+                            Use Custom: "{typeSearchQuery.trim()}"
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Attempt Number</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Attempt Number</label>
                 <input
                   type="number"
                   value={form.attempt_number}
                   onChange={(e) => setForm({ ...form, attempt_number: parseInt(e.target.value) || 1 })}
                   min={1}
-                  className="vmd-input"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Treating Consultant</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Treating Consultant</label>
                 <select
                   value={form.treating_doctor_id}
                   onChange={(e) => setForm({ ...form, treating_doctor_id: e.target.value })}
-                  className="vmd-input"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                 >
                   <option value="">Select Treating Consultant...</option>
                   {doctors.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.specialization})</option>
+                    <option key={d.id} value={d.id}>{d.name} ({d.specialization || 'Consultant'})</option>
                   ))}
                 </select>
               </div>
@@ -971,7 +1184,7 @@ export default function TreatmentCycleWizard({
           {currentStep < steps.length ? (
             <button
               type="button"
-              onClick={() => setCurrentStep(currentStep + 1)}
+              onClick={handleNextStep}
               className="px-6 py-2 bg-primary text-white font-bold rounded-md hover:bg-primary-mid text-xs transition-colors shadow-md shadow-primary/20"
             >
               Next Step →
