@@ -22,6 +22,12 @@ export const pharmacyApi = {
 
   listBatches: (params?: { category?: string; search?: string }) =>
     request<any[]>(`/core/pharmacy/batches${toQueryString(params)}`),
+  createBatch: (data: Record<string, unknown>) =>
+    request<any>('/core/pharmacy/batches', { method: 'POST', body: JSON.stringify(data) }),
+  updateBatch: (id: string, data: Record<string, unknown>) =>
+    request<any>(`/core/pharmacy/batches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBatch: (id: string) =>
+    request<any>(`/core/pharmacy/batches/${id}`, { method: 'DELETE' }),
   
   parseOcrInvoice: (payload?: { base64_image?: string; invoice_hint?: string; file_name?: string; vendor_name?: string } | Record<string, any>) =>
     request<any>('/core/pharmacy/ocr/invoice', { method: 'POST', body: JSON.stringify(payload || {}) }),

@@ -64,7 +64,7 @@ export default function A4Sheet({
       {header && <div className="shrink-0 relative z-10 w-full">{header}</div>}
 
       {/* Middle Content Area — strictly in between header and footer, cannot overlap! */}
-      <div className="a4-sheet-content flex-1 flex flex-col justify-between relative z-10 w-full">
+      <div className="a4-sheet-content flex-1 flex flex-col justify-start relative z-10 w-full">
         {children}
       </div>
 

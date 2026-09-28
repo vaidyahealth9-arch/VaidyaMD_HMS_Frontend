@@ -125,12 +125,14 @@ export default function PharmacyPage() {
         'expiry_date', 'purchase_rate', 'mrp', 'selling_price', 'quantity_received', 'quantity_available',
         'rack_location', 'hsn_code', 'vendor_name'
       ];
-      const sampleRow = [
-        'DRUG-001', 'Gonal-F 450IU Pen', 'Follitropin Alfa', 'Injections', 'BCH2026-A', 'Merck Serono',
-        '2027-12-31', '4500', '5800', '5600', '50', '50',
-        'Fridge-1', '3004', 'Apex Pharma'
+      const sampleRows = [
+        ['SODU02', 'DUPHASTON TAB 10MG', 'Dydrogesterone 10mg', 'Luteal Support', 'MAW26022', "Abbott Women's Health", '2029-06-01', '687.10', '901.82', '880.00', '12', '12', 'D210', '30043919', 'Matrika Pharmacy Vendor'],
+        ['SEEV01', 'EVATONE 2 MG TAB', 'Estradiol Valerate 2mg', 'Hormones / Endometrial Prep', 'PLEV2603', 'Serum Institute', '2028-01-01', '122.55', '160.85', '155.00', '30', '30', 'A003', '30043919', 'Matrika Pharmacy Vendor'],
+        ['MIDO02', 'DOLO 650 TAB', 'Paracetamol 650mg', 'Analgesics / Antipyretics', 'DOBS4440', 'Micro Labs', '2030-03-01', '24.59', '32.28', '32.00', '12', '12', 'A059', '30049061', 'Matrika Pharmacy Vendor'],
+        ['UNCO05', 'COQ CAP 100MG', 'Coenzyme Q10 100mg', 'Fertility Antioxidants', 'COQ26002GJ', 'Universal Nutriscience', '2028-11-01', '452.57', '594.00', '570.00', '9', '9', 'B072', '30045090', 'Matrika Pharmacy Vendor'],
+        ['COHB03', 'HBCOM SACHETS (1X2GM)', 'Iron + Folic Acid + Vitamin B12', 'Supplements / Hematology', 'BS260140', 'Comed Chemicals', '2028-05-01', '15.60', '20.48', '20.48', '48', '48', 'A003', '30045010', 'Matrika Pharmacy Vendor']
       ];
-      const csvText = [headers.join(','), sampleRow.join(',')].join('\n');
+      const csvText = [headers.join(','), ...sampleRows.map((r) => r.join(','))].join('\n');
       const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

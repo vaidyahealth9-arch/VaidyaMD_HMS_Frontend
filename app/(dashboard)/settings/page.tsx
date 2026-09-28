@@ -672,6 +672,28 @@ export default function SettingsMasterPage() {
     address: '',
   });
 
+  // Pharmacy stock batch edit state
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<any>(null);
+  const [batchForm, setBatchForm] = useState({
+    item_code: '',
+    item_name: '',
+    generic_name: '',
+    category: 'Fertility / Hormones',
+    batch_number: '',
+    expiry_date: '',
+    quantity_available: 50,
+    quantity_received: 50,
+    purchase_rate: 0,
+    mrp: 0,
+    selling_price: 0,
+    rack_location: 'A003',
+    branch_id: '',
+    is_active: true,
+  });
+  const [batchSearch, setBatchSearch] = useState('');
+  const [batchCategoryFilter, setBatchCategoryFilter] = useState('ALL');
+
   // ==========================================
   // 9. ROLE PERMISSIONS STATE
   // ==========================================
@@ -1608,6 +1630,35 @@ export default function SettingsMasterPage() {
       pharmacyApi.listVendors().then((v: any) => setPharmacyVendors(Array.isArray(v) ? v : []));
     } catch (e: any) {
       alert(e.message || 'Failed to delete vendor');
+    }
+  };
+
+  const handleSaveBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingBatch) {
+        await pharmacyApi.updateBatch(editingBatch.id, batchForm);
+        alert('Pharmacy formulary batch updated successfully!');
+      } else {
+        await pharmacyApi.createBatch(batchForm);
+        alert('New pharmacy formulary batch created successfully!');
+      }
+      setShowBatchModal(false);
+      setEditingBatch(null);
+      pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+    } catch (e: any) {
+      alert(e.message || 'Failed to save pharmacy batch');
+    }
+  };
+
+  const handleDeleteBatch = async (batchId: string) => {
+    if (!confirm('Are you sure you want to deactivate this pharmacy inventory batch?')) return;
+    try {
+      await pharmacyApi.deleteBatch(batchId);
+      alert('Pharmacy batch deactivated successfully!');
+      pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+    } catch (e: any) {
+      alert(e.message || 'Failed to deactivate pharmacy batch');
     }
   };
 
@@ -5264,7 +5315,7 @@ export default function SettingsMasterPage() {
                 Formulary Stock & Reorder Levels ({pharmacyBatches.length})
               </button>
             </div>
-            {pharmaSubTab === 'vendors' && (
+            {pharmaSubTab === 'vendors' ? (
               <button
                 onClick={() => {
                   setEditingVendor(null);
@@ -5275,6 +5326,33 @@ export default function SettingsMasterPage() {
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Vendor
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setEditingBatch(null);
+                  setBatchForm({
+                    item_code: '',
+                    item_name: '',
+                    generic_name: '',
+                    category: 'Fertility / Hormones',
+                    batch_number: '',
+                    expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    quantity_available: 50,
+                    quantity_received: 50,
+                    purchase_rate: 0,
+                    mrp: 0,
+                    selling_price: 0,
+                    rack_location: 'A003',
+                    branch_id: '',
+                    is_active: true,
+                  });
+                  setShowBatchModal(true);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Drug Batch
               </button>
             )}
           </div>
@@ -5318,14 +5396,14 @@ export default function SettingsMasterPage() {
                               });
                               setShowVendorModal(true);
                             }}
-                            className="p-1 text-slate-400 hover:text-primary rounded"
+                            className="p-1 text-slate-400 hover:text-primary rounded hover:bg-slate-100"
                             title="Edit Vendor"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteVendor(v.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100"
                             title="Delete Vendor"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -5338,35 +5416,169 @@ export default function SettingsMasterPage() {
               </table>
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Brand & Generic Name</th>
-                    <th className="py-3 px-3">Batch No</th>
-                    <th className="py-3 px-3">Expiry Date</th>
-                    <th className="py-3 px-3 text-center">Stock Level</th>
-                    <th className="py-3 px-4 text-right">MRP</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pharmacyBatches.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-50/80">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{b.item_name}</div>
-                        <div className="text-[11px] text-slate-500">{b.generic_name}</div>
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-700">{b.batch_number}</td>
-                      <td className="py-3 px-3 text-slate-600">{b.expiry_date}</td>
-                      <td className="py-3 px-3 text-center font-bold text-primary">{b.quantity_available} units</td>
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">
-                        {formatCurrency(b.mrp || 0)}
-                      </td>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-0">
+              {/* Search & Category Filter Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border-b border-slate-200 text-xs">
+                <div className="flex items-center gap-2 flex-1 max-w-sm">
+                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search brand, salt, batch #, rack..."
+                    value={batchSearch}
+                    onChange={(e) => setBatchSearch(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                  {batchSearch && (
+                    <button
+                      onClick={() => setBatchSearch('')}
+                      className="text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500">Category:</span>
+                  <select
+                    value={batchCategoryFilter}
+                    onChange={(e) => setBatchCategoryFilter(e.target.value)}
+                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:ring-1 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="ALL">All Categories ({pharmacyBatches.length})</option>
+                    {Array.from(new Set(pharmacyBatches.map((b) => b.category).filter(Boolean))).sort().map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Batches Table with Edit Actions */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Brand &amp; Formulation</th>
+                      <th className="py-3 px-3">Item Code</th>
+                      <th className="py-3 px-3">Category</th>
+                      <th className="py-3 px-3">Batch &amp; Rack</th>
+                      <th className="py-3 px-3">Expiry Date</th>
+                      <th className="py-3 px-3 text-center">Available Stock</th>
+                      <th className="py-3 px-3 text-right">Purchase Rate</th>
+                      <th className="py-3 px-3 text-right">MRP</th>
+                      <th className="py-3 px-3 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {pharmacyBatches
+                      .filter((b) => {
+                        const q = batchSearch.toLowerCase().trim();
+                        const matchesSearch =
+                          !q ||
+                          (b.item_name || '').toLowerCase().includes(q) ||
+                          (b.generic_name || '').toLowerCase().includes(q) ||
+                          (b.batch_number || '').toLowerCase().includes(q) ||
+                          (b.item_code || '').toLowerCase().includes(q) ||
+                          (b.rack_location || '').toLowerCase().includes(q);
+                        const matchesCat =
+                          batchCategoryFilter === 'ALL' || (b.category || '') === batchCategoryFilter;
+                        return matchesSearch && matchesCat;
+                      })
+                      .map((b) => (
+                        <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{b.item_name}</div>
+                            <div className="text-[11px] text-slate-500 line-clamp-1">{b.generic_name || '---'}</div>
+                          </td>
+                          <td className="py-3 px-3 font-mono font-semibold text-slate-700">{b.item_code || '---'}</td>
+                          <td className="py-3 px-3 text-slate-600">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
+                              {b.category || 'General'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="font-mono text-slate-800 font-semibold">{b.batch_number}</div>
+                            <div className="text-[10px] text-slate-500">Rack: {b.rack_location || '---'}</div>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 font-medium">
+                            {b.expiry_date ? String(b.expiry_date).split('T')[0] : '---'}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full font-bold text-xs ${
+                                (b.quantity_available || 0) <= 5
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : (b.quantity_available || 0) <= 20
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}
+                            >
+                              {b.quantity_available ?? 0} units
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-600">
+                            {formatCurrency(b.purchase_rate || 0)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                            {formatCurrency(b.mrp || 0)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                                b.is_active !== false
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}
+                            >
+                              {b.is_active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditingBatch(b);
+                                  setBatchForm({
+                                    item_code: b.item_code || '',
+                                    item_name: b.item_name || '',
+                                    generic_name: b.generic_name || '',
+                                    category: b.category || 'General Pharmacy',
+                                    batch_number: b.batch_number || '',
+                                    expiry_date: b.expiry_date ? String(b.expiry_date).split('T')[0] : '',
+                                    quantity_available: b.quantity_available ?? 0,
+                                    quantity_received: b.quantity_received ?? b.quantity_available ?? 0,
+                                    purchase_rate: b.purchase_rate ?? 0,
+                                    mrp: b.mrp ?? 0,
+                                    selling_price: b.selling_price ?? b.mrp ?? 0,
+                                    rack_location: b.rack_location || '',
+                                    branch_id: b.branch_id || '',
+                                    is_active: b.is_active !== false,
+                                  });
+                                  setShowBatchModal(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-primary rounded-lg hover:bg-slate-100 transition-colors"
+                                title="Edit Batch Details"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBatch(b.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
+                                title="Deactivate Batch"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
           )}
         </div>
       )}
@@ -6981,6 +7193,229 @@ export default function SettingsMasterPage() {
                   className="px-4 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm"
                 >
                   {editingVendor ? 'Update Vendor' : 'Save Vendor'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ADD / EDIT PHARMACY STOCK BATCH                                    */}
+      {/* ========================================================================= */}
+      {showBatchModal && (
+        <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-8 max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <Pill className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {editingBatch ? 'Edit Pharmacy Inventory Batch' : 'Add New Drug Formulary Batch'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {editingBatch ? `Updating batch ${editingBatch.batch_number}` : 'Create a new stock batch with FEFO expiry and pricing'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBatchModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBatch} className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-700 font-semibold mb-1">Medication / Brand Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={batchForm.item_name}
+                    onChange={(e) => setBatchForm({ ...batchForm, item_name: e.target.value })}
+                    placeholder="e.g. DUPHASTON TAB 10MG"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-700 font-semibold mb-1">Generic Name / Salt Formulation</label>
+                  <input
+                    type="text"
+                    value={batchForm.generic_name}
+                    onChange={(e) => setBatchForm({ ...batchForm, generic_name: e.target.value })}
+                    placeholder="e.g. Dydrogesterone 10mg"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Item Code / SKU *</label>
+                  <input
+                    type="text"
+                    required
+                    value={batchForm.item_code}
+                    onChange={(e) => setBatchForm({ ...batchForm, item_code: e.target.value.toUpperCase() })}
+                    placeholder="e.g. SODU02"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono font-semibold focus:ring-1 focus:ring-primary focus:border-primary uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Therapeutic Category *</label>
+                  <input
+                    type="text"
+                    required
+                    value={batchForm.category}
+                    onChange={(e) => setBatchForm({ ...batchForm, category: e.target.value })}
+                    placeholder="e.g. Luteal Support / Hormones"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Batch Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={batchForm.batch_number}
+                    onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value.toUpperCase() })}
+                    placeholder="e.g. MAW26022"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:ring-1 focus:ring-primary focus:border-primary uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Expiry Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={batchForm.expiry_date}
+                    onChange={(e) => setBatchForm({ ...batchForm, expiry_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Available Quantity (Units) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={batchForm.quantity_available}
+                    onChange={(e) => setBatchForm({ ...batchForm, quantity_available: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-primary focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Total Quantity Received</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={batchForm.quantity_received}
+                    onChange={(e) => setBatchForm({ ...batchForm, quantity_received: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Purchase / Cost Rate (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={batchForm.purchase_rate}
+                    onChange={(e) => setBatchForm({ ...batchForm, purchase_rate: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">MRP (₹) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={batchForm.mrp}
+                    onChange={(e) => setBatchForm({ ...batchForm, mrp: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Selling Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={batchForm.selling_price || batchForm.mrp}
+                    onChange={(e) => setBatchForm({ ...batchForm, selling_price: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Rack / Storage Location</label>
+                  <input
+                    type="text"
+                    value={batchForm.rack_location}
+                    onChange={(e) => setBatchForm({ ...batchForm, rack_location: e.target.value })}
+                    placeholder="e.g. D210 / Fridge 1"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary uppercase"
+                  />
+                </div>
+
+                {hospitalBranches.length > 1 && (
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">Branch Context</label>
+                    <select
+                      value={batchForm.branch_id}
+                      onChange={(e) => setBatchForm({ ...batchForm, branch_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Default Main Branch</option>
+                      {hospitalBranches.map((br) => (
+                        <option key={br.id} value={br.id}>
+                          {br.name} ({br.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="sm:col-span-2 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={batchForm.is_active}
+                      onChange={(e) => setBatchForm({ ...batchForm, is_active: e.target.checked })}
+                      className="rounded text-primary focus:ring-primary"
+                    />
+                    <span className="text-slate-700 font-semibold">Active Formulary Stock (Eligible for FEFO OPD Dispensing)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowBatchModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm transition-colors"
+                >
+                  {editingBatch ? 'Update Batch' : 'Save Batch'}
                 </button>
               </div>
             </form>

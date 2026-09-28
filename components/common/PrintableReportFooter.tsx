@@ -138,9 +138,9 @@ export default function PrintableReportFooter({
         {/* ── Conditional Footer: Full Letterhead or Pre-printed Spacer ── */}
         {!hideHospitalFooter ? (
           <>
-            {/* ── Thin Divider Line Above Address (Full Bleed) ── */}
+            {/* ── Thin Divider Line Above Address ── */}
             <div
-              className="w-full"
+              className="w-full mb-1"
               style={{
                 height: '1.5px',
                 backgroundColor: effectiveSmallColor,
@@ -151,41 +151,41 @@ export default function PrintableReportFooter({
             />
 
             {/* ── Official Letterhead Footer Format (Matching Reference Design) ── */}
-            <div className="pt-1 pb-0.5 space-y-1 text-center">
+            <div className="pt-0.5 pb-0.5 space-y-1 text-center">
               {/* Address Row */}
               {address && (
-                <div className="flex items-start justify-center gap-1.5 font-semibold text-slate-700 text-[10px]">
-                  <MapPin className="w-3 h-3 text-slate-500 shrink-0 mt-0.5" />
+                <div className="flex items-center justify-center gap-1.5 font-medium text-slate-800 text-[10px]">
+                  <MapPin className="w-3 h-3 text-[#4A2E2B] shrink-0" />
                   <span>{address}</span>
                 </div>
               )}
 
-              {/* Contact Info Row — all inline with separators like reference image */}
-              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[9.5px] text-slate-600 font-medium">
+              {/* Contact Info Row — all inline with bullet separators like reference image */}
+              <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 text-[9.5px] text-slate-600 font-medium">
                 {phone && (
                   <div className="flex items-center gap-1">
-                    <Phone className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                    <Phone className="w-2.5 h-2.5 text-[#4A2E2B] shrink-0" />
                     <span>{phone}</span>
                   </div>
                 )}
-                {phone && email && <span className="text-slate-300 text-[8px]">|</span>}
+                {phone && email && <span className="text-slate-400 text-[8px]">·</span>}
                 {email && (
                   <div className="flex items-center gap-1">
-                    <Mail className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                    <Mail className="w-2.5 h-2.5 text-[#4A2E2B] shrink-0" />
                     <span>{email}</span>
                   </div>
                 )}
-                {(email || phone) && website && <span className="text-slate-300 text-[8px]">|</span>}
+                {(email || phone) && website && <span className="text-slate-400 text-[8px]">·</span>}
                 {website && (
                   <div className="flex items-center gap-1">
-                    <Globe className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                    <Globe className="w-2.5 h-2.5 text-[#4A2E2B] shrink-0" />
                     <span>{website}</span>
                   </div>
                 )}
-                {(email || phone || website) && timings && <span className="text-slate-300 text-[8px]">|</span>}
+                {(email || phone || website) && timings && <span className="text-slate-400 text-[8px]">·</span>}
                 {timings && (
                   <div className="flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                    <Clock className="w-2.5 h-2.5 text-[#4A2E2B] shrink-0" />
                     <span>{timings}</span>
                   </div>
                 )}
@@ -193,11 +193,13 @@ export default function PrintableReportFooter({
             </div>
 
             {/* Dynamic Page Counter & Certified Note Bar */}
-            <div className="flex items-center justify-between text-[8.5px] text-slate-400 pb-0.5">
+            <div className="flex items-center justify-between text-[8px] text-slate-400 pb-0.5">
               <span className="italic truncate">{disclaimer || (showComputerGeneratedNotice ? 'Certified computer-generated medical record.' : '')}</span>
-              <span className="print-page-number font-mono font-medium shrink-0">
-                Page {pageNumber || 1}{totalPages && totalPages > 1 ? ` of ${totalPages}` : ''}
-              </span>
+              {pageNumber !== undefined && pageNumber > 0 ? (
+                <span className="print-page-number font-mono font-medium shrink-0">
+                  Page {pageNumber}{totalPages && totalPages > 1 ? ` of ${totalPages}` : ''}
+                </span>
+              ) : null}
             </div>
           </>
         ) : (
@@ -213,10 +215,10 @@ export default function PrintableReportFooter({
       {/* ── Bottom Bold Accent Stripe (Full Bleed to Paper Edges) ── */}
       {!hideHospitalFooter && (
         <div
-          className="h-2 w-full block m-0 p-0 shrink-0"
+          className="w-full block m-0 p-0 shrink-0 mt-1"
           style={{
+            height: '4.5mm',
             backgroundColor: effectiveBoldColor,
-            borderTop: `6px solid ${effectiveBoldColor}`,
             WebkitPrintColorAdjust: 'exact',
             printColorAdjust: 'exact',
           }}

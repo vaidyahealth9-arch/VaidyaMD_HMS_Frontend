@@ -156,10 +156,10 @@ export default function PrintableReportHeader({
         {/* ── Top Bold Accent Stripe (Full Bleed to Paper Edges) ── */}
         {isHeaderVisible ? (
           <div
-            className="h-2 w-full block m-0 p-0 shrink-0"
+            className="w-full block m-0 p-0 shrink-0"
             style={{
+              height: '4.5mm',
               backgroundColor: effectiveBoldColor,
-              borderTop: `6px solid ${effectiveBoldColor}`,
               WebkitPrintColorAdjust: 'exact',
               printColorAdjust: 'exact',
             }}
@@ -168,13 +168,13 @@ export default function PrintableReportHeader({
 
         {/* ── Hospital Letterhead Banner (Logo Only, Centered & Clean) ── */}
         {isHeaderVisible ? (
-          <div className="px-6 sm:px-8 print:px-[12mm] pb-2 pt-2 flex flex-col items-center justify-center text-center gap-1">
+          <div className="px-6 sm:px-8 print:px-[12mm] pb-1.5 pt-2 flex flex-col items-center justify-center text-center gap-1">
             {effectiveLogoUrl ? (
               /* Logo-only header — matching reference letterhead */
               <img
                 src={effectiveLogoUrl}
                 alt={effectiveHospitalName}
-                className="max-h-24 max-w-[400px] object-contain mx-auto"
+                className="max-h-20 max-w-[380px] object-contain mx-auto"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                   const sib = e.currentTarget.nextElementSibling as HTMLElement;
@@ -187,7 +187,7 @@ export default function PrintableReportHeader({
               className={`flex items-center justify-center gap-2 ${effectiveLogoUrl ? 'hidden' : 'flex'}`}
             >
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow"
+                className="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow"
                 style={{
                   backgroundColor: effectiveBoldColor,
                   WebkitPrintColorAdjust: 'exact',
@@ -197,7 +197,7 @@ export default function PrintableReportHeader({
                 {initialLetter}
               </div>
               <div className="text-left">
-                <h1 className="font-bold text-xl leading-tight text-slate-900 tracking-wide uppercase">
+                <h1 className="font-bold text-lg leading-tight text-slate-900 tracking-wide uppercase">
                   {effectiveHospitalName}
                 </h1>
                 {effectiveSubtitle && (
@@ -205,9 +205,9 @@ export default function PrintableReportHeader({
                 )}
               </div>
             </div>
-            {/* ── Small / Thin Divider Line Under Logo (Full Bleed) ── */}
+            {/* ── Small / Thin Divider Line Under Logo ── */}
             <div
-              className="w-full mt-2"
+              className="w-full mt-1.5"
               style={{
                 height: '1.5px',
                 backgroundColor: effectiveSmallColor,
