@@ -20,14 +20,14 @@ export const pharmacyApi = {
   stockGRN: (id: string) =>
     request<any>(`/core/pharmacy/grns/${id}/stock`, { method: 'POST' }),
 
-  listBatches: (params?: { category?: string; search?: string }) =>
+  listBatches: (params?: { category?: string; search?: string; active_only?: boolean }) =>
     request<any[]>(`/core/pharmacy/batches${toQueryString(params)}`),
   createBatch: (data: Record<string, unknown>) =>
     request<any>('/core/pharmacy/batches', { method: 'POST', body: JSON.stringify(data) }),
   updateBatch: (id: string, data: Record<string, unknown>) =>
     request<any>(`/core/pharmacy/batches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteBatch: (id: string) =>
-    request<any>(`/core/pharmacy/batches/${id}`, { method: 'DELETE' }),
+  deleteBatch: (id: string, params?: { deactivate_all?: boolean }) =>
+    request<any>(`/core/pharmacy/batches/${id}${toQueryString(params)}`, { method: 'DELETE' }),
   
   parseOcrInvoice: (payload?: { base64_image?: string; invoice_hint?: string; file_name?: string; vendor_name?: string } | Record<string, any>) =>
     request<any>('/core/pharmacy/ocr/invoice', { method: 'POST', body: JSON.stringify(payload || {}) }),
