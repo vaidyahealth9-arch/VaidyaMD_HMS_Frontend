@@ -31,6 +31,8 @@ const instrumentSerif = localFont({
   preload: false, // Not needed for first paint
 });
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'VaidyaMD HMS — Fertility & Hospital Management System',
   description:
