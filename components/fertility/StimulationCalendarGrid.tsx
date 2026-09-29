@@ -58,7 +58,7 @@ export interface StimulationCalendarGridProps {
   sentinelDates?: Record<string, any>;
 }
 
-const DEFAULT_DRUGS = [
+const IVF_ICSI_DRUGS = [
   { name: 'Rec-FSH (Gonal-F / Puregon)', defaultDose: '225 IU', route: 'SC', frequency: 'OD Evening' },
   { name: 'HMG (Menopur)', defaultDose: '75 IU', route: 'IM', frequency: 'OD Morning' },
   { name: 'GnRH Antagonist (Cetrotide 0.25mg)', defaultDose: '0.25 mg', route: 'SC', frequency: 'OD Morning' },
@@ -66,6 +66,31 @@ const DEFAULT_DRUGS = [
   { name: 'Micronized Progesterone (Susten 400mg)', defaultDose: '400 mg', route: 'PV', frequency: 'BD' },
   { name: 'Oral Estradiol Valerate (Progynova 2mg)', defaultDose: '2 mg', route: 'PO', frequency: 'TDS' },
 ];
+
+const FET_DRUGS = [
+  { name: 'Oral Estradiol Valerate (Progynova 2mg)', defaultDose: '2 mg', route: 'PO', frequency: 'TDS' },
+  { name: 'Micronized Progesterone (Susten 400mg)', defaultDose: '400 mg', route: 'PV', frequency: 'BD' },
+  { name: 'Dydrogesterone (Duphaston 10mg)', defaultDose: '10 mg', route: 'PO', frequency: 'BD' },
+  { name: 'Aspirin / Ecosprin 75mg', defaultDose: '75 mg', route: 'PO', frequency: 'OD' },
+  { name: 'Methylfolate / Folvite 5mg', defaultDose: '5 mg', route: 'PO', frequency: 'OD' },
+  { name: 'Inj Progesterone (Proluton 100mg)', defaultDose: '100 mg', route: 'IM', frequency: 'OD' },
+];
+
+const IUI_DRUGS = [
+  { name: 'Tab Letrozole (Femara 2.5mg)', defaultDose: '2.5 mg', route: 'PO', frequency: 'OD' },
+  { name: 'Tab Clomiphene Citrate 50mg', defaultDose: '50 mg', route: 'PO', frequency: 'OD' },
+  { name: 'Inj HMG (Menopur 75 IU)', defaultDose: '75 IU', route: 'IM', frequency: 'Alt Days' },
+  { name: 'Inj hCG / Ovitrelle 250mcg (Trigger)', defaultDose: '250 mcg', route: 'SC', frequency: 'Stat' },
+  { name: 'Micronized Progesterone (Susten 200mg)', defaultDose: '200 mg', route: 'PV', frequency: 'BD' },
+  { name: 'Tab Folvite (Folic Acid 5mg)', defaultDose: '5 mg', route: 'PO', frequency: 'OD' },
+];
+
+const getTailoredDefaultDrugs = (treatmentType?: string, protocolCategory?: string) => {
+  const upper = (treatmentType || '').toUpperCase();
+  if (upper.includes('FET') || protocolCategory === 'fet') return FET_DRUGS;
+  if (upper.includes('IUI') || upper.includes('OI')) return IUI_DRUGS;
+  return IVF_ICSI_DRUGS;
+};
 
 export default function StimulationCalendarGrid({
   cycleId,
@@ -87,7 +112,7 @@ export default function StimulationCalendarGrid({
   ].filter(Boolean).join(' · ') || 'Centre for Reproductive Medicine & Advanced IVF';
 
   const isFetDefault = Boolean(
-    treatmentType?.includes('FET') ||
+    treatmentType?.toUpperCase().includes('FET') ||
     protocolCategory === 'fet' ||
     sentinelDates?.is_hrt_fet ||
     (initialDays && initialDays.length > 0 && initialDays[0]?.phase)
@@ -96,8 +121,30 @@ export default function StimulationCalendarGrid({
     isFetDefault ? 'hrt_fet' : 'stimulation'
   );
 
+  // Synchronize protocolMode whenever treatmentType, protocolCategory, or sentinelDates change
+  useEffect(() => {
+    const isFet = Boolean(
+      treatmentType?.toUpperCase().includes('FET') ||
+      protocolCategory === 'fet' ||
+      sentinelDates?.is_hrt_fet ||
+      (initialDays && initialDays.length > 0 && initialDays[0]?.phase)
+    );
+    setProtocolMode(isFet ? 'hrt_fet' : 'stimulation');
+  }, [treatmentType, protocolCategory, sentinelDates, initialDays]);
+
   const [totalDays, setTotalDays] = useState(14);
-  const [drugList, setDrugList] = useState<string[]>(DEFAULT_DRUGS.map((d) => d.name));
+  const [drugList, setDrugList] = useState<string[]>(
+    getTailoredDefaultDrugs(treatmentType, protocolCategory).map((d) => d.name)
+  );
+
+  // Synchronize drug list presets when cycle treatment selection changes
+  useEffect(() => {
+    const tailored = getTailoredDefaultDrugs(treatmentType, protocolCategory);
+    setDrugList((prevList) => {
+      const combined = new Set([...tailored.map((d) => d.name), ...prevList]);
+      return Array.from(combined);
+    });
+  }, [treatmentType, protocolCategory]);
   const [newDrugName, setNewDrugName] = useState('');
   const [showAddDrug, setShowAddDrug] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -190,31 +237,85 @@ export default function StimulationCalendarGrid({
     const count = Math.max(14, initialDays?.length || 14);
     setTotalDays(count);
 
+    const isFet = Boolean(
+      treatmentType?.toUpperCase().includes('FET') ||
+      protocolCategory === 'fet' ||
+      sentinelDates?.is_hrt_fet
+    );
+    const isIui = Boolean(
+      treatmentType?.toUpperCase().includes('IUI') ||
+      treatmentType?.toUpperCase().includes('OI')
+    );
+
+    // Build Sentinel Milestone Map
+    const sentinelMilestoneMap = new Map<string, string>();
+    if (sentinelDates) {
+      if (sentinelDates.lmp_day1) sentinelMilestoneMap.set(sentinelDates.lmp_day1, 'Day 1 (LMP)');
+      if (sentinelDates.baseline_scan) sentinelMilestoneMap.set(sentinelDates.baseline_scan, 'Baseline Scan');
+      if (sentinelDates.stim_start) sentinelMilestoneMap.set(sentinelDates.stim_start, isFet ? 'HRT Prep Start' : 'Stimulation Start');
+      if (sentinelDates.d12_scan) sentinelMilestoneMap.set(sentinelDates.d12_scan, 'D12 Endometrial Scan');
+      if (sentinelDates.p0_date) sentinelMilestoneMap.set(sentinelDates.p0_date, 'P0 (Progesterone Start)');
+      if (sentinelDates.trigger) sentinelMilestoneMap.set(sentinelDates.trigger, 'Trigger Injection ⚡');
+
+      if (isIui) {
+        if (sentinelDates.insemination) sentinelMilestoneMap.set(sentinelDates.insemination, 'IUI Insemination 💉');
+        else if (sentinelDates.opu) sentinelMilestoneMap.set(sentinelDates.opu, 'IUI Insemination 💉');
+      } else if (isFet) {
+        if (sentinelDates.et || sentinelDates.transfer_date) sentinelMilestoneMap.set(sentinelDates.et || sentinelDates.transfer_date, 'Frozen Embryo Transfer 👶');
+      } else {
+        if (sentinelDates.opu) sentinelMilestoneMap.set(sentinelDates.opu, 'OPU (Egg Retrieval) 🧫');
+        if (sentinelDates.et) sentinelMilestoneMap.set(sentinelDates.et, 'Embryo Transfer 👶');
+      }
+
+      if (sentinelDates.beta_hcg_date) sentinelMilestoneMap.set(sentinelDates.beta_hcg_date, 'Beta-hCG Pregnancy Test 🩸');
+    }
+
     const generated: DayData[] = [];
     for (let i = 1; i <= count; i++) {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + (i - 1));
 
-      const existing = initialDays?.find((x: any) => x.day_number === i);
+      const existing = initialDays?.find((x: any) => x.day_number === i || x.cycle_day === i);
 
       const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
       const displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const isoDate = d.toISOString().split('T')[0];
+      const isoDate = existing?.date || d.toISOString().split('T')[0];
 
-      // Auto-assign milestones
-      let milestone: string | undefined = undefined;
-      if (i === 1) milestone = 'Stim Day 1';
-      else if (i === 6) milestone = 'Antagonist Start';
-      else if (i === 11) milestone = 'Trigger Imminent';
-      else if (i === 12) milestone = 'hCG Trigger';
-      else if (i === 14) milestone = 'OPU Retrieval';
+      // Dynamic milestone assignment based on selections & sentinels
+      let milestone: string | undefined = existing?.milestone || existing?.phase || sentinelMilestoneMap.get(isoDate);
+
+      // If still not defined, fallback based on treatment type (never force IVF milestones on FET or IUI)
+      if (!milestone) {
+        if (isFet) {
+          if (i === 1) milestone = 'HRT Start (E2 Priming)';
+          else if (i === 10) milestone = 'Endometrial TVS Check';
+          else if (i === 13) milestone = 'P0 (Progesterone Window)';
+          else if (i === 18) milestone = 'Embryo Transfer';
+          else if (i === count) milestone = 'Beta-hCG Pregnancy Test';
+        } else if (isIui) {
+          if (i === 1) milestone = 'Cycle Day 1 (LMP)';
+          else if (i === 2) milestone = 'Ovulation Induction Start';
+          else if (i === 8) milestone = 'Follicular Tracking Scan';
+          else if (i === 11) milestone = 'Trigger Evaluation';
+          else if (i === 12) milestone = 'hCG Trigger ⚡';
+          else if (i === 14) milestone = 'IUI Insemination 💉';
+          else if (i === count) milestone = 'Beta-hCG Pregnancy Test';
+        } else {
+          // IVF / ICSI
+          if (i === 1) milestone = 'Stim Day 1';
+          else if (i === 6) milestone = 'Antagonist Start';
+          else if (i === 10) milestone = 'Trigger Imminent';
+          else if (i === 12) milestone = 'hCG Trigger';
+          else if (i === 14) milestone = 'OPU Retrieval';
+        }
+      }
 
       generated.push({
         day_number: i,
-        date: existing?.date || isoDate,
+        date: isoDate,
         display_date: existing?.display_date || displayDate,
         day_of_week: existing?.day_of_week || dayOfWeek,
-        milestone: existing?.milestone || milestone,
+        milestone: milestone,
         medications: existing?.medications || [],
         right_follicles: existing?.right_follicles || '',
         left_follicles: existing?.left_follicles || '',
@@ -239,7 +340,7 @@ export default function StimulationCalendarGrid({
     }
 
     setDays(generated);
-  }, [startDate, initialDays]);
+  }, [startDate, initialDays, treatmentType, protocolCategory, sentinelDates, cycleId]);
 
   const handleCellChange = (dayNum: number, drugName: string, value: string) => {
     if (readonly) return;

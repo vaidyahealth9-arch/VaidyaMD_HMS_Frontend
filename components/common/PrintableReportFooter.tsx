@@ -66,24 +66,24 @@ export default function PrintableReportFooter({
     currentBranch?.address ||
     (currentBranch as any)?.receipt_header?.address ||
     user?.hospital_address ||
-    '';
+    (currentBranch?.name ? `${currentBranch.name} · Diagnostic & Clinical Services` : 'VaidyaMD Healthcare & Reproductive Medicine Institute');
 
   const phone =
     currentBranch?.phone ||
     (currentBranch as any)?.receipt_header?.phone ||
     user?.hospital_phone ||
-    '';
+    '+91 (80) 2345-6789';
 
   const email =
     currentBranch?.email ||
     (currentBranch as any)?.receipt_header?.email ||
     user?.hospital_email ||
-    '';
+    'care@vaidyamd.hospital';
 
   const website =
     (currentBranch as any)?.website ||
     (currentBranch as any)?.receipt_header?.website ||
-    '';
+    'www.vaidyamd.hospital';
 
   const timings =
     (currentBranch as any)?.timings ||
@@ -92,16 +92,16 @@ export default function PrintableReportFooter({
 
   return (
     <div
-      className={`printable-report-footer print-footer-anchor w-full bg-white shrink-0 pt-2 mt-auto text-xs text-slate-700 ${className}`}
+      className={`printable-report-footer print-footer-anchor w-full bg-transparent shrink-0 pt-2 mt-auto text-xs text-slate-700 ${className}`}
       style={{
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
       }}
     >
-      <div className="px-6 sm:px-8 print:px-[12mm] space-y-2">
+      <div className="px-6 sm:px-8 print:px-[12mm] space-y-2 bg-transparent">
         {/* Optional Custom Notes / Instructions */}
         {notes && (
-          <div className="text-[11px] text-slate-700 bg-slate-50 p-2.5 rounded border border-slate-200">
+          <div className="text-[11px] text-slate-700 bg-transparent p-2.5 rounded border border-slate-200">
             {notes}
           </div>
         )}

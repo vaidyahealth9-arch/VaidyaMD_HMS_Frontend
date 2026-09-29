@@ -247,8 +247,10 @@ export default function TreatmentCycleWizard({
     const baseDateStr = form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0];
     const baseDate = new Date(baseDateStr);
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const days = [];
-    const totalDays = ['FET', 'ICSI_FET'].includes(form.treatment_type) ? 23 : 21;
+    const isFet = ['FET', 'ICSI_FET'].includes(form.treatment_type) || form.sentinel_dates?.is_hrt_fet;
+    const isIui = form.treatment_type === 'IUI' || form.treatment_type === 'OI';
+    const totalDays = isFet ? 23 : 21;
+    const days: any[] = [];
     for (let i = 0; i < totalDays; i++) {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + i);
@@ -257,18 +259,31 @@ export default function TreatmentCycleWizard({
       let milestone = '';
       if (iso === form.sentinel_dates.lmp_day1) milestone = 'Day 1 (LMP)';
       else if (iso === form.sentinel_dates.baseline_scan) milestone = 'Baseline Scan';
-      else if (iso === form.sentinel_dates.stim_start) milestone = 'Stimulation Start';
+      else if (iso === form.sentinel_dates.stim_start) milestone = isFet ? 'HRT Prep Start' : 'Stimulation Start';
+      else if (iso === form.sentinel_dates.d12_scan) milestone = 'D12 Endometrial Scan';
       else if (iso === form.sentinel_dates.p0_date) milestone = 'P0 (Progesterone Start)';
-      else if (iso === form.sentinel_dates.trigger) milestone = 'Trigger Injection';
-      else if (iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval)';
-      else if (iso === form.sentinel_dates.et) milestone = 'Embryo Transfer';
+      else if (iso === form.sentinel_dates.trigger) milestone = 'Trigger Injection ⚡';
+      else if (isIui && (iso === form.sentinel_dates.insemination || iso === form.sentinel_dates.opu)) milestone = 'IUI Insemination 💉';
+      else if (isFet && (iso === form.sentinel_dates.et || iso === form.sentinel_dates.transfer_date)) milestone = 'Frozen Embryo Transfer 👶';
+      else if (!isFet && !isIui && iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval) 🧫';
+      else if (!isFet && !isIui && iso === form.sentinel_dates.et) milestone = 'Embryo Transfer 👶';
+      else if (iso === form.sentinel_dates.beta_hcg_date) milestone = 'Beta-hCG Pregnancy Test 🩸';
+
+      let stimDayLabel: string | null = null;
+      if (isIui) {
+        stimDayLabel = `Cycle Day ${dayNum}`;
+      } else if (isFet) {
+        stimDayLabel = dayNum <= 13 ? `HRT Day ${dayNum}` : (dayNum === 14 ? 'P0' : `P+${dayNum - 14}`);
+      } else {
+        stimDayLabel = dayNum >= 2 && dayNum <= 12 ? `Stim Day ${dayNum - 1}` : null;
+      }
 
       days.push({
         date: iso,
         day_number: dayNum,
         display_date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
         day_of_week: dayNames[d.getDay()],
-        stim_day_label: dayNum >= 2 && dayNum <= 12 ? `Stim Day ${dayNum - 1}` : null,
+        stim_day_label: stimDayLabel,
         milestone: milestone || null,
         medications: [],
       });
@@ -1130,9 +1145,10 @@ export default function TreatmentCycleWizard({
         {currentStep === 6 && (
           <div className="space-y-4">
             <StimulationCalendarGrid
-              startDate={form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1}
+              startDate={form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || form.sentinel_dates.baseline_scan || new Date().toISOString().split('T')[0]}
               initialDays={calendarPreview?.days}
               treatmentType={form.treatment_type}
+              protocolCategory={['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'fet' : 'stimulation'}
               sentinelDates={form.sentinel_dates}
               onCalendarSaved={(savedDays) => {
                 setCalendarPreview({ ...(calendarPreview || {}), days: savedDays });

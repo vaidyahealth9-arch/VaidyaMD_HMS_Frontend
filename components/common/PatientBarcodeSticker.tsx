@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { generateCode128SvgString, generateQrSvgString } from '@/lib/barcodeUtils';
 
-export type StickerPreset = '50x25' | '50x38' | '75x50' | '38x25';
+export type StickerPreset = '50x25' | '50x38' | '75x50' | '38x25' | 'desmat48' | 'desmat48-compact';
 export type BarcodeFormat = 'code128' | 'qr' | 'both';
 
 export interface PatientBarcodeStickerProps {
@@ -29,6 +29,8 @@ export interface PatientBarcodeStickerProps {
   preset?: StickerPreset;
   barcodeType?: BarcodeFormat;
   sampleType?: string;
+  sampleId?: string;
+  customSubtext?: string;
   collectionDate?: string;
   collectionTime?: string;
   className?: string;
@@ -43,6 +45,8 @@ export default function PatientBarcodeSticker({
   preset = '50x25',
   barcodeType = 'code128',
   sampleType,
+  sampleId,
+  customSubtext,
   collectionDate,
   collectionTime,
   className = '',
@@ -72,7 +76,13 @@ export default function PatientBarcodeSticker({
     let height = 36;
     let width = 1.3;
 
-    if (preset === '50x25') {
+    if (preset === 'desmat48') {
+      height = 20;
+      width = 1.05;
+    } else if (preset === 'desmat48-compact') {
+      height = 16;
+      width = 0.95;
+    } else if (preset === '50x25') {
       height = 28;
       width = 1.15;
     } else if (preset === '38x25') {
@@ -98,6 +108,10 @@ export default function PatientBarcodeSticker({
   // Dimensions mapped to physical millimeters
   const dimensions = useMemo(() => {
     switch (preset) {
+      case 'desmat48':
+        return { width: '48.5mm', height: '24mm', minWidth: '48.5mm', minHeight: '24mm' };
+      case 'desmat48-compact':
+        return { width: '48.5mm', height: '21.2mm', minWidth: '48.5mm', minHeight: '21.2mm' };
       case '38x25':
         return { width: '38mm', height: '25mm', minWidth: '38mm', minHeight: '25mm' };
       case '50x38':
@@ -116,6 +130,55 @@ export default function PatientBarcodeSticker({
       style={dimensions}
       className={`barcode-sticker-item bg-white text-black p-[2mm] flex flex-col justify-between overflow-hidden border border-dashed border-slate-300 print:border-none print:m-0 print:p-[1.5mm] select-none font-sans ${className}`}
     >
+      {/* ─────────────────────────────────────────────────────────────
+          PRESET: Desmat 48 (48.5mm x 24mm / 48.5mm x 21.2mm A4 Sticker Sheet)
+      ───────────────────────────────────────────────────────────── */}
+      {(preset === 'desmat48' || preset === 'desmat48-compact') && (
+        <div className="w-full h-full flex flex-col justify-between text-[7px] leading-tight box-border px-[1mm] py-[0.8mm] print:p-[0.6mm]">
+          {/* Header row: Hospital Name & Date/Time */}
+          <div className="flex items-center justify-between border-b border-black/30 pb-[0.3mm] text-[6.5px] font-semibold leading-none">
+            <span className="truncate max-w-[27mm] uppercase tracking-wider">{hospitalName}</span>
+            <span className="font-mono text-[6px] text-black/80">{dateStr} {timeStr}</span>
+          </div>
+
+          {/* Patient Name & Tags */}
+          <div className="flex items-center justify-between pt-[0.3mm] leading-none">
+            <span className="font-bold text-[8.5px] truncate max-w-[31mm] uppercase tracking-tight">
+              {patientName}
+            </span>
+            {sampleType ? (
+              <span className="font-mono font-black text-[6px] px-1 py-0.2 bg-black text-white rounded-xs uppercase leading-none">
+                {sampleType}
+              </span>
+            ) : customSubtext ? (
+              <span className="text-[6px] font-mono text-black/70 font-semibold">{customSubtext}</span>
+            ) : null}
+          </div>
+
+          {/* Middle: Barcode & VID */}
+          <div className="flex items-center justify-center py-[0.2mm]">
+            <div className="w-full flex flex-col items-center">
+              <div
+                className="w-full flex justify-center overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: barcodeSvg || '' }}
+              />
+              <div className="flex items-center justify-center gap-1 font-mono font-bold text-[7.5px] tracking-[1.2px] leading-none mt-[0.3mm]">
+                <span>{vid}</span>
+                {sampleId && sampleId !== vid && (
+                  <span className="text-[6px] tracking-normal text-black/70 font-normal">({sampleId})</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer: Age/Gender, Blood Group */}
+          <div className="flex items-center justify-between border-t border-black/30 pt-[0.3mm] text-[6.5px] leading-none">
+            <span className="font-medium truncate max-w-[25mm]">{ageGender || '—'}</span>
+            <span className="font-bold">{bloodGroup || (patient?.gender ? patient.gender.toUpperCase() : '')}</span>
+          </div>
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────────
           PRESET: 50mm x 25mm (Standard Specimen Tube / Blood Sample Label)
       ───────────────────────────────────────────────────────────── */}

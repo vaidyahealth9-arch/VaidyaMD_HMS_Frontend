@@ -23,6 +23,7 @@ import {
   X,
   UploadCloud,
   Loader2,
+  Barcode,
 } from 'lucide-react';
 
 
@@ -40,6 +41,7 @@ import {
 } from '@/shared/ui/sheet';
 import { formatDateTime } from '@/lib/utils';
 import ManualDiagnosticEntry from '@/components/lims/ManualDiagnosticEntry';
+import PatientBarcodeModal from '@/components/common/PatientBarcodeModal';
 import PageLayout from '@/components/common/PageLayout';
 
 export default function LimsPage() {
@@ -71,6 +73,32 @@ export default function LimsPage() {
   // Manual Report Modal State
   const [showManualModal, setShowManualModal] = useState(false);
   const [initialPatientIdForManualForm, setInitialPatientIdForManualForm] = useState('');
+
+  // Barcode / Sticker Studio Modal State
+  const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
+  const [barcodePatient, setBarcodePatient] = useState<any>(null);
+  const [barcodeSampleType, setBarcodeSampleType] = useState<string>('');
+  const [barcodeSampleId, setBarcodeSampleId] = useState<string>('');
+
+  const handleOpenBarcodeModal = (item?: any) => {
+    if (item) {
+      setBarcodePatient({
+        name: item.patient_name,
+        vid: item.patient_mrn,
+        age: item.age,
+        gender: item.patient_gender || item.gender,
+        blood_group: item.blood_group,
+      });
+      setBarcodeSampleType(item.test_name || '');
+      setBarcodeSampleId(item.sample_id || '');
+    } else if (patients.length > 0) {
+      const firstPat = patients[0];
+      setBarcodePatient(firstPat);
+      setBarcodeSampleType('General Lab');
+      setBarcodeSampleId('');
+    }
+    setBarcodeModalOpen(true);
+  };
 
   // Pathologist Authorization Mutation
   const authorizeMutation = useMutation({
@@ -151,6 +179,16 @@ export default function LimsPage() {
           >
             <Plus className="w-4 h-4" />
             <span>New Diagnostic Report</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleOpenBarcodeModal()}
+            className="gap-1.5 text-xs font-bold border-slate-300 text-slate-700 hover:text-slate-900 bg-white rounded-md h-9 shadow-2xs"
+          >
+            <Barcode className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
+            <span>Print Desmat Barcodes</span>
           </Button>
 
 
@@ -289,9 +327,19 @@ export default function LimsPage() {
                 return (
                   <tr key={item.id} className="hover:bg-slate-50">
                     <td className="p-3.5">
-                      <span className="font-mono font-bold text-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.08)] px-2 py-0.5 rounded">
-                        {item.sample_id}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-[rgb(var(--clr-primary))] bg-[rgb(var(--clr-primary)/0.08)] px-2 py-0.5 rounded">
+                          {item.sample_id}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBarcodeModal(item)}
+                          className="p-1 text-slate-400 hover:text-[rgb(var(--clr-primary))] hover:bg-slate-100 rounded transition-colors"
+                          title="Print Desmat 48 / Roll Sticker"
+                        >
+                          <Barcode className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                     <td className="p-3.5">
                       <p className="font-bold text-slate-900">{item.patient_name}</p>
@@ -443,6 +491,20 @@ export default function LimsPage() {
             setTimeout(() => setActionSuccess(null), 5000);
           }}
           initialPatientId={initialPatientIdForManualForm}
+        />
+      )}
+
+      {/* Barcode & Desmat 48 Sticker Studio */}
+      {barcodeModalOpen && barcodePatient && (
+        <PatientBarcodeModal
+          isOpen={barcodeModalOpen}
+          onClose={() => setBarcodeModalOpen(false)}
+          patient={barcodePatient}
+          hospitalName="VAIDYAMD HMS"
+          branchName="Diagnostic & Pathology Laboratory"
+          initialSampleType={barcodeSampleType}
+          initialSampleId={barcodeSampleId}
+          initialMode="desmat48"
         />
       )}
     </PageLayout>

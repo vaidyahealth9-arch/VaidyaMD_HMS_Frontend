@@ -42,6 +42,7 @@ interface DynamicFormProps {
   userRole: string;
   onSave: (data: Record<string, unknown>) => Promise<void>;
   isSaving?: boolean;
+  submitButtonLabel?: string;
 }
 
 // --- Normalization Helpers ---
@@ -297,7 +298,7 @@ function DateField({ field, value, onChange, disabled }: { field: FieldSchema; v
 }
 
 // --- DynamicForm Main ---
-export default function DynamicForm({ schema: rawSchema, initialData = {}, userRole, onSave, isSaving }: DynamicFormProps) {
+export default function DynamicForm({ schema: rawSchema, initialData = {}, userRole, onSave, isSaving, submitButtonLabel }: DynamicFormProps) {
   const schema = useMemo(() => normalizeSchema(rawSchema), [rawSchema]);
 
   const computedInitial = useMemo(() => {
@@ -427,7 +428,7 @@ export default function DynamicForm({ schema: rawSchema, initialData = {}, userR
           {isSaving ? (
             <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
           ) : (
-            <><Save className="w-3.5 h-3.5" /> Save Record</>
+            <><Save className="w-3.5 h-3.5" /> {submitButtonLabel || 'Save Record'}</>
           )}
         </button>
       </div>

@@ -71,6 +71,17 @@ export const fertilityApi = {
         ...data,
       }),
     }),
+  updateRecord: (recordId: string, data: Record<string, unknown>) =>
+    request<any>(`/core/clinical-records/${recordId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        data,
+      }),
+    }),
+  deleteRecord: (recordId: string) =>
+    request<any>(`/core/clinical-records/${recordId}`, {
+      method: 'DELETE',
+    }),
 };
 
 export const andrologyApi = {
