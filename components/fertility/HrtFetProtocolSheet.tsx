@@ -293,15 +293,39 @@ export default function HrtFetProtocolSheet({
     return generated;
   };
 
-  // Initial Load
+  // Synchronize setup parameters when sentinelDates, startDate, or cycleId change
   useEffect(() => {
-    if (initialDays && Array.isArray(initialDays) && initialDays.length > 0 && initialDays[0]?.phase) {
+    if (sentinelDates?.lmp_day1 || startDate) {
+      setBleedDate(sentinelDates?.lmp_day1 || startDate || new Date().toISOString().split('T')[0]);
+    }
+    if (sentinelDates?.planned_estrogen_days) {
+      setPlannedEstrogenDays(Number(sentinelDates.planned_estrogen_days));
+    }
+    if (sentinelDates?.embryo_stage) {
+      setEmbryoStage(sentinelDates.embryo_stage === 'Day 3' ? 'Day 3' : 'Day 5');
+    }
+    if (sentinelDates?.p0_time) {
+      setP0Time(sentinelDates.p0_time);
+    }
+    if (sentinelDates?.e2_dose) setE2Dose(sentinelDates.e2_dose);
+    if (sentinelDates?.p4_dose) setP4Dose(sentinelDates.p4_dose);
+    if (sentinelDates?.lining_thickness) setLiningThickness(sentinelDates.lining_thickness);
+    if (sentinelDates?.lining_pattern) setLiningPattern(sentinelDates.lining_pattern);
+  }, [sentinelDates, startDate, cycleId]);
+
+  // Initial Load & Schedule Generation
+  useEffect(() => {
+    if (initialDays && Array.isArray(initialDays) && initialDays.length > 0 && (initialDays[0]?.phase || initialDays[0]?.estrogen_day !== undefined)) {
       setRows(initialDays);
     } else {
-      const generated = buildScheduleFromTemplate(bleedDate, plannedEstrogenDays, embryoStage, p0Time);
+      const targetBleed = sentinelDates?.lmp_day1 || startDate || bleedDate;
+      const targetEstrogen = sentinelDates?.planned_estrogen_days ? Number(sentinelDates.planned_estrogen_days) : plannedEstrogenDays;
+      const targetStage = sentinelDates?.embryo_stage === 'Day 3' ? 'Day 3' : embryoStage;
+      const targetP0 = sentinelDates?.p0_time || p0Time;
+      const generated = buildScheduleFromTemplate(targetBleed, targetEstrogen, targetStage, targetP0);
       setRows(generated);
     }
-  }, [startDate]);
+  }, [startDate, initialDays, sentinelDates, cycleId]);
 
   // Handle cell edit
   const handleCellChange = (cycleDay: number, field: keyof HrtFetRowData, value: any) => {
@@ -565,8 +589,30 @@ ${bodyHtml}
     setIsSaving(true);
     try {
       if (cycleId) {
+        const rowsWithMilestones = rows.map((r) => {
+          let m = r.phase;
+          if (r.embryo_stage && r.embryo_stage !== '') m = `${r.embryo_stage} Transfer 👶`;
+          else if (r.phase?.includes('P0')) m = 'P0 (Progesterone Start)';
+          else if (r.cycle_day === 1) m = 'Day 1 (HRT Start)';
+          else if (r.cycle_day === 12) m = 'D12 Endometrial Scan';
+          else if (r.cycle_day === 13) m = 'Triple-Line Optimization Scan';
+          else if (r.cycle_day === rows.length) m = 'Beta-hCG Pregnancy Test 🩸';
+          return {
+            ...r,
+            milestone: m,
+            medications: [
+              {
+                drug_name: r.medication,
+                dose: r.dose,
+                route: r.route,
+                frequency: r.frequency,
+                instructions: r.timing,
+              },
+            ],
+          };
+        });
         // Save rows into medication_calendar and sentinel_dates
-        await treatmentCyclesApi.updateMedicationCalendar(cycleId, rows);
+        await treatmentCyclesApi.updateMedicationCalendar(cycleId, rowsWithMilestones);
         await treatmentCyclesApi.updateSentinelDates(cycleId, {
           sentinel_dates: {
             ...(sentinelDates || {}),

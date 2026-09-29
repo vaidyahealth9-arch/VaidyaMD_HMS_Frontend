@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -337,12 +337,36 @@ export default function PharmacyPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch Inventory Batches
-  const { data: batches = [], isLoading: batchesLoading } = useQuery({
+  // Fetch Inventory Batches (Active Only for Stock & POS Dispensing)
+  const { data: rawBatches = [], isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
     queryKey: ['pharmacy-batches', searchQuery],
-    queryFn: () => pharmacyApi.listBatches({ search: searchQuery || undefined }),
-    refetchInterval: 30000,
+    queryFn: () => pharmacyApi.listBatches({ search: searchQuery || undefined, active_only: true }),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: 15000,
   });
+
+  // Listen for inventory/master updates across tabs or from master settings
+  useEffect(() => {
+    const handleUpdate = () => {
+      refetchBatches();
+    };
+    window.addEventListener('pharmacy_inventory_updated', handleUpdate);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'pharmacy_stock_timestamp') handleUpdate();
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('pharmacy_inventory_updated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [refetchBatches]);
+
+  // Strict defensive filter to ensure inactivated medicines never appear in stock or POS
+  const batches = useMemo(() => {
+    return (rawBatches || []).filter((b: any) => b.is_active !== false);
+  }, [rawBatches]);
 
   // Fetch Indents
   const { data: indents = [] } = useQuery({
@@ -602,6 +626,7 @@ export default function PharmacyPage() {
 
   // Add Item to POS Cart
   const handleAddToCart = (batch: any) => {
+    if (batch.is_active === false) return;
     if (batch.quantity_available <= 0) return;
     setPosCart((prev) => {
       const existing = prev.find((i) => i.item_code === batch.item_code);

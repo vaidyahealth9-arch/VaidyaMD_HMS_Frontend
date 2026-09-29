@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   adminApi,
   authApi,
@@ -266,6 +267,7 @@ export const getPurposeBadgeStyle = (purpose: TemplatePurpose) => {
 };
 
 export default function SettingsMasterPage() {
+  const queryClient = useQueryClient();
   const { user, currentBranch, setCurrentBranch } = useAuth();
   const [activeTab, setActiveTab] = useState<
     'hospital' | 'staff' | 'tariffs' | 'ipd' | 'cycles' | 'templates' | 'labs' | 'pharmacy' | 'profiles' | 'csv_hub'
@@ -693,6 +695,7 @@ export default function SettingsMasterPage() {
   });
   const [batchSearch, setBatchSearch] = useState('');
   const [batchCategoryFilter, setBatchCategoryFilter] = useState('ALL');
+  const [batchStatusFilter, setBatchStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   // ==========================================
   // 9. ROLE PERMISSIONS STATE
@@ -801,9 +804,9 @@ export default function SettingsMasterPage() {
       if (Array.isArray(res) && res.length > 0) setCryoTanks(res);
     }).catch(() => {});
 
-    // 8. Pharmacy Vendors & Batches
+    // 8. Pharmacy Vendors & Batches (Load all including inactive for master administration)
     pharmacyApi.listVendors().then((v: any) => setPharmacyVendors(Array.isArray(v) ? v : [])).catch(() => {});
-    pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : [])).catch(() => {});
+    pharmacyApi.listBatches({ active_only: false }).then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : [])).catch(() => {});
 
     // 9. Role Permissions
     permissionProfilesApi
@@ -1645,20 +1648,48 @@ export default function SettingsMasterPage() {
       }
       setShowBatchModal(false);
       setEditingBatch(null);
-      pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+      pharmacyApi.listBatches({ active_only: false }).then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+      window.dispatchEvent(new CustomEvent('pharmacy_inventory_updated'));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pharmacy_stock_timestamp', Date.now().toString());
+      }
     } catch (e: any) {
       alert(e.message || 'Failed to save pharmacy batch');
     }
   };
 
   const handleDeleteBatch = async (batchId: string) => {
-    if (!confirm('Are you sure you want to deactivate this pharmacy inventory batch?')) return;
+    const target = pharmacyBatches.find((b) => b.id === batchId);
+    const medName = target?.item_name || 'this medicine';
+    if (!confirm(`Are you sure you want to deactivate "${medName}" (${target?.batch_number || ''})?\n\nDeactivating will prevent it from appearing in pharmacy stock and prevent dispensing.`)) return;
     try {
-      await pharmacyApi.deleteBatch(batchId);
-      alert('Pharmacy batch deactivated successfully!');
-      pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+      await pharmacyApi.deleteBatch(batchId, { deactivate_all: true });
+      alert(`Medication "${medName}" deactivated successfully. It is now excluded from pharmacy stock and FEFO dispensing.`);
+      pharmacyApi.listBatches({ active_only: false }).then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+      window.dispatchEvent(new CustomEvent('pharmacy_inventory_updated'));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pharmacy_stock_timestamp', Date.now().toString());
+      }
     } catch (e: any) {
       alert(e.message || 'Failed to deactivate pharmacy batch');
+    }
+  };
+
+  const handleReactivateBatch = async (batch: any) => {
+    if (!confirm(`Reactivate "${batch.item_name}" (${batch.batch_number}) for pharmacy stock and dispensing?`)) return;
+    try {
+      await pharmacyApi.updateBatch(batch.id, { is_active: true });
+      alert(`Medication "${batch.item_name}" reactivated successfully! It is now active in pharmacy stock.`);
+      pharmacyApi.listBatches({ active_only: false }).then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+      window.dispatchEvent(new CustomEvent('pharmacy_inventory_updated'));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pharmacy_stock_timestamp', Date.now().toString());
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to reactivate pharmacy batch');
     }
   };
 
@@ -5437,20 +5468,35 @@ export default function SettingsMasterPage() {
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-500">Category:</span>
-                  <select
-                    value={batchCategoryFilter}
-                    onChange={(e) => setBatchCategoryFilter(e.target.value)}
-                    className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:ring-1 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="ALL">All Categories ({pharmacyBatches.length})</option>
-                    {Array.from(new Set(pharmacyBatches.map((b) => b.category).filter(Boolean))).sort().map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-slate-500">Status:</span>
+                    <select
+                      value={batchStatusFilter}
+                      onChange={(e) => setBatchStatusFilter(e.target.value as any)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="ALL">All Batches ({pharmacyBatches.length})</option>
+                      <option value="ACTIVE">Active Formulary ({pharmacyBatches.filter((b) => b.is_active !== false).length})</option>
+                      <option value="INACTIVE">Deactivated ({pharmacyBatches.filter((b) => b.is_active === false).length})</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-slate-500">Category:</span>
+                    <select
+                      value={batchCategoryFilter}
+                      onChange={(e) => setBatchCategoryFilter(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="ALL">All Categories</option>
+                      {Array.from(new Set(pharmacyBatches.map((b) => b.category).filter(Boolean))).sort().map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -5484,7 +5530,11 @@ export default function SettingsMasterPage() {
                           (b.rack_location || '').toLowerCase().includes(q);
                         const matchesCat =
                           batchCategoryFilter === 'ALL' || (b.category || '') === batchCategoryFilter;
-                        return matchesSearch && matchesCat;
+                        const matchesStatus =
+                          batchStatusFilter === 'ALL' ||
+                          (batchStatusFilter === 'ACTIVE' && b.is_active !== false) ||
+                          (batchStatusFilter === 'INACTIVE' && b.is_active === false);
+                        return matchesSearch && matchesCat && matchesStatus;
                       })
                       .map((b) => (
                         <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
@@ -5529,7 +5579,7 @@ export default function SettingsMasterPage() {
                               className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
                                 b.is_active !== false
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
                               }`}
                             >
                               {b.is_active !== false ? 'Active' : 'Inactive'}
@@ -5563,13 +5613,23 @@ export default function SettingsMasterPage() {
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => handleDeleteBatch(b.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
-                                title="Deactivate Batch"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {b.is_active !== false ? (
+                                <button
+                                  onClick={() => handleDeleteBatch(b.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
+                                  title="Deactivate Batch"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleReactivateBatch(b)}
+                                  className="p-1.5 text-emerald-600 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
+                                  title="Reactivate Batch"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
