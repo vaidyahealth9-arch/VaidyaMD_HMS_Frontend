@@ -18,12 +18,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Ensure HTML documents are never stale-cached by CDNs across deployments
-        source: '/:path*',
+        // HTML pages must NEVER be cached by Firebase CDN — always fetch from origin.
+        // Next.js static assets (/_next/static/) already get immutable caching by default.
+        // no-store prevents stale HTML with wrong asset hashes after new deployments.
+        source: '/((?!_next/static).*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
           },
         ],
       },

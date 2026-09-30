@@ -292,7 +292,7 @@ export default function SettingsMasterPage() {
   const [cycleTypeForm, setCycleTypeForm] = useState({ name: '', category: 'Stimulation', display_order: 0, is_active: true });
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [editingProtocol, setEditingProtocol] = useState<any>(null);
-  const [protocolForm, setProtocolForm] = useState({ name: '', category: 'stimulation', description: '', rules: [] as any[] });
+  const [protocolForm, setProtocolForm] = useState({ name: '', category: 'stimulation', description: '', rules: [] as any[], timeline_events: [] as any[] });
 
   // Labs & Cryobank configuration state
   const [showLimsModal, setShowLimsModal] = useState(false);
@@ -442,9 +442,12 @@ export default function SettingsMasterPage() {
   const [cycleTypes, setCycleTypes] = useState<any[]>([]);
   const [cycleSearch, setCycleSearch] = useState('');
   const [cycleCategoryFilter, setCycleCategoryFilter] = useState('all');
+  const [cycleStatusFilter, setCycleStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [protocols, setProtocols] = useState<any[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<any>(null);
   const [protocolPreviewCalendar, setProtocolPreviewCalendar] = useState<any[]>([]);
+  const [protocolStatusFilter, setProtocolStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [protocolSearch, setProtocolSearch] = useState('');
 
   // ==========================================
   // 6. CLINICAL TEMPLATES STATE
@@ -770,15 +773,17 @@ export default function SettingsMasterPage() {
 
     // 5. Treatment Cycles & Protocols
     treatmentCyclesApi
-      .listTypes()
+      .listTypes({ include_inactive: true })
       .then((ct: any) => setCycleTypes(Array.isArray(ct) ? ct : []))
       .catch(() => {});
     protocolsApi
-      .list()
+      .list({ include_inactive: true })
       .then((pr: any) => {
         const pList = Array.isArray(pr) ? pr : [];
         setProtocols(pList);
-        if (pList.length > 0) handleSelectProtocol(pList[0]);
+        const activeList = pList.filter((p: any) => p.is_active !== false);
+        if (activeList.length > 0) handleSelectProtocol(activeList[0]);
+        else if (pList.length > 0) handleSelectProtocol(pList[0]);
       })
       .catch(() => {});
 
@@ -844,10 +849,14 @@ export default function SettingsMasterPage() {
   // Protocol calendar preview
   const handleSelectProtocol = (proto: any) => {
     setSelectedProtocol(proto);
-    if (proto && proto.schedule_rules) {
+    if (proto?.id) {
+      const today = new Date().toISOString().split('T')[0];
       protocolsApi
-        .previewCalendar({ schedule_rules: proto.schedule_rules, cycle_start_date: new Date().toISOString().split('T')[0] })
-        .then((res: any) => setProtocolPreviewCalendar(res?.calendar || []))
+        .previewCalendar({
+          protocol_template_id: proto.id,
+          sentinel_dates: { stim_start: today, lmp_day1: today },
+        })
+        .then((res: any) => setProtocolPreviewCalendar(res?.days || []))
         .catch(() => setProtocolPreviewCalendar([]));
     }
   };
@@ -1271,18 +1280,37 @@ export default function SettingsMasterPage() {
       setShowCycleModal(false);
       setEditingCycleType(null);
       setCycleTypeForm({ name: '', category: 'Stimulation', display_order: 0, is_active: true });
-      treatmentCyclesApi.listTypes().then((ct: any) => setCycleTypes(Array.isArray(ct) ? ct : []));
+      const ct = await treatmentCyclesApi.listTypes({ include_inactive: true });
+      setCycleTypes(Array.isArray(ct) ? ct : []);
     } catch (e: any) {
       alert(e.message || 'Failed to save cycle type');
     }
   };
 
-  const handleDeleteCycleType = async (typeId: string) => {
-    if (!confirm('Are you sure you want to deactivate this cycle modality?')) return;
+  const handleToggleCycleType = async (cycleType: any) => {
     try {
-      await treatmentCyclesApi.deleteType(typeId);
-      alert('Cycle modality deactivated successfully!');
-      treatmentCyclesApi.listTypes().then((ct: any) => setCycleTypes(Array.isArray(ct) ? ct : []));
+      if (cycleType.is_active !== false) {
+        if (!confirm(`Are you sure you want to deactivate modality "${cycleType.name}"? It will be disabled and hidden from new patient cycles.`)) return;
+        await treatmentCyclesApi.deleteType(cycleType.id, false);
+        alert('Modality deactivated successfully!');
+      } else {
+        await treatmentCyclesApi.reactivateType(cycleType.id);
+        alert('Modality reactivated successfully!');
+      }
+      const ct = await treatmentCyclesApi.listTypes({ include_inactive: true });
+      setCycleTypes(Array.isArray(ct) ? ct : []);
+    } catch (e: any) {
+      alert(e.message || 'Failed to update modality status');
+    }
+  };
+
+  const handleHardDeleteCycleType = async (typeId: string, name: string) => {
+    if (!confirm(`DANGER: Are you sure you want to permanently delete modality "${name}"? This CANNOT be undone!`)) return;
+    try {
+      await treatmentCyclesApi.deleteType(typeId, true);
+      alert('Cycle modality permanently deleted!');
+      const ct = await treatmentCyclesApi.listTypes({ include_inactive: true });
+      setCycleTypes(Array.isArray(ct) ? ct : []);
     } catch (e: any) {
       alert(e.message || 'Failed to delete cycle modality');
     }
@@ -1301,19 +1329,60 @@ export default function SettingsMasterPage() {
       }
       setShowProtocolModal(false);
       setEditingProtocol(null);
-      setProtocolForm({ name: '', category: 'stimulation', description: '', rules: [] });
-      protocolsApi.list().then((pr: any) => setProtocols(Array.isArray(pr) ? pr : []));
+      setProtocolForm({ name: '', category: 'stimulation', description: '', rules: [], timeline_events: [] });
+      const updated = await protocolsApi.list({ include_inactive: true });
+      const pList = Array.isArray(updated) ? updated : [];
+      setProtocols(pList);
+      if (editingProtocol) {
+        const found = pList.find((p: any) => p.id === editingProtocol.id);
+        if (found) handleSelectProtocol(found);
+      } else if (pList.length > 0) {
+        handleSelectProtocol(pList[0]);
+      }
     } catch (e: any) {
       alert(e.message || 'Failed to save protocol');
     }
   };
 
-  const handleDeleteProtocol = async (protocolId: string) => {
-    if (!confirm('Are you sure you want to deactivate this protocol template?')) return;
+  const handleDeactivateProtocol = async (protocolId: string) => {
+    if (!confirm('Are you sure you want to deactivate this protocol template? It will be marked inactive and moved to the Inactive list.')) return;
     try {
-      await protocolsApi.delete(protocolId);
+      await protocolsApi.delete(protocolId, false);
       alert('Protocol template deactivated successfully!');
-      protocolsApi.list().then((pr: any) => setProtocols(Array.isArray(pr) ? pr : []));
+      const pr = await protocolsApi.list({ include_inactive: true });
+      const pList = Array.isArray(pr) ? pr : [];
+      setProtocols(pList);
+      const updated = pList.find((p: any) => p.id === protocolId);
+      if (updated) setSelectedProtocol(updated);
+    } catch (e: any) {
+      alert(e.message || 'Failed to deactivate protocol');
+    }
+  };
+
+  const handleReactivateProtocol = async (protocolId: string) => {
+    try {
+      await protocolsApi.reactivate(protocolId);
+      alert('Protocol template reactivated successfully!');
+      const pr = await protocolsApi.list({ include_inactive: true });
+      const pList = Array.isArray(pr) ? pr : [];
+      setProtocols(pList);
+      const updated = pList.find((p: any) => p.id === protocolId);
+      if (updated) setSelectedProtocol(updated);
+    } catch (e: any) {
+      alert(e.message || 'Failed to reactivate protocol');
+    }
+  };
+
+  const handleHardDeleteProtocol = async (protocolId: string, name: string) => {
+    if (!confirm(`DANGER: Are you sure you want to permanently delete protocol "${name}" and all its rules? This action CANNOT be undone!`)) return;
+    try {
+      await protocolsApi.delete(protocolId, true);
+      alert('Protocol permanently deleted!');
+      const pr = await protocolsApi.list({ include_inactive: true });
+      const pList = Array.isArray(pr) ? pr : [];
+      setProtocols(pList);
+      if (pList.length > 0) handleSelectProtocol(pList[0]);
+      else setSelectedProtocol(null);
     } catch (e: any) {
       alert(e.message || 'Failed to delete protocol');
     }
@@ -3630,88 +3699,194 @@ export default function SettingsMasterPage() {
           </div>
 
           {cycleSubTab === 'modalities' ? (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200">
-                <span className="font-bold text-slate-900 text-xs">Registered ART Modalities ({cycleTypes.length})</span>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-3 p-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">ART Modality Catalog ({cycleTypes.length})</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Master registry of clinical cycle types offered by the hospital. Populates the treatment type dropdown across Patient Charts, IVF Lab, and Billing packages.
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setEditingCycleType(null);
                     setCycleTypeForm({ name: '', category: 'Stimulation', display_order: cycleTypes.length + 1, is_active: true });
                     setShowCycleModal(true);
                   }}
-                  className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg flex items-center gap-1 shadow-xs"
+                  className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg flex items-center gap-1 shadow-xs shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Modality
                 </button>
               </div>
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/50 text-slate-600 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Cycle Modality</th>
-                    <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3 text-center">Display Order</th>
-                    <th className="py-3 px-3 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {cycleTypes.map((c) => (
-                    <tr key={c.id || c.name} className="hover:bg-slate-50/80">
-                      <td className="py-3 px-4 font-bold text-slate-900">{c.name}</td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-slate-100 text-slate-700">
-                          {c.category || 'Stimulation'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center font-mono text-slate-600">{c.display_order || 0}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                          c.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          {c.is_active !== false ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setEditingCycleType(c);
-                              setCycleTypeForm({
-                                name: c.name,
-                                category: c.category || 'Stimulation',
-                                display_order: c.display_order || 0,
-                                is_active: c.is_active !== false,
-                              });
-                              setShowCycleModal(true);
-                            }}
-                            className="p-1 text-slate-400 hover:text-primary rounded"
-                            title="Edit Modality"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCycleType(c.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                            title="Deactivate Modality"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
+
+              {/* Modalities Search & Filter Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search modality name..."
+                    value={cycleSearch}
+                    onChange={(e) => setCycleSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <select
+                    value={cycleCategoryFilter}
+                    onChange={(e) => setCycleCategoryFilter(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50/50"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Stimulation">Stimulation (ICSI, IVF)</option>
+                    <option value="FET">FET (Frozen Embryo Transfer)</option>
+                    <option value="IUI">IUI & Ovulation Induction</option>
+                    <option value="Preservation">Preservation (Egg/Embryo Freeze)</option>
+                    <option value="Third-Party">Third-Party (Donation / Surrogacy)</option>
+                    <option value="Diagnostics">Diagnostics (PGT-A / PGT-M)</option>
+                    <option value="Surgical">Surgical (TESA / PESA)</option>
+                  </select>
+                </div>
+                <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+                  <button
+                    onClick={() => setCycleStatusFilter('all')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      cycleStatusFilter === 'all' ? 'bg-white shadow-2xs text-slate-900' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All ({cycleTypes.length})
+                  </button>
+                  <button
+                    onClick={() => setCycleStatusFilter('active')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      cycleStatusFilter === 'active' ? 'bg-white shadow-2xs text-emerald-700' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Enabled ({cycleTypes.filter(c => c.is_active !== false).length})
+                  </button>
+                  <button
+                    onClick={() => setCycleStatusFilter('inactive')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      cycleStatusFilter === 'inactive' ? 'bg-white shadow-2xs text-rose-700' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Disabled ({cycleTypes.filter(c => c.is_active === false).length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Modalities Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4">Cycle Modality</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3 text-center">Display Order</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {cycleTypes
+                      .filter((c) => {
+                        const matchesSearch = !cycleSearch || c.name.toLowerCase().includes(cycleSearch.toLowerCase());
+                        const matchesCategory = cycleCategoryFilter === 'all' || (c.category || '').toLowerCase() === cycleCategoryFilter.toLowerCase();
+                        const matchesStatus =
+                          cycleStatusFilter === 'all'
+                            ? true
+                            : cycleStatusFilter === 'active'
+                            ? c.is_active !== false
+                            : c.is_active === false;
+                        return matchesSearch && matchesCategory && matchesStatus;
+                      })
+                      .map((c) => (
+                        <tr key={c.id || c.name} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-4 font-bold text-slate-900">{c.name}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-slate-100 text-slate-700">
+                              {c.category || 'Stimulation'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-600">{c.display_order || 0}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                                c.is_active !== false
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                              }`}
+                            >
+                              {c.is_active !== false ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right">
+                            <div className="flex justify-end items-center gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditingCycleType(c);
+                                  setCycleTypeForm({
+                                    name: c.name,
+                                    category: c.category || 'Stimulation',
+                                    display_order: c.display_order || 0,
+                                    is_active: c.is_active !== false,
+                                  });
+                                  setShowCycleModal(true);
+                                }}
+                                className="px-2 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs"
+                                title="Edit Modality"
+                              >
+                                <Edit2 className="w-3 h-3" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleToggleCycleType(c)}
+                                className={`px-2 py-1 border rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs ${
+                                  c.is_active !== false
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+                                    : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                                }`}
+                                title={c.is_active !== false ? 'Deactivate Modality' : 'Enable Modality'}
+                              >
+                                {c.is_active !== false ? (
+                                  <>
+                                    <EyeOff className="w-3 h-3" /> Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-3 h-3" /> Enable
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleHardDeleteCycleType(c.id, c.name)}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                title="Permanently Delete Modality"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-2">
+              {/* Protocols Library Left Rail */}
+              <div className="lg:col-span-4 space-y-2.5">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-bold text-slate-700">Protocols Library ({protocols.length})</span>
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 block">Protocols Library</span>
+                    <span className="text-[10px] text-slate-500">
+                      {protocols.filter(p => p.is_active !== false).length} Active · {protocols.filter(p => p.is_active === false).length} Inactive
+                    </span>
+                  </div>
                   <button
                     onClick={() => {
                       setEditingProtocol(null);
-                      setProtocolForm({ name: '', category: 'stimulation', description: '', rules: [] });
+                      setProtocolForm({ name: '', category: 'stimulation', description: '', rules: [], timeline_events: [] });
                       setShowProtocolModal(true);
                     }}
                     className="px-2.5 py-1 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg flex items-center gap-1 shadow-xs"
@@ -3719,28 +3894,114 @@ export default function SettingsMasterPage() {
                     <Plus className="w-3 h-3" /> Add Protocol
                   </button>
                 </div>
-                {protocols.map((proto) => (
+
+                {/* Filter Pills */}
+                <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
                   <button
-                    key={proto.id}
-                    onClick={() => handleSelectProtocol(proto)}
-                    className={`w-full text-left p-3.5 rounded-xl border transition-all ${
-                      selectedProtocol?.id === proto.id
-                        ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20 shadow-xs'
-                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    onClick={() => setProtocolStatusFilter('active')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      protocolStatusFilter === 'active' ? 'bg-white shadow-2xs text-primary font-bold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    <div className="font-bold text-slate-900 text-xs">{proto.name}</div>
-                    <div className="text-[11px] text-slate-500 mt-1 capitalize">{proto.category} Protocol</div>
+                    Active ({protocols.filter(p => p.is_active !== false).length})
                   </button>
-                ))}
+                  <button
+                    onClick={() => setProtocolStatusFilter('inactive')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      protocolStatusFilter === 'inactive' ? 'bg-white shadow-2xs text-amber-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Inactive ({protocols.filter(p => p.is_active === false).length})
+                  </button>
+                  <button
+                    onClick={() => setProtocolStatusFilter('all')}
+                    className={`flex-1 py-1 rounded-md text-[11px] transition-all ${
+                      protocolStatusFilter === 'all' ? 'bg-white shadow-2xs text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All ({protocols.length})
+                  </button>
+                </div>
+
+                {/* Protocols Search Input */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search protocols..."
+                    value={protocolSearch}
+                    onChange={(e) => setProtocolSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1 text-xs border border-slate-200 rounded-lg bg-white"
+                  />
+                </div>
+
+                {/* Protocol Card List */}
+                <div className="space-y-1.5 max-h-[600px] overflow-y-auto custom-scrollbar pr-1">
+                  {protocols
+                    .filter((proto) => {
+                      const matchesSearch = !protocolSearch || proto.name.toLowerCase().includes(protocolSearch.toLowerCase());
+                      const matchesStatus =
+                        protocolStatusFilter === 'all'
+                          ? true
+                          : protocolStatusFilter === 'active'
+                          ? proto.is_active !== false
+                          : proto.is_active === false;
+                      return matchesSearch && matchesStatus;
+                    })
+                    .map((proto) => (
+                      <button
+                        key={proto.id}
+                        onClick={() => handleSelectProtocol(proto)}
+                        className={`w-full text-left p-3 rounded-xl border transition-all ${
+                          selectedProtocol?.id === proto.id
+                            ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20 shadow-xs'
+                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="font-bold text-slate-900 text-xs truncate">{proto.name}</div>
+                          {proto.is_active === false && (
+                            <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 capitalize flex items-center justify-between">
+                          <span>{proto.category} Protocol</span>
+                          <span className="text-[10px] text-slate-400">
+                            {proto.rules?.length || 0} drugs · {proto.timeline_events?.length || 0} events
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                </div>
               </div>
-              <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                  <h3 className="font-bold text-slate-900 text-sm">
-                    {selectedProtocol?.name || 'Protocol'} — Drug Schedule Timeline
-                  </h3>
+
+              {/* Protocol Detail Pane */}
+              <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
+                <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        {selectedProtocol?.name || 'Protocol Details'}
+                      </h3>
+                      {selectedProtocol?.category && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-primary/10 text-primary border border-primary/20">
+                          {selectedProtocol.category}
+                        </span>
+                      )}
+                      {selectedProtocol?.is_active === false && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-slate-100 text-slate-600 border border-slate-300">
+                          Deactivated / Inactive
+                        </span>
+                      )}
+                    </div>
+                    {selectedProtocol?.description && (
+                      <p className="text-xs text-slate-500 mt-1 max-w-xl">{selectedProtocol.description}</p>
+                    )}
+                  </div>
                   {selectedProtocol && (
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => {
                           setEditingProtocol(selectedProtocol);
@@ -3748,36 +4009,203 @@ export default function SettingsMasterPage() {
                             name: selectedProtocol.name,
                             category: selectedProtocol.category || 'stimulation',
                             description: selectedProtocol.description || '',
-                            rules: selectedProtocol.rules || [],
+                            rules: (selectedProtocol.rules || []).map((r: any) => ({
+                              drug_name: r.drug_name || '',
+                              dose: r.dose || '',
+                              route: r.route || 'SC',
+                              frequency: r.frequency || 'OD',
+                              day_start_offset: r.day_start_offset ?? 1,
+                              day_end_offset: r.day_end_offset ?? 10,
+                              instructions: r.instructions || '',
+                            })),
+                            timeline_events: (selectedProtocol.timeline_events || []).map((ev: any) => ({
+                              type: ev.type || 'scan',
+                              day_offset: ev.day_offset ?? 1,
+                              title: ev.title || '',
+                              instructions: ev.instructions || '',
+                            })),
                           });
                           setShowProtocolModal(true);
                         }}
-                        className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-xs rounded-lg flex items-center gap-1"
+                        className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
                       >
                         <Edit2 className="w-3 h-3" /> Edit
                       </button>
+
+                      {/* Deactivate vs Reactivate Buttons */}
+                      {selectedProtocol.is_active !== false ? (
+                        <button
+                          onClick={() => handleDeactivateProtocol(selectedProtocol.id)}
+                          className="px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
+                          title="Deactivate protocol (archives it without permanently deleting)"
+                        >
+                          <EyeOff className="w-3 h-3" /> Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivateProtocol(selectedProtocol.id)}
+                          className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
+                          title="Reactivate protocol (restores it to active clinical schedules)"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> Reactivate
+                        </button>
+                      )}
+
+                      {/* Permanent Delete Button */}
                       <button
-                        onClick={() => handleDeleteProtocol(selectedProtocol.id)}
-                        className="px-2.5 py-1 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold text-xs rounded-lg flex items-center gap-1"
+                        onClick={() => handleHardDeleteProtocol(selectedProtocol.id, selectedProtocol.name)}
+                        className="px-2.5 py-1 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
+                        title="Permanently delete this protocol and its rules"
                       >
                         <Trash2 className="w-3 h-3" /> Delete
                       </button>
                     </div>
                   )}
                 </div>
+
+                {/* Section A: Configured Drug Rules */}
                 <div className="space-y-2">
-                  {protocolPreviewCalendar.map((dayItem: any, idx: number) => (
-                    <div key={idx} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                      <span className="w-16 font-bold font-mono text-primary">Day {dayItem.day}</span>
-                      <div className="flex-1 font-medium text-slate-800">
-                        {(dayItem.medications || []).map((m: any, mIdx: number) => (
-                          <span key={mIdx} className="mr-3 bg-white px-2 py-1 rounded border border-slate-200 text-[11px]">
-                            💊 {m.drug_name || m.name} ({m.dose || m.dosage})
-                          </span>
-                        ))}
-                      </div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-primary" /> Configured Prescriptions & Drug Rules ({selectedProtocol?.rules?.length || 0})
+                  </h4>
+                  {selectedProtocol?.rules && selectedProtocol.rules.length > 0 ? (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                          <tr>
+                            <th className="py-2 px-3">Medication</th>
+                            <th className="py-2 px-2">Dose</th>
+                            <th className="py-2 px-2">Route</th>
+                            <th className="py-2 px-2">Freq</th>
+                            <th className="py-2 px-2 text-center">Cycle Days</th>
+                            <th className="py-2 px-3">Clinical Instructions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedProtocol.rules.map((r: any, rIdx: number) => (
+                            <tr key={r.id || rIdx} className="hover:bg-slate-50/60">
+                              <td className="py-2 px-3 font-bold text-slate-800">{r.drug_name}</td>
+                              <td className="py-2 px-2 font-mono text-primary font-bold">{r.dose}</td>
+                              <td className="py-2 px-2 text-slate-600">{r.route || 'SC'}</td>
+                              <td className="py-2 px-2 text-slate-600">{r.frequency || 'OD'}</td>
+                              <td className="py-2 px-2 text-center font-mono font-bold text-slate-700 bg-slate-50/50">
+                                D{r.day_start_offset}–D{r.day_end_offset}
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 text-[11px]">{r.instructions || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No drug rules configured.</p>
+                  )}
+                </div>
+
+                {/* Section B: Scheduled Clinical Events (Scans, Labs, Procedures) */}
+                {selectedProtocol?.timeline_events && selectedProtocol.timeline_events.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-blue-600" /> Scheduled Scans, Investigations & Procedures ({selectedProtocol.timeline_events.length})
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {selectedProtocol.timeline_events.map((ev: any, evIdx: number) => {
+                        const isScan = ev.type === 'scan';
+                        const isInv = ev.type === 'investigation';
+                        const isProc = ev.type === 'procedure';
+
+                        return (
+                          <div
+                            key={evIdx}
+                            className={`p-2.5 rounded-lg border text-xs flex flex-col justify-between ${
+                              isScan
+                                ? 'bg-blue-50/60 border-blue-200 text-blue-900'
+                                : isInv
+                                ? 'bg-purple-50/60 border-purple-200 text-purple-900'
+                                : 'bg-amber-50/60 border-amber-200 text-amber-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="font-bold font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/80 border border-slate-200/60">
+                                Day {ev.day_offset}
+                              </span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider">
+                                {isScan ? '🔍 Scan' : isInv ? '🧪 Lab' : '🧫 Procedure'}
+                              </span>
+                            </div>
+                            <div className="font-bold text-xs">{ev.title}</div>
+                            {ev.instructions && (
+                              <div className="text-[10px] opacity-75 mt-0.5 truncate" title={ev.instructions}>
+                                {ev.instructions}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section C: Day-by-Day Timeline Preview */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-primary" /> Generated Day-by-Day Clinical Timeline ({protocolPreviewCalendar.length} Days)
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-medium">Computed live via Rules Engine</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                    {protocolPreviewCalendar.map((dayItem: any, idx: number) => {
+                      const hasEvents = (dayItem.scans?.length || 0) + (dayItem.investigations?.length || 0) + (dayItem.procedures?.length || 0) > 0;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg border text-xs transition-colors ${
+                            hasEvents ? 'bg-slate-50/90 border-slate-300' : 'bg-white border-slate-200/80 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-[140px]">
+                            <span className="font-bold font-mono text-primary text-xs shrink-0 w-24">
+                              {dayItem.stim_day_label || `Day ${dayItem.day_number || idx + 1}`}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0">
+                              {dayItem.display_date || ''}
+                            </span>
+                          </div>
+
+                          {/* Multi-Track Badges */}
+                          <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                            {dayItem.milestone && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+                                {dayItem.milestone}
+                              </span>
+                            )}
+                            {(dayItem.scans || []).map((s: string, sIdx: number) => (
+                              <span key={sIdx} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                                🔍 {s}
+                              </span>
+                            ))}
+                            {(dayItem.investigations || []).map((inv: string, iIdx: number) => (
+                              <span key={iIdx} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 truncate max-w-[200px]" title={inv}>
+                                🧪 {inv}
+                              </span>
+                            ))}
+                            {(dayItem.procedures || []).map((p: string, pIdx: number) => (
+                              <span key={pIdx} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 shrink-0">
+                                🧫 {p}
+                              </span>
+                            ))}
+                            {(dayItem.medications || []).map((m: any, mIdx: number) => (
+                              <span key={mIdx} className="bg-white px-2 py-0.5 rounded border border-slate-200 text-[11px] font-medium text-slate-800 shadow-2xs">
+                                💊 {m.drug_name || m.name} <strong className="text-primary">{m.dose || m.dosage}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -8225,69 +8653,395 @@ export default function SettingsMasterPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: ADD / EDIT CLINICAL PROTOCOL                                        */}
+      {/* MODAL: ADD / EDIT CLINICAL PROTOCOL (FULL DRUG & TIMELINE EVENT BUILDER)   */}
       {/* ========================================================================= */}
       {showProtocolModal && (
         <div className="fixed inset-0 bg-rail-bg/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-sm">
-                {editingProtocol ? 'Edit Protocol Template' : 'Add New Protocol Template'}
-              </h3>
-              <button onClick={() => setShowProtocolModal(false)} className="text-slate-400 hover:text-slate-700">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex justify-between items-center border-b border-slate-100 px-6 py-4 bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  {editingProtocol ? `Edit Protocol: ${editingProtocol.name}` : 'Add New Clinical Protocol Template'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Configure protocol metadata, prescription dosing rules, and scheduled clinical scans, labs, and procedures.
+                </p>
+              </div>
+              <button onClick={() => setShowProtocolModal(false)} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSaveProtocol} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">Protocol Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Antagonist (Flexible) Protocol"
-                  value={protocolForm.name}
-                  onChange={(e) => setProtocolForm({ ...protocolForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-md"
-                />
+
+            <form onSubmit={handleSaveProtocol} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+              {/* SECTION 1: PROTOCOL IDENTITY */}
+              <div className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <Dna className="w-4 h-4 text-primary" /> Protocol Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-slate-700 font-semibold mb-1">Protocol Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Antagonist (Flexible) Protocol"
+                      value={protocolForm.name}
+                      onChange={(e) => setProtocolForm({ ...protocolForm, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">Category *</label>
+                    <select
+                      value={protocolForm.category}
+                      onChange={(e) => setProtocolForm({ ...protocolForm, category: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white capitalize"
+                    >
+                      <option value="stimulation">Stimulation</option>
+                      <option value="fet">FET Endometrial Prep</option>
+                      <option value="luteal">Luteal Phase Support</option>
+                      <option value="iui">IUI Mild Stimulation</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-slate-700 font-semibold mb-1">Clinical Description / Indication</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Standard GnRH antagonist protocol for normal-to-high responders"
+                      value={protocolForm.description}
+                      onChange={(e) => setProtocolForm({ ...protocolForm, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Protocol Category</label>
-                  <select
-                    value={protocolForm.category}
-                    onChange={(e) => setProtocolForm({ ...protocolForm, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md bg-white capitalize"
+
+              {/* SECTION 2: MEDICATION RULES */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Pill className="w-4 h-4 text-primary" /> Configured Prescriptions & Drug Rules ({protocolForm.rules.length})
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Define medications, cycle day offsets, and dosing schedules.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setProtocolForm({
+                        ...protocolForm,
+                        rules: [
+                          ...protocolForm.rules,
+                          {
+                            drug_name: '',
+                            dose: '',
+                            route: 'SC',
+                            frequency: 'OD',
+                            day_start_offset: 1,
+                            day_end_offset: 10,
+                            instructions: '',
+                          },
+                        ],
+                      })
+                    }
+                    className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs rounded-lg flex items-center gap-1 border border-primary/20 transition-colors"
                   >
-                    <option value="stimulation">Stimulation</option>
-                    <option value="fet">FET Endometrial Prep</option>
-                    <option value="luteal">Luteal Phase Support</option>
-                    <option value="iui">IUI Mild Stimulation</option>
-                  </select>
+                    <Plus className="w-3.5 h-3.5" /> Add Medication
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Description</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. GnRH antagonist for high responders"
-                    value={protocolForm.description}
-                    onChange={(e) => setProtocolForm({ ...protocolForm, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md"
-                  />
-                </div>
+
+                {protocolForm.rules.length > 0 ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Medication *</th>
+                          <th className="py-2.5 px-2 w-24">Dose *</th>
+                          <th className="py-2.5 px-2 w-24">Route</th>
+                          <th className="py-2.5 px-2 w-20">Freq</th>
+                          <th className="py-2.5 px-2 w-16 text-center">Start Day</th>
+                          <th className="py-2.5 px-2 w-16 text-center">End Day</th>
+                          <th className="py-2.5 px-3">Instructions</th>
+                          <th className="py-2.5 px-2 w-10 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {protocolForm.rules.map((rule: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Inj Gonal-F"
+                                value={rule.drug_name}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].drug_name = e.target.value;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-medium"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2">
+                              <input
+                                type="text"
+                                required
+                                placeholder="225 IU"
+                                value={rule.dose}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].dose = e.target.value;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-mono font-bold text-primary"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2">
+                              <select
+                                value={rule.route || 'SC'}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].route = e.target.value;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
+                              >
+                                <option value="SC">SC</option>
+                                <option value="Oral">Oral</option>
+                                <option value="IM">IM</option>
+                                <option value="Vaginal">Vaginal</option>
+                                <option value="Sublingual">Sublingual</option>
+                              </select>
+                            </td>
+                            <td className="py-1.5 px-2">
+                              <select
+                                value={rule.frequency || 'OD'}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].frequency = e.target.value;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
+                              >
+                                <option value="OD">OD</option>
+                                <option value="BD">BD</option>
+                                <option value="TDS">TDS</option>
+                                <option value="QID">QID</option>
+                                <option value="STAT">STAT</option>
+                              </select>
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <input
+                                type="number"
+                                required
+                                value={rule.day_start_offset}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].day_start_offset = parseInt(e.target.value) || 0;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-14 px-1.5 py-1 border border-slate-200 rounded bg-white font-mono text-center"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <input
+                                type="number"
+                                required
+                                value={rule.day_end_offset}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].day_end_offset = parseInt(e.target.value) || 0;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-14 px-1.5 py-1 border border-slate-200 rounded bg-white font-mono text-center"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="text"
+                                placeholder="e.g. Evening at 9 PM"
+                                value={rule.instructions || ''}
+                                onChange={(e) => {
+                                  const updated = [...protocolForm.rules];
+                                  updated[idx].instructions = e.target.value;
+                                  setProtocolForm({ ...protocolForm, rules: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProtocolForm({
+                                    ...protocolForm,
+                                    rules: protocolForm.rules.filter((_: any, i: number) => i !== idx),
+                                  });
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                title="Remove rule"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 border border-dashed border-slate-300 rounded-xl text-center text-slate-400">
+                    No medication rules added yet. Click &quot;+ Add Medication&quot; to configure dosing.
+                  </div>
+                )}
               </div>
+
+              {/* SECTION 3: TIMELINE EVENTS */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-blue-600" /> Scheduled Scans, Labs & Procedures ({protocolForm.timeline_events?.length || 0})
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Schedule follicular ultrasound scans (🔍), diagnostic blood tests (🧪), and procedures (🧫).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setProtocolForm({
+                        ...protocolForm,
+                        timeline_events: [
+                          ...(protocolForm.timeline_events || []),
+                          {
+                            type: 'scan',
+                            day_offset: 2,
+                            title: '',
+                            instructions: '',
+                          },
+                        ],
+                      })
+                    }
+                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs rounded-lg flex items-center gap-1 border border-blue-200 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Clinical Event
+                  </button>
+                </div>
+
+                {protocolForm.timeline_events && protocolForm.timeline_events.length > 0 ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3 w-36">Event Track *</th>
+                          <th className="py-2.5 px-2 w-20 text-center">Day Offset *</th>
+                          <th className="py-2.5 px-3">Event Title *</th>
+                          <th className="py-2.5 px-3">Clinical Instructions / Criteria</th>
+                          <th className="py-2.5 px-2 w-10 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {protocolForm.timeline_events.map((ev: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-1.5 px-3">
+                              <select
+                                value={ev.type || 'scan'}
+                                onChange={(e) => {
+                                  const updated = [...(protocolForm.timeline_events || [])];
+                                  updated[idx].type = e.target.value;
+                                  setProtocolForm({ ...protocolForm, timeline_events: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-semibold text-[11px]"
+                              >
+                                <option value="scan">🔍 Ultrasound Scan</option>
+                                <option value="investigation">🧪 Diagnostic Lab</option>
+                                <option value="procedure">🧫 Clinical Procedure</option>
+                              </select>
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <input
+                                type="number"
+                                required
+                                value={ev.day_offset}
+                                onChange={(e) => {
+                                  const updated = [...(protocolForm.timeline_events || [])];
+                                  updated[idx].day_offset = parseInt(e.target.value) || 0;
+                                  setProtocolForm({ ...protocolForm, timeline_events: updated });
+                                }}
+                                className="w-16 px-1.5 py-1 border border-slate-200 rounded bg-white font-mono text-center font-bold"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Follicular Monitoring Scan or Serum E2"
+                                value={ev.title}
+                                onChange={(e) => {
+                                  const updated = [...(protocolForm.timeline_events || [])];
+                                  updated[idx].title = e.target.value;
+                                  setProtocolForm({ ...protocolForm, timeline_events: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-medium"
+                              />
+                            </td>
+                            <td className="py-1.5 px-3">
+                              <input
+                                type="text"
+                                placeholder="e.g. Baseline AFC scan or Trigger criteria"
+                                value={ev.instructions || ''}
+                                onChange={(e) => {
+                                  const updated = [...(protocolForm.timeline_events || [])];
+                                  updated[idx].instructions = e.target.value;
+                                  setProtocolForm({ ...protocolForm, timeline_events: updated });
+                                }}
+                                className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
+                              />
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProtocolForm({
+                                    ...protocolForm,
+                                    timeline_events: protocolForm.timeline_events.filter((_: any, i: number) => i !== idx),
+                                  });
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                title="Remove event"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 border border-dashed border-slate-300 rounded-xl text-center text-slate-400">
+                    No scheduled clinical events added yet. Click &quot;+ Add Clinical Event&quot; to schedule milestone scans, labs, or OPU/ET.
+                  </div>
+                )}
+              </div>
+
+              {/* FOOTER */}
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowProtocolModal(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold rounded-lg"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm"
+                  className="px-5 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm flex items-center gap-1.5"
                 >
-                  {editingProtocol ? 'Update Protocol' : 'Save Protocol'}
+                  <Check className="w-4 h-4" /> {editingProtocol ? 'Update Protocol & Rules' : 'Save Protocol & Rules'}
                 </button>
               </div>
             </form>

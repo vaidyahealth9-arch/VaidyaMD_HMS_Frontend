@@ -128,6 +128,7 @@ export default function TreatmentCycleWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [protocols, setProtocols] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarPreview, setCalendarPreview] = useState<any>(null);
   const [cycleTypes, setCycleTypes] = useState<{id: string; name: string}[]>([]);
@@ -168,6 +169,80 @@ export default function TreatmentCycleWizard({
     endometrial_monitoring: [],
     remarks: '',
   });
+
+  // Load Treating Consultants, Protocols, and ART Cycle Types on mount
+  useEffect(() => {
+    // 1. Fetch Doctors / Consultants
+    setLoadingDoctors(true);
+    authApi
+      .getDoctors()
+      .then((docs) => {
+        if (Array.isArray(docs) && docs.length > 0) {
+          const validDocs = docs.filter((d: any) => isUserDoctor(d));
+          const list = validDocs.length > 0 ? validDocs : docs;
+          setDoctors(list);
+          if (userId) {
+            const matched = list.find((d: any) => d.id === userId);
+            if (matched) {
+              setForm((prev) => (prev.treating_doctor_id ? prev : { ...prev, treating_doctor_id: matched.id }));
+            }
+          }
+        } else {
+          return authApi.listUsers({ include_inactive: false }).then((users) => {
+            if (Array.isArray(users)) {
+              const docList = users.filter((u: any) => isUserDoctor(u));
+              setDoctors(docList);
+              if (userId) {
+                const matched = docList.find((d: any) => d.id === userId);
+                if (matched) {
+                  setForm((prev) => (prev.treating_doctor_id ? prev : { ...prev, treating_doctor_id: matched.id }));
+                }
+              }
+            }
+          });
+        }
+      })
+      .catch(() => {
+        authApi
+          .listUsers({ include_inactive: false })
+          .then((users) => {
+            if (Array.isArray(users)) {
+              const docList = users.filter((u: any) => isUserDoctor(u));
+              setDoctors(docList);
+              if (userId) {
+                const matched = docList.find((d: any) => d.id === userId);
+                if (matched) {
+                  setForm((prev) => (prev.treating_doctor_id ? prev : { ...prev, treating_doctor_id: matched.id }));
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      })
+      .finally(() => {
+        setLoadingDoctors(false);
+      });
+
+    // 2. Fetch Active Protocol Templates
+    protocolsApi
+      .list({ include_inactive: false })
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setProtocols(res);
+        }
+      })
+      .catch(() => {});
+
+    // 3. Fetch Treatment Cycle Types Catalog
+    treatmentCyclesApi
+      .listTypes({ include_inactive: false })
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setCycleTypes(res);
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -223,33 +298,90 @@ export default function TreatmentCycleWizard({
     );
   }, [allAvailableTypes, form.treatment_type]);
 
-  useEffect(() => {
-    protocolsApi.list().then((p: any) => {
-      if (Array.isArray(p) && p.length > 0) {
-        setProtocols(p);
-      }
-    }).catch(() => {});
+  // Robust clinical classification based on selected treatment type
+  const cycleMeta = useMemo(() => {
+    const raw = (form.treatment_type || '').toUpperCase();
+    const cat = (currentSelectedType?.category || '').toUpperCase();
 
-    authApi.listUsers().then((u: any) => {
-      if (Array.isArray(u)) {
-        const docs = u.filter((x: any) => isUserDoctor(x));
-        setDoctors(docs);
-      }
-    }).catch(() => {});
+    const isFet =
+      raw.includes('FET') ||
+      raw.includes('FROZEN EMBRYO') ||
+      raw.includes('HRT') ||
+      raw.includes('THAW') ||
+      cat.includes('FET') ||
+      Boolean(form.sentinel_dates?.is_hrt_fet);
 
-    // Fetch dynamic treatment cycle types
-    treatmentCyclesApi.listTypes().then((types: any) => {
-      if (Array.isArray(types)) setCycleTypes(types);
-    }).catch(() => {});
-  }, []);
+    const isIui =
+      raw.includes('IUI') ||
+      raw.includes('INSEMINATION') ||
+      raw.includes('OVULATION INDUCTION') ||
+      raw.includes('OI') ||
+      cat.includes('IUI');
+
+    const isEggFreezing =
+      raw.includes('EGG FREEZE') ||
+      raw.includes('OOCYTE FREEZING') ||
+      raw.includes('PRESERVATION') ||
+      cat.includes('PRESERVATION');
+
+    const isPgt =
+      raw.includes('PGT') ||
+      raw.includes('PGS') ||
+      raw.includes('PGD') ||
+      cat.includes('DIAGNOSTICS');
+
+    const isSurrogacy =
+      raw.includes('SURROGATE') ||
+      raw.includes('SURROGACY') ||
+      cat.includes('THIRD-PARTY');
+
+    const isDonorEgg =
+      raw.includes('DONOR EGG') ||
+      raw.includes('DONOR OOCYTE') ||
+      raw.includes('EGG DONATION') ||
+      raw.includes('* EGG') ||
+      raw.includes('EGG SHARING');
+
+    const isDonorSperm =
+      raw.includes('IUI - D') ||
+      raw.includes('IUI_D') ||
+      raw.includes('DONOR SPERM') ||
+      raw.includes('* SPERM');
+
+    const isSurgicalSperm =
+      raw.includes('TESA') ||
+      raw.includes('PESA') ||
+      raw.includes('TESE') ||
+      cat.includes('SURGICAL');
+
+    const hasOpu = !isFet && !isIui; // Only stimulation / ICSI / IVF / Egg freezing has OPU
+    const hasEt = !isEggFreezing && !isIui; // Egg freeze and IUI don't have embryo transfer
+
+    let defaultProtocolCategory = 'stimulation';
+    if (isFet) defaultProtocolCategory = 'fet';
+    else if (isIui) defaultProtocolCategory = 'iui';
+
+    return {
+      isFet,
+      isIui,
+      isEggFreezing,
+      isPgt,
+      isSurrogacy,
+      isDonorEgg,
+      isDonorSperm,
+      isSurgicalSperm,
+      hasOpu,
+      hasEt,
+      defaultProtocolCategory,
+    };
+  }, [form.treatment_type, currentSelectedType, form.sentinel_dates?.is_hrt_fet]);
 
   const generateFallbackCalendar = () => {
     const baseDateStr = form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || new Date().toISOString().split('T')[0];
     const baseDate = new Date(baseDateStr);
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const isFet = ['FET', 'ICSI_FET'].includes(form.treatment_type) || form.sentinel_dates?.is_hrt_fet;
-    const isIui = form.treatment_type === 'IUI' || form.treatment_type === 'OI';
-    const totalDays = isFet ? 23 : 21;
+    const { isFet, isIui, hasOpu, hasEt } = cycleMeta;
+    const totalDays = isFet ? 24 : 21;
     const days: any[] = [];
     for (let i = 0; i < totalDays; i++) {
       const d = new Date(baseDate);
@@ -257,16 +389,16 @@ export default function TreatmentCycleWizard({
       const iso = d.toISOString().split('T')[0];
       const dayNum = i + 1;
       let milestone = '';
-      if (iso === form.sentinel_dates.lmp_day1) milestone = 'Day 1 (LMP)';
+      if (iso === form.sentinel_dates.lmp_day1) milestone = isFet ? 'Day 1 (HRT Prep Start)' : 'Day 1 (LMP)';
       else if (iso === form.sentinel_dates.baseline_scan) milestone = 'Baseline Scan';
-      else if (iso === form.sentinel_dates.stim_start) milestone = isFet ? 'HRT Prep Start' : 'Stimulation Start';
+      else if (iso === form.sentinel_dates.stim_start) milestone = isFet ? 'HRT Estrogen Start' : isIui ? 'Induction Start' : 'Stimulation Start';
       else if (iso === form.sentinel_dates.d12_scan) milestone = 'D12 Endometrial Scan';
       else if (iso === form.sentinel_dates.p0_date) milestone = 'P0 (Progesterone Start)';
       else if (iso === form.sentinel_dates.trigger) milestone = 'Trigger Injection ⚡';
       else if (isIui && (iso === form.sentinel_dates.insemination || iso === form.sentinel_dates.opu)) milestone = 'IUI Insemination 💉';
       else if (isFet && (iso === form.sentinel_dates.et || iso === form.sentinel_dates.transfer_date)) milestone = 'Frozen Embryo Transfer 👶';
-      else if (!isFet && !isIui && iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval) 🧫';
-      else if (!isFet && !isIui && iso === form.sentinel_dates.et) milestone = 'Embryo Transfer 👶';
+      else if (hasOpu && iso === form.sentinel_dates.opu) milestone = 'OPU (Egg Retrieval) 🧫';
+      else if (hasEt && iso === form.sentinel_dates.et) milestone = 'Embryo Transfer 👶';
       else if (iso === form.sentinel_dates.beta_hcg_date) milestone = 'Beta-hCG Pregnancy Test 🩸';
 
       let stimDayLabel: string | null = null;
@@ -333,12 +465,11 @@ export default function TreatmentCycleWizard({
       return res.toISOString().split('T')[0];
     };
 
-    const isFetCycle = ['FET', 'ICSI_FET'].includes(form.treatment_type);
     const isDay3 = form.sentinel_dates?.embryo_stage === 'Day 3';
     const estrogenDays = Number(form.sentinel_dates?.planned_estrogen_days || 13);
     const p0Date = addDays(lmp, estrogenDays);
 
-    if (isFetCycle) {
+    if (cycleMeta.isFet) {
       setForm((prev) => ({
         ...prev,
         sentinel_dates: {
@@ -354,6 +485,35 @@ export default function TreatmentCycleWizard({
           is_hrt_fet: true,
         },
       }));
+    } else if (cycleMeta.isIui) {
+      setForm((prev) => ({
+        ...prev,
+        sentinel_dates: {
+          ...prev.sentinel_dates,
+          lmp_day1: lmpDate,
+          baseline_scan: addDays(lmp, 1), // Day 2
+          stim_start: addDays(lmp, 2),    // Day 3
+          trigger: addDays(lmp, 11),      // Day 12
+          insemination: addDays(lmp, 13), // Day 14
+          beta_hcg_date: addDays(lmp, 27),// Day 28
+          is_hrt_fet: false,
+        },
+      }));
+    } else if (cycleMeta.isEggFreezing) {
+      setForm((prev) => ({
+        ...prev,
+        sentinel_dates: {
+          ...prev.sentinel_dates,
+          lmp_day1: lmpDate,
+          baseline_scan: addDays(lmp, 1), // Day 2
+          stim_start: addDays(lmp, 2),    // Day 3
+          trigger: addDays(lmp, 11),      // Day 12
+          opu: addDays(lmp, 13),          // Day 14
+          et: '',                         // No transfer in egg freezing
+          beta_hcg_date: '',
+          is_hrt_fet: false,
+        },
+      }));
     } else {
       setForm((prev) => ({
         ...prev,
@@ -365,6 +525,8 @@ export default function TreatmentCycleWizard({
           trigger: addDays(lmp, 11),      // Day 12
           opu: addDays(lmp, 13),          // Day 14
           et: addDays(lmp, 18),           // Day 19
+          beta_hcg_date: addDays(lmp, 28),// Day 29
+          is_hrt_fet: false,
         },
       }));
     }
@@ -655,7 +817,33 @@ export default function TreatmentCycleWizard({
                               key={t.id}
                               type="button"
                               onClick={() => {
-                                setForm((prev) => ({ ...prev, treatment_type: t.name }));
+                                const raw = t.name.toUpperCase();
+                                const cat = (t.category || '').toUpperCase();
+                                const isFet = raw.includes('FET') || raw.includes('FROZEN EMBRYO') || raw.includes('HRT') || cat.includes('FET');
+                                const isIui = raw.includes('IUI') || raw.includes('INSEMINATION') || raw.includes('OVULATION INDUCTION') || raw.includes('OI');
+                                const isDonorEgg = raw.includes('DONOR EGG') || raw.includes('DONOR OOCYTE') || raw.includes('EGG DONATION') || raw.includes('* EGG') || raw.includes('EGG SHARING');
+                                const isDonorSperm = raw.includes('IUI - D') || raw.includes('IUI_D') || raw.includes('DONOR SPERM') || raw.includes('* SPERM');
+                                const isSurgicalSperm = raw.includes('TESA') || raw.includes('PESA') || raw.includes('TESE') || cat.includes('SURGICAL');
+                                const isPgt = raw.includes('PGT') || raw.includes('PGS') || raw.includes('PGD') || cat.includes('DIAGNOSTICS');
+
+                                setForm((prev) => ({
+                                  ...prev,
+                                  treatment_type: t.name,
+                                  sentinel_dates: {
+                                    ...prev.sentinel_dates,
+                                    is_hrt_fet: isFet,
+                                  },
+                                  gametes_source: {
+                                    ...prev.gametes_source,
+                                    oocyte: isDonorEgg ? 'donor' : prev.gametes_source.oocyte,
+                                    sperm: isDonorSperm ? 'donor' : isSurgicalSperm ? 'surgical' : prev.gametes_source.sperm,
+                                  },
+                                  pgs_pgd_data: {
+                                    ...prev.pgs_pgd_data,
+                                    indicated: isPgt ? true : prev.pgs_pgd_data.indicated,
+                                    type: isPgt ? (raw.includes('PGT-M') ? 'PGT-M (Monogenic)' : 'PGT-A (Aneuploidy)') : prev.pgs_pgd_data.type,
+                                  },
+                                }));
                                 setTypeSearchQuery('');
                                 setTypeDropdownOpen(false);
                               }}
@@ -719,15 +907,19 @@ export default function TreatmentCycleWizard({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Treating Consultant</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Treating Consultant <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={form.treating_doctor_id}
                   onChange={(e) => setForm({ ...form, treating_doctor_id: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
                 >
-                  <option value="">Select Treating Consultant...</option>
+                  <option value="">{loadingDoctors ? 'Loading consultants...' : 'Select Treating Consultant...'}</option>
                   {doctors.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.specialization || 'Consultant'})</option>
+                    <option key={d.id} value={d.id}>
+                      {d.name?.startsWith('Dr.') ? d.name : `Dr. ${d.name}`} ({d.specialization || d.role || 'Consultant'})
+                    </option>
                   ))}
                 </select>
               </div>
@@ -859,65 +1051,82 @@ export default function TreatmentCycleWizard({
         {/* Step 3: PGS/PGD */}
         {currentStep === 3 && (
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Preimplantation Genetic Testing (PGT)</h3>
+            <div className="border-b pb-2 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Preimplantation Genetic Testing (PGT)</h3>
+                <p className="text-[11px] text-slate-500">Trophectoderm biopsy tracking for aneuploidy screening, single-gene disorders, or structural rearrangements</p>
+              </div>
+              {cycleMeta.isPgt && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  Indicated by Treatment Modality
+                </span>
+              )}
+            </div>
             
-            {!['ICSI', 'IVF', 'ICSI_FET', 'SURROGACY'].includes(form.treatment_type) ? (
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-lg p-6 text-center text-slate-500 text-xs">
-                PGT is not applicable for the selected treatment type ({form.treatment_type}).
+            {cycleMeta.isIui ? (
+              <div className="bg-amber-50/60 border border-dashed border-amber-200 rounded-lg p-6 text-center text-amber-900 text-xs space-y-1">
+                <p className="font-bold">PGT is not applicable for IUI / Ovulation Induction cycles</p>
+                <p className="text-[11px] text-amber-700">Insemination occurs in vivo with no laboratory embryo culture or trophectoderm biopsy stage.</p>
+              </div>
+            ) : cycleMeta.isEggFreezing ? (
+              <div className="bg-blue-50/60 border border-dashed border-blue-200 rounded-lg p-6 text-center text-blue-900 text-xs space-y-1">
+                <p className="font-bold">PGT is not applicable for Oocyte Cryopreservation cycles</p>
+                <p className="text-[11px] text-blue-700">Gametes are vitrified unfertilized. Embryo genetic screening occurs later if and when thawed oocytes are fertilized into blastocysts.</p>
               </div>
             ) : (
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-4">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.pgs_pgd_data.indicated}
-                  onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, indicated: e.target.checked } })}
-                  className="w-5 h-5 text-primary rounded"
-                />
-                <div>
-                  <p className="font-bold text-xs text-slate-900">Preimplantation Genetic Testing Indicated</p>
-                  <p className="text-[11px] text-slate-500">Enable trophectoderm biopsy tracking for aneuploidy / single-gene defect screening</p>
-                </div>
-              </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.pgs_pgd_data.indicated}
+                    onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, indicated: e.target.checked } })}
+                    className="w-5 h-5 text-primary rounded"
+                  />
+                  <div>
+                    <p className="font-bold text-xs text-slate-900">Preimplantation Genetic Testing Indicated</p>
+                    <p className="text-[11px] text-slate-500">Enable trophectoderm biopsy tracking for aneuploidy / single-gene defect screening</p>
+                  </div>
+                </label>
 
-              {form.pgs_pgd_data.indicated && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-slate-200">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">PGT Assay Type</label>
-                    <select
-                      value={form.pgs_pgd_data.type}
-                      onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, type: e.target.value } })}
-                      className="vmd-input"
-                    >
-                      <option value="PGT-A">PGT-A (Aneuploidy Screening - NGS)</option>
-                      <option value="PGT-M">PGT-M (Monogenic / Single Gene)</option>
-                      <option value="PGT-SR">PGT-SR (Structural Rearrangements)</option>
-                    </select>
+                {form.pgs_pgd_data.indicated && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-slate-200">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">PGT Assay Type</label>
+                      <select
+                        value={form.pgs_pgd_data.type}
+                        onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, type: e.target.value } })}
+                        className="vmd-input text-xs"
+                      >
+                        <option value="PGT-A">PGT-A (Aneuploidy Screening - NGS)</option>
+                        <option value="PGT-M">PGT-M (Monogenic / Single Gene)</option>
+                        <option value="PGT-SR">PGT-SR (Structural Rearrangements)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Genetics Reference Lab</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Igenomix, MedGenome, CooperSurgical..."
+                        value={form.pgs_pgd_data.lab_name}
+                        onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, lab_name: e.target.value } })}
+                        className="vmd-input text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Target Biopsy Stage</label>
+                      <select
+                        value={form.pgs_pgd_data.biopsy_day}
+                        onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, biopsy_day: e.target.value } })}
+                        className="vmd-input text-xs"
+                      >
+                        <option value="D5">Day 5 (Expanded Trophectoderm)</option>
+                        <option value="D6">Day 6 Blastocyst</option>
+                        <option value="D3">Day 3 (Cleavage Blastomere)</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Genetics Reference Lab</label>
-                    <input
-                      type="text"
-                      value={form.pgs_pgd_data.lab_name}
-                      onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, lab_name: e.target.value } })}
-                      className="vmd-input"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Target Biopsy Stage</label>
-                    <select
-                      value={form.pgs_pgd_data.biopsy_day}
-                      onChange={(e) => setForm({ ...form, pgs_pgd_data: { ...form.pgs_pgd_data, biopsy_day: e.target.value } })}
-                      className="vmd-input"
-                    >
-                      <option value="D5">Day 5 (Expanded Trophectoderm)</option>
-                      <option value="D6">Day 6 Blastocyst</option>
-                      <option value="D3">Day 3 (Cleavage Blastomere)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -928,16 +1137,26 @@ export default function TreatmentCycleWizard({
             <div className="border-b pb-2 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  {['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'HRT FET Protocol & Timing Anchors' : 'Stimulation Protocol & Sentinel Dates'}
+                  {cycleMeta.isFet
+                    ? 'HRT FET Protocol & Timing Anchors'
+                    : cycleMeta.isIui
+                    ? 'IUI / OI Protocol & Timing Anchors'
+                    : cycleMeta.isEggFreezing
+                    ? 'Oocyte Cryopreservation Protocol & Timing Anchors'
+                    : 'Stimulation Protocol & Sentinel Dates'}
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  {['FET', 'ICSI_FET'].includes(form.treatment_type)
+                  {cycleMeta.isFet
                     ? 'Day 1 Bleed Date, Day 12 Endometrial Scan, and P0 Progesterone Start timing anchor (aligned with Excel template)'
+                    : cycleMeta.isIui
+                    ? 'Day 1 (LMP), Folliculometry Scans, Trigger Injection, and Insemination Timing'
+                    : cycleMeta.isEggFreezing
+                    ? 'Day 1 (LMP), Stimulation Start, Follicle Monitoring, Trigger, and Oocyte Pick-Up (No Transfer)'
                     : 'Set Day 1 (LMP) to auto-calculate milestones, or customize dates individually.'}
                 </p>
               </div>
 
-              {['FET', 'ICSI_FET'].includes(form.treatment_type) && (
+              {cycleMeta.hasEt && (
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
                   <span className="text-[10px] font-bold text-slate-500 px-1">Stage:</span>
                   <button
@@ -970,7 +1189,7 @@ export default function TreatmentCycleWizard({
 
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">
-                {['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'Select FET Protocol Template' : 'Select Stimulation Protocol'}
+                {cycleMeta.isFet ? 'Select FET Protocol Template' : cycleMeta.isIui ? 'Select IUI / OI Protocol' : 'Select Stimulation Protocol'}
               </label>
               <select
                 value={form.protocol_template_id}
@@ -978,39 +1197,63 @@ export default function TreatmentCycleWizard({
                 className="vmd-input font-bold text-text-main bg-surface-muted"
               >
                 <option value="">Select Protocol Template...</option>
-                {protocols.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
-                ))}
+                {(() => {
+                  const filtered = protocols.filter((p) => {
+                    const cat = (p.category || '').toLowerCase();
+                    if (cycleMeta.isFet) return cat.includes('fet') || cat.includes('transfer');
+                    if (cycleMeta.isIui) return cat.includes('iui') || cat.includes('induction');
+                    return !cat.includes('fet');
+                  });
+                  const list = filtered.length > 0 ? filtered : protocols;
+                  return list.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
+                  ));
+                })()}
               </select>
             </div>
 
-            {['FET', 'ICSI_FET'].includes(form.treatment_type) ? (
+            {cycleMeta.isFet ? (
               <div className="p-3 bg-teal-50 border border-teal-200 rounded-md text-xs text-teal-900 flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-teal-700 inline shrink-0" />
                 <span>
                   <strong>HRT-FET Auto-Calculation:</strong> Cycle Day 1 sets Baseline Scan (D2), D12 Endometrial Assessment, Day 14 P0 Progesterone Start, Embryo Transfer on <strong>{form.sentinel_dates?.embryo_stage === 'Day 3' ? 'P+3' : 'P+5'}</strong>, and Serum β-hCG on Day 23.
                 </span>
               </div>
+            ) : cycleMeta.isIui ? (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-md text-xs text-indigo-900 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-indigo-700 inline shrink-0" />
+                <span>
+                  <strong>IUI Auto-Calculation:</strong> Cycle Day 1 sets Baseline Scan (D2), Day 3 Induction Start, Day 12 Trigger, Day 14 Insemination, and Serum β-hCG on Day 28.
+                </span>
+              </div>
+            ) : cycleMeta.isEggFreezing ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-900 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-blue-700 inline shrink-0" />
+                <span>
+                  <strong>Oocyte Cryopreservation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, and Day 14 OPU Retrieval. (No embryo transfer step).
+                </span>
+              </div>
             ) : (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-md text-xs text-primary flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-amber-600 inline mr-1" />
                 <span>
-                  <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, and Day 19 ET. You can adjust any date manually.
+                  <strong>Auto-Calculation:</strong> Entering Day 1 (LMP) auto-populates Day 2 Baseline Scan, Day 3 Stim Start, Day 12 Trigger, Day 14 OPU, Day 19 ET, and Day 29 Serum β-hCG. You can adjust any date manually.
                 </span>
               </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
               {[
-                { key: 'lmp_day1', label: 'Day 1 (LMP / Bleed Date)', icon: Droplet, show: true },
+                { key: 'lmp_day1', label: cycleMeta.isFet ? 'Cycle Day 1 (Bleed Date)' : 'Day 1 (LMP / Bleed Date)', icon: Droplet, show: true },
                 { key: 'baseline_scan', label: 'Baseline Scan Date (D2)', icon: Search, show: true },
-                { key: 'd12_scan', label: 'Endometrial Assessment (D12)', icon: Search, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
-                { key: 'p0_date', label: 'Progesterone Start (P0)', icon: Clock, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
-                { key: 'stim_start', label: 'Stimulation Start Date', icon: Syringe, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
-                { key: 'trigger', label: 'Estimated Trigger Date', icon: Zap, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY', 'IUI_H', 'IUI_D'].includes(form.treatment_type) },
-                { key: 'opu', label: 'Planned OPU Retrieval', icon: FlaskConical, show: ['ICSI', 'IVF', 'EGG_FREEZING', 'SURROGACY'].includes(form.treatment_type) },
-                { key: 'et', label: `Planned Transfer (${form.sentinel_dates?.embryo_stage || 'Day 5'})`, icon: Heart, show: ['ICSI', 'IVF', 'FET', 'ICSI_FET', 'SURROGACY'].includes(form.treatment_type) },
-                { key: 'beta_hcg_date', label: 'Serum β-hCG Test Date (D23)', icon: Activity, show: ['FET', 'ICSI_FET'].includes(form.treatment_type) },
+                { key: 'stim_start', label: cycleMeta.isIui ? 'Induction Start Date (D3)' : 'Stimulation Start Date (D3)', icon: Syringe, show: !cycleMeta.isFet },
+                { key: 'd12_scan', label: 'Endometrial Assessment (D12)', icon: Search, show: cycleMeta.isFet },
+                { key: 'p0_date', label: 'Progesterone Start (P0)', icon: Clock, show: cycleMeta.isFet },
+                { key: 'trigger', label: 'Estimated Trigger Date (D12)', icon: Zap, show: !cycleMeta.isFet },
+                { key: 'opu', label: 'Planned OPU Retrieval (D14)', icon: FlaskConical, show: cycleMeta.hasOpu },
+                { key: 'insemination', label: 'Planned Insemination (D14)', icon: Heart, show: cycleMeta.isIui },
+                { key: 'et', label: `Planned Transfer (${form.sentinel_dates?.embryo_stage || 'Day 5'})`, icon: Heart, show: cycleMeta.hasEt },
+                { key: 'beta_hcg_date', label: `Serum β-hCG Test Date (${cycleMeta.isFet ? 'D23' : cycleMeta.isIui ? 'D28' : 'D29'})`, icon: Activity, show: cycleMeta.hasEt || cycleMeta.isIui },
               ].filter(s => s.show).map((s) => (
                 <div key={s.key} className="bg-slate-50 border border-slate-200 rounded-md p-3">
                   <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 mb-1">
@@ -1040,8 +1283,20 @@ export default function TreatmentCycleWizard({
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Serial Endometrial & Follicular Monitoring</h3>
-                <p className="text-[11px] text-slate-500">Track endometrial thickness, echo-pattern, and sub-endometrial vascularity zones</p>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {cycleMeta.isFet
+                    ? 'Endometrial Preparation Monitoring (HRT-FET)'
+                    : cycleMeta.isIui
+                    ? 'Serial Folliculometry & Endometrial Monitoring (IUI)'
+                    : 'Serial Endometrial & Follicular Monitoring'}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  {cycleMeta.isFet
+                    ? 'Track serial endometrial thickness (target ≥8 mm), trilaminar pattern, and sub-endometrial vascularity before P0 start'
+                    : cycleMeta.isIui
+                    ? 'Track follicular maturation (leading follicle ≥18 mm), endometrial thickness, and vascularity before trigger'
+                    : 'Track endometrial thickness, echo-pattern, follicular cohort progression, and vascularity zones'}
+                </p>
               </div>
               <button
                 type="button"
@@ -1145,11 +1400,17 @@ export default function TreatmentCycleWizard({
         {currentStep === 6 && (
           <div className="space-y-4">
             <StimulationCalendarGrid
-              startDate={form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || form.sentinel_dates.baseline_scan || new Date().toISOString().split('T')[0]}
+              startDate={
+                cycleMeta.isFet
+                  ? (form.sentinel_dates.lmp_day1 || form.sentinel_dates.baseline_scan || new Date().toISOString().split('T')[0])
+                  : (form.sentinel_dates.stim_start || form.sentinel_dates.lmp_day1 || form.sentinel_dates.baseline_scan || new Date().toISOString().split('T')[0])
+              }
               initialDays={calendarPreview?.days}
               treatmentType={form.treatment_type}
-              protocolCategory={['FET', 'ICSI_FET'].includes(form.treatment_type) ? 'fet' : 'stimulation'}
+              protocolCategory={cycleMeta.isFet ? 'fet' : cycleMeta.isIui ? 'iui' : 'stimulation'}
               sentinelDates={form.sentinel_dates}
+              patientId={patientId}
+              doctor={doctors.find((d: any) => String(d.id) === String(form.treating_doctor_id))}
               onCalendarSaved={(savedDays) => {
                 setCalendarPreview({ ...(calendarPreview || {}), days: savedDays });
               }}
@@ -1161,14 +1422,159 @@ export default function TreatmentCycleWizard({
         {currentStep === 7 && (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-slate-900 border-b pb-2">Review & Launch Treatment Cycle</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <p><span className="text-slate-500 font-medium">Treatment:</span> <strong className="text-slate-800">{form.treatment_type} (Attempt #{form.attempt_number})</strong></p>
-                <p><span className="text-slate-500 font-medium">Oocyte / Sperm:</span> <strong className="text-slate-800">{form.gametes_source.oocyte} / {form.gametes_source.sperm}</strong></p>
-                <p><span className="text-slate-500 font-medium">LMP Day 1:</span> <strong className="text-slate-800">{form.sentinel_dates.lmp_day1}</strong></p>
-                <p><span className="text-slate-500 font-medium">Stim Start:</span> <strong className="text-slate-800">{form.sentinel_dates.stim_start}</strong></p>
-                <p><span className="text-slate-500 font-medium">Est. OPU:</span> <strong className="text-slate-800">{form.sentinel_dates.opu}</strong></p>
-                <p><span className="text-slate-500 font-medium">Est. ET:</span> <strong className="text-slate-800">{form.sentinel_dates.et}</strong></p>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
+                <p>
+                  <span className="text-slate-500 font-medium">Treatment Modality:</span>{' '}
+                  <strong className="text-slate-900">{form.treatment_type || 'Unspecified'} (Attempt #{form.attempt_number})</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Modality Category:</span>{' '}
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-800">
+                    {currentSelectedType?.category || (cycleMeta.isFet ? 'Embryo Transfer' : cycleMeta.isIui ? 'IUI' : 'ART')}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Treating Consultant:</span>{' '}
+                  <strong className="text-slate-800">
+                    {(() => {
+                      const doc = doctors.find((d) => d.id === form.treating_doctor_id);
+                      if (!doc) return 'Not assigned';
+                      return `${doc.name?.startsWith('Dr.') ? doc.name : `Dr. ${doc.name}`} (${doc.specialization || doc.role || 'Consultant'})`;
+                    })()}
+                  </strong>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Oocyte Source:</span>{' '}
+                  <strong className="text-slate-800">
+                    {form.gametes_source.oocyte === 'donor'
+                      ? `Donor Oocyte (${form.gametes_source.donor_oocyte_id || 'ID Pending'})`
+                      : 'Self (Autologous)'}
+                  </strong>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Sperm Source:</span>{' '}
+                  <strong className="text-slate-800">
+                    {cycleMeta.isEggFreezing
+                      ? 'N/A (Oocyte Freezing Only)'
+                      : form.gametes_source.sperm === 'donor'
+                      ? `Donor Sperm (${form.gametes_source.donor_sperm_id || 'ID Pending'})`
+                      : form.gametes_source.sperm === 'surgical'
+                      ? 'Surgical (TESA / PESA)'
+                      : 'Partner (Ejaculate)'}
+                  </strong>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Day 1 (LMP / Bleed Date):</span>{' '}
+                  <strong className="text-slate-800">{form.sentinel_dates.lmp_day1 || 'Not set'}</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500 font-medium">Baseline Scan (D2):</span>{' '}
+                  <strong className="text-slate-800">{form.sentinel_dates.baseline_scan || 'Not set'}</strong>
+                </p>
+
+                {/* Modality Specific Dates */}
+                {cycleMeta.isFet && (
+                  <>
+                    <p>
+                      <span className="text-slate-500 font-medium">D12 Endometrial Assessment:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.d12_scan || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Progesterone P0 Start:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.p0_date || 'Not set'} ({form.sentinel_dates.p0_time || '08:00 AM'})</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Planned Embryo Transfer:</span>{' '}
+                      <strong className="text-teal-700">{form.sentinel_dates.et || 'Not set'} ({form.sentinel_dates.embryo_stage || 'Day 5'})</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Serum β-hCG Test:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.beta_hcg_date || 'Not set'} (D23)</strong>
+                    </p>
+                  </>
+                )}
+
+                {cycleMeta.isIui && (
+                  <>
+                    <p>
+                      <span className="text-slate-500 font-medium">Induction Start (D3):</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.stim_start || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Estimated Trigger:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.trigger || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Planned Insemination (D14):</span>{' '}
+                      <strong className="text-indigo-700">{form.sentinel_dates.insemination || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Serum β-hCG Test:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.beta_hcg_date || 'Not set'} (D28)</strong>
+                    </p>
+                  </>
+                )}
+
+                {cycleMeta.isEggFreezing && (
+                  <>
+                    <p>
+                      <span className="text-slate-500 font-medium">Stimulation Start (D3):</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.stim_start || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Estimated Trigger:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.trigger || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Planned OPU Retrieval (D14):</span>{' '}
+                      <strong className="text-blue-700">{form.sentinel_dates.opu || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Embryo Transfer:</span>{' '}
+                      <span className="text-slate-500 italic">None (Oocyte Vitrification Cycle)</span>
+                    </p>
+                  </>
+                )}
+
+                {!cycleMeta.isFet && !cycleMeta.isIui && !cycleMeta.isEggFreezing && (
+                  <>
+                    <p>
+                      <span className="text-slate-500 font-medium">Stimulation Start (D3):</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.stim_start || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Estimated Trigger:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.trigger || 'Not set'}</strong>
+                    </p>
+                    <p>
+                      <span className="text-slate-500 font-medium">Planned OPU Retrieval (D14):</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.opu || 'Not set'}</strong>
+                    </p>
+                    {cycleMeta.hasEt && (
+                      <p>
+                        <span className="text-slate-500 font-medium">Planned Embryo Transfer:</span>{' '}
+                        <strong className="text-teal-700">{form.sentinel_dates.et || 'Not set'} ({form.sentinel_dates.embryo_stage || 'Day 5'})</strong>
+                      </p>
+                    )}
+                    <p>
+                      <span className="text-slate-500 font-medium">Serum β-hCG Test:</span>{' '}
+                      <strong className="text-slate-800">{form.sentinel_dates.beta_hcg_date || 'Not set'} (D29)</strong>
+                    </p>
+                  </>
+                )}
+
+                {/* PGT Summary */}
+                {!cycleMeta.isIui && !cycleMeta.isEggFreezing && (
+                  <p className="col-span-1 md:col-span-2 pt-2 border-t border-slate-200">
+                    <span className="text-slate-500 font-medium">PGT Status:</span>{' '}
+                    <strong className={form.pgs_pgd_data.indicated ? 'text-purple-700' : 'text-slate-700'}>
+                      {form.pgs_pgd_data.indicated
+                        ? `${form.pgs_pgd_data.type} (${form.pgs_pgd_data.biopsy_day} Biopsy)${form.pgs_pgd_data.lab_name ? ` — Ref Lab: ${form.pgs_pgd_data.lab_name}` : ''}`
+                        : 'Not Indicated'}
+                    </strong>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1178,6 +1584,7 @@ export default function TreatmentCycleWizard({
                 value={form.remarks}
                 onChange={(e) => setForm({ ...form, remarks: e.target.value })}
                 rows={3}
+                placeholder="Enter any specific clinical instructions, protocol notes, or patient instructions..."
                 className="vmd-input text-xs"
               />
             </div>

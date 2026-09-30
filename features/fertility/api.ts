@@ -38,14 +38,18 @@ export const treatmentCyclesApi = {
   getCalendar: (cycleId: string) => request<any>(`/plugins/fertility/treatment-cycles/${cycleId}/calendar`),
   addMedication: (cycleId: string, data: { day_number: number; drug_name: string; dose: string; frequency?: string; instructions?: string }) =>
     request<any>(`/plugins/fertility/treatment-cycles/${cycleId}/medications`, { method: 'POST', body: JSON.stringify(data) }),
-  listTypes: () => request<any[]>('/plugins/fertility/treatment-cycles/types'),
-  getTypes: () => request<any[]>('/plugins/fertility/treatment-cycles/types'),
+  listTypes: (params?: { include_inactive?: boolean }) =>
+    request<any[]>(`/plugins/fertility/treatment-cycles/types${toQueryString(params)}`),
+  getTypes: (params?: { include_inactive?: boolean }) =>
+    request<any[]>(`/plugins/fertility/treatment-cycles/types${toQueryString(params)}`),
   createType: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/treatment-cycles/types', { method: 'POST', body: JSON.stringify(data) }),
   updateType: (id: string, data: Record<string, unknown>) =>
     request<any>(`/plugins/fertility/treatment-cycles/types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteType: (id: string) =>
-    request<any>(`/plugins/fertility/treatment-cycles/types/${id}`, { method: 'DELETE' }),
+  deleteType: (id: string, hardDelete: boolean = false) =>
+    request<any>(`/plugins/fertility/treatment-cycles/types/${id}${hardDelete ? '?hard_delete=true' : ''}`, { method: 'DELETE' }),
+  reactivateType: (id: string) =>
+    request<any>(`/plugins/fertility/treatment-cycles/types/${id}/reactivate`, { method: 'POST' }),
 };
 
 export const fertilityApi = {
@@ -122,15 +126,17 @@ export const cryoApi = {
 };
 
 export const protocolsApi = {
-  list: (params?: { search?: string; category?: string }) =>
+  list: (params?: { search?: string; category?: string; include_inactive?: boolean }) =>
     request<any[]>(`/plugins/fertility/protocols/${toQueryString(params)}`),
   get: (id: string) => request<any>(`/plugins/fertility/protocols/${id}`),
   create: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/protocols/', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, unknown>) =>
     request<any>(`/plugins/fertility/protocols/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<any>(`/plugins/fertility/protocols/${id}`, { method: 'DELETE' }),
+  delete: (id: string, hardDelete: boolean = false) =>
+    request<any>(`/plugins/fertility/protocols/${id}${hardDelete ? '?hard_delete=true' : ''}`, { method: 'DELETE' }),
+  reactivate: (id: string) =>
+    request<any>(`/plugins/fertility/protocols/${id}/reactivate`, { method: 'POST' }),
   previewCalendar: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/protocols/preview-calendar', { method: 'POST', body: JSON.stringify(data) }),
 };

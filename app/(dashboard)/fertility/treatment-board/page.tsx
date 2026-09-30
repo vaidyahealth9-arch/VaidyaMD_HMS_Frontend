@@ -652,6 +652,9 @@ export default function TreatmentBoardPage() {
               initialDays={activeCalendarCycle.medication_calendar}
               treatmentType={activeCalendarCycle.treatment_type}
               sentinelDates={activeCalendarCycle.sentinel_dates}
+              patient={activeCalendarCycle.patient}
+              doctor={activeCalendarCycle.doctor || activeCalendarCycle.treating_consultant}
+              cycleNumber={activeCalendarCycle.attempt_number || activeCalendarCycle.code}
               onCalendarSaved={() => {
                 loadCycles();
               }}
