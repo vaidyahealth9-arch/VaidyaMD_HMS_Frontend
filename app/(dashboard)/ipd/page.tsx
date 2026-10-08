@@ -1,142 +1,112 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import { ipdApi, patientsApi } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { ipdApi, patientsApi, authApi } from '@/lib/api';
 import {
   BedDouble,
   Users,
-  CheckCircle2,
-  AlertCircle,
-  Plus,
-  RefreshCw,
-  Sparkles,
   ClipboardList,
-  Clock,
-  ArrowRightLeft,
-  LogOut,
-  HeartPulse,
-  IndianRupee,
+  CheckCircle2,
+  RefreshCw,
+  Plus,
 } from 'lucide-react';
+import { Card, CardContent } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
-import { Badge } from '@/shared/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from '@/shared/ui/sheet';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
 import PageLayout from '@/components/common/PageLayout';
+import PageHeader from '@/components/common/PageHeader';
+import TabBar from '@/components/common/TabBar';
+import {
+  BedboardTab,
+  NursingTab,
+  AdmissionsTab,
+  AdmissionSheet,
+} from '@/components/ipd';
 
-export default function IPDBedboardPage() {
-  const { user } = useAuth();
+export default function IPDPage() {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>('bedboard');
   const [selectedWardId, setSelectedWardId] = useState<string>('all');
+
+  // Admission Sheet state
   const [admitSheetOpen, setAdmitSheetOpen] = useState(false);
-  const [selectedBedForAdmission, setSelectedBedForAdmission] = useState<any>(null);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedBedForAdmission, setSelectedBedForAdmission] = useState<any | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [packageName, setPackageName] = useState('');
   const [notes, setNotes] = useState('');
-  const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>(() => {
-    const t = searchParams.get('tab');
-    return (t === 'nursing' || t === 'history' || t === 'bedboard') ? (t === 'history' ? 'admissions' : t as any) : 'bedboard';
-  });
-  useEffect(() => {
-    const t = searchParams.get('tab');
-    if (t === 'nursing') setActiveTab('nursing');
-    else if (t === 'history') setActiveTab('admissions');
-    else if (t === 'bedboard' || !t) setActiveTab('bedboard');
-  }, [searchParams]);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Fetch Wards
+  // Queries
   const { data: wards = [] } = useQuery({
     queryKey: ['ipd-wards'],
     queryFn: () => ipdApi.listWards(),
   });
 
-  // Fetch Beds
-  const { data: beds = [], isLoading: bedsLoading } = useQuery({
+  const { data: beds = [] } = useQuery({
     queryKey: ['ipd-beds', selectedWardId],
-    queryFn: () => ipdApi.listBeds(selectedWardId !== 'all' ? { ward_id: selectedWardId } : undefined),
-    refetchInterval: 30000,
+    queryFn: () => ipdApi.listBeds({ ward_id: selectedWardId === 'all' ? undefined : selectedWardId }),
+    refetchInterval: 15000,
   });
 
-  // Fetch Admissions
   const { data: admissions = [] } = useQuery({
     queryKey: ['ipd-admissions'],
-    queryFn: () => ipdApi.listAdmissions({ status: 'Active' }),
-    refetchInterval: 30000,
+    queryFn: () => ipdApi.listAdmissions({ status: 'Admitted' }),
+    refetchInterval: 15000,
   });
 
-  // Fetch Nursing Tasks
   const { data: nursingTasks = [] } = useQuery({
-    queryKey: ['nursing-tasks'],
+    queryKey: ['ipd-nursing-tasks'],
     queryFn: () => ipdApi.listNursingTasks({ status: 'Pending' }),
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
-  // Fetch Patients
   const { data: patientsData } = useQuery({
-    queryKey: ['patients-list'],
+    queryKey: ['patients-ipd-select'],
     queryFn: () => patientsApi.list({ per_page: 500 }),
   });
-  const patients = patientsData?.patients || patientsData?.items || [];
+  const patients = (patientsData as any)?.patients || patientsData || [];
 
-  // Admit Mutation
+  const { data: doctors = [] } = useQuery({
+    queryKey: ['ipd-doctors'],
+    queryFn: () => authApi.getDoctors(),
+  });
+
+  // Mutations
   const admitMutation = useMutation({
-    mutationFn: () => {
-      const match = patients.find((p: any) => p.id === selectedPatientId || `${p.name} (${p.mrn || p.vid})` === selectedPatientId);
-      const patientUuid = match ? match.id : selectedPatientId;
-      if (!patientUuid) {
-        throw new Error('Please select a registered patient from the list.');
-      }
-      return ipdApi.admitPatient({
-        patient_id: patientUuid,
-        bed_id: selectedBedForAdmission.id,
-        admitting_doctor_id: user?.id,
+    mutationFn: () =>
+      ipdApi.admitPatient({
+        patient_id: selectedPatientId,
+        bed_id: selectedBedForAdmission?.id,
+        admitting_doctor_id: selectedDoctorId || undefined,
         diagnosis,
         package_name: packageName,
         notes,
-      });
-    console.log('Fetched beds:', beds?.length, beds);
-    },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
       queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
-      queryClient.invalidateQueries({ queryKey: ['nursing-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
       setAdmitSheetOpen(false);
-      setActionMessage('Patient successfully admitted to bed!');
-      setTimeout(() => setActionMessage(null), 4000);
+      resetAdmitForm();
     },
     onError: (err: any) => {
-      alert(err.message || 'Failed to admit patient');
+      alert(err.message || 'Failed to admit patient to bed');
     },
   });
 
-  // Discharge Mutation
   const dischargeMutation = useMutation({
-    mutationFn: (admissionId: string) =>
-      ipdApi.dischargePatient(admissionId, 'Routine clinical discharge with home care plan.'),
+    mutationFn: (admissionId: string) => ipdApi.dischargePatient(admissionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
       queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
-      setActionMessage('Patient discharged. Bed marked for cleaning.');
-      setTimeout(() => setActionMessage(null), 4000);
+      queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to discharge patient');
     },
   });
 
-  // Bed Status Change Mutation (e.g. Cleaned -> Vacant)
   const bedStatusMutation = useMutation({
     mutationFn: ({ bedId, status }: { bedId: string; status: string }) =>
       ipdApi.updateBedStatus(bedId, status),
@@ -145,89 +115,69 @@ export default function IPDBedboardPage() {
     },
   });
 
-  // Complete Nursing Task Mutation
   const completeTaskMutation = useMutation({
-    mutationFn: (taskId: string) =>
-      ipdApi.completeNursingTask(taskId, {
-        completed_by_id: user?.id,
-        notes: 'Task verified and completed on shift.',
-      }),
+    mutationFn: (taskId: string) => ipdApi.completeNursingTask(taskId, { notes: 'Completed from nursing station' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nursing-tasks'] });
-      setActionMessage('Nursing task marked completed!');
-      setTimeout(() => setActionMessage(null), 4000);
+      queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
     },
   });
 
-  // Daily Accrual Mutation
-  const accrualMutation = useMutation({
-    mutationFn: () => ipdApi.accrueDailyCharges(),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
-      queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
-      setActionMessage(data.message || 'Daily bed charges accrued!');
-      setTimeout(() => setActionMessage(null), 5000);
-    },
-  });
-
-  const handleOpenAdmit = (bed: any) => {
-    setSelectedBedForAdmission(bed);
+  const resetAdmitForm = () => {
     setSelectedPatientId('');
+    setSelectedDoctorId('');
     setDiagnosis('');
     setPackageName('');
     setNotes('');
+    setSelectedBedForAdmission(null);
+  };
+
+  const handleOpenAdmit = (bed: any) => {
+    setSelectedBedForAdmission(bed);
     setAdmitSheetOpen(true);
   };
 
-  const vacantCount = beds.filter((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available').length;
+  // KPIs
+  const totalBeds = beds.length;
   const occupiedCount = beds.filter((b: any) => b.status === 'Occupied').length;
-  const cleaningCount = beds.filter((b: any) => b.status === 'Cleaning' || b.status === 'Maintenance').length;
+  const vacantCount = beds.filter((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available').length;
+  const cleaningCount = beds.filter((b: any) => b.status === 'Cleaning').length;
+  const occupancyRate = totalBeds > 0 ? Math.round((occupiedCount / totalBeds) * 100) : 0;
 
   return (
     <PageLayout className="space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[rgb(var(--clr-primary)/0.08)] border border-[rgb(var(--clr-primary)/0.2)] flex items-center justify-center text-[rgb(var(--clr-primary))]">
-            <BedDouble className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-tight">IPD Bedboard & Nursing Station</h1>
-            <p className="text-xs text-slate-500 font-medium">Real-time bed occupancy, admissions, and nursing shift checklists</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
+      <PageHeader
+        title="Inpatient Department (IPD) & Bedboard"
+        subtitle="Live census visual grid, ward management & inpatient clinical workflows"
+        icon={BedDouble}
+        actions={
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => accrualMutation.mutate()}
-            disabled={accrualMutation.isPending}
-            className="gap-1.5 text-xs font-bold bg-white text-[rgb(var(--clr-primary))] border-[rgb(var(--clr-primary)/0.2)] hover:bg-[rgb(var(--clr-primary)/0.08)] h-9 rounded-md shadow-sm"
+            onClick={() => {
+              const firstVacant = beds.find((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available');
+              if (firstVacant) {
+                handleOpenAdmit(firstVacant);
+              } else {
+                alert('No vacant beds available currently.');
+              }
+            }}
+            className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
           >
-            <IndianRupee className="w-4 h-4 text-emerald-600" />
-            <span>{accrualMutation.isPending ? 'Accruing...' : 'Daily Bed Charge Accrual'}</span>
+            <Plus className="w-4 h-4" />
+            <span>Admit to Vacant Bed</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {actionMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          <span>{actionMessage}</span>
-        </div>
-      )}
-
-      {/* KPI METRIC TILES */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
-        <Card className="border-slate-200">
+      {/* Live Bed KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="border-slate-200 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase">Total Ward Capacity</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{beds.length} Beds</h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Occupancy Rate</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{occupancyRate}%</h3>
             </div>
-            <div className="w-10 h-10 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
-              <BedDouble className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-md bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] flex items-center justify-center font-bold">
+              {occupiedCount}/{totalBeds}
             </div>
           </CardContent>
         </Card>
@@ -235,7 +185,7 @@ export default function IPDBedboardPage() {
         <Card className="border-emerald-200 bg-emerald-50/40">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-emerald-700 uppercase">Available / Vacant</p>
+              <p className="text-[11px] font-bold text-emerald-700 uppercase">Vacant Available</p>
               <h3 className="text-2xl font-bold text-emerald-700 mt-0.5">{vacantCount} Beds</h3>
             </div>
             <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
@@ -247,7 +197,7 @@ export default function IPDBedboardPage() {
         <Card className="border-red-200 bg-red-50/40">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-red-700 uppercase">Occupied (Admitted)</p>
+              <p className="text-[11px] font-bold text-red-700 uppercase">Occupied (Census)</p>
               <h3 className="text-2xl font-bold text-red-700 mt-0.5">{occupiedCount} Beds</h3>
             </div>
             <div className="w-10 h-10 rounded-md bg-red-100 text-red-600 flex items-center justify-center font-bold">
@@ -269,340 +219,66 @@ export default function IPDBedboardPage() {
         </Card>
       </div>
 
-      {/* Main Tabs: Visual Bedboard, Nursing Checklist, Inpatient Register */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-md h-11">
-          <TabsTrigger value="bedboard" className="rounded-lg text-xs font-bold gap-1.5">
-            <BedDouble className="w-3.5 h-3.5" />
-            <span>Visual Bedboard Grid</span>
-          </TabsTrigger>
-          <TabsTrigger value="nursing" className="rounded-lg text-xs font-bold gap-1.5">
-            <ClipboardList className="w-3.5 h-3.5" />
-            <span>Nursing Station Shift Tasks ({nursingTasks.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="admissions" className="rounded-lg text-xs font-bold gap-1.5">
-            <Users className="w-3.5 h-3.5" />
-            <span>Active Inpatient Register ({admissions.length})</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Main Tabs */}
+      <div className="space-y-4">
+        <TabBar
+          activeTab={activeTab}
+          onChange={(v) => setActiveTab(v as any)}
+          tabs={[
+            { id: 'bedboard', label: 'Visual Bedboard Grid', icon: BedDouble },
+            { id: 'nursing', label: 'Nursing Station Tasks', icon: ClipboardList, badge: nursingTasks.length || undefined },
+            { id: 'admissions', label: 'Inpatient Register', icon: Users, badge: admissions.length || undefined },
+          ]}
+        />
 
-        {/* TAB 1: VISUAL BEDBOARD */}
-        <TabsContent value="bedboard" className="space-y-4 pt-2">
-          {/* Ward Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => setSelectedWardId('all')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                selectedWardId === 'all'
-                  ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              All Wards ({beds.length})
-            </button>
-            {wards.map((w: any) => (
-              <button
-                key={w.id}
-                onClick={() => setSelectedWardId(w.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                  selectedWardId === w.id
-                    ? 'bg-[rgb(var(--clr-primary))] text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {w.name} (₹{w.base_charge_per_day}/day)
-              </button>
-            ))}
-          </div>
+        {activeTab === 'bedboard' && (
+          <BedboardTab
+            wards={wards}
+            beds={beds}
+            selectedWardId={selectedWardId}
+            setSelectedWardId={setSelectedWardId}
+            onAdmit={handleOpenAdmit}
+            onDischarge={(admissionId) => dischargeMutation.mutate(admissionId)}
+            onCleanBed={(bedId) => bedStatusMutation.mutate({ bedId, status: 'Vacant' })}
+          />
+        )}
 
-          {/* Bed Grid Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {beds.map((bed: any) => {
-              const isOccupied = bed.status === 'Occupied';
-              const isCleaning = bed.status === 'Cleaning';
-              const isVacant = bed.status === 'Vacant' || bed.status?.toLowerCase() === 'available';
+        {activeTab === 'nursing' && (
+          <NursingTab
+            nursingTasks={nursingTasks}
+            onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
+            isCompleting={completeTaskMutation.isPending}
+          />
+        )}
 
-              return (
-                <Card
-                  key={bed.id}
-                  className={`overflow-hidden border-2 transition-all hover:shadow-md ${
-                    isOccupied
-                      ? 'border-red-300 bg-gradient-to-b from-red-50/50 to-white'
-                      : isCleaning
-                      ? 'border-amber-300 bg-gradient-to-b from-amber-50/50 to-white'
-                      : 'border-emerald-300 bg-gradient-to-b from-emerald-50/50 to-white'
-                  }`}
-                >
-                  <CardHeader className="p-3.5 pb-2 border-b border-slate-100 flex flex-row items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">{bed.bed_type} Bed</span>
-                      <CardTitle className="text-sm font-bold text-slate-900">{bed.bed_number}</CardTitle>
-                    </div>
-                    <Badge
-                      variant={isOccupied ? 'destructive' : isCleaning ? 'warning' : 'success'}
-                      className="text-[10px] font-bold uppercase"
-                    >
-                      {bed.status}
-                    </Badge>
-                  </CardHeader>
+        {activeTab === 'admissions' && (
+          <AdmissionsTab
+            admissions={admissions}
+            onDischarge={(admissionId) => dischargeMutation.mutate(admissionId)}
+          />
+        )}
+      </div>
 
-                  <CardContent className="p-3.5 space-y-3">
-                    {isOccupied && bed.current_admission ? (
-                      <div className="space-y-2 text-xs">
-                        <div className="bg-white p-2.5 rounded-md border border-red-100 shadow-sm">
-                          <p className="font-bold text-slate-900 text-sm truncate">{bed.current_admission.patient_name}</p>
-                          <p className="text-[11px] text-[rgb(var(--clr-primary))] font-semibold">{bed.current_admission.patient_mrn}</p>
-                          <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">Dx: {bed.current_admission.diagnosis || 'Observation'}</p>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>Accrued:</span>
-                          <span className="font-bold text-slate-900">{formatCurrency(bed.current_admission.total_accrued_amount || bed.daily_rate)}</span>
-                        </div>
-
-                        <div className="flex gap-1.5 pt-1">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => dischargeMutation.mutate(bed.current_admission.admission_id)}
-                            className="flex-1 h-8 rounded-lg text-xs font-bold gap-1"
-                          >
-                            <LogOut className="w-3.5 h-3.5" />
-                            <span>Discharge</span>
-                          </Button>
-                        </div>
-                      </div>
-                    ) : isCleaning ? (
-                      <div className="space-y-3 text-center py-2">
-                        <p className="text-xs text-amber-800 font-medium">Under housekeeping / disinfection cycle</p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => bedStatusMutation.mutate({ bedId: bed.id, status: 'Vacant' })}
-                          className="w-full h-8 rounded-lg text-xs font-bold border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          <span>Mark Sanitized & Vacant</span>
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 text-center py-2">
-                        <p className="text-xs text-emerald-800 font-semibold">Rate: {formatCurrency(bed.daily_rate)} / day</p>
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenAdmit(bed)}
-                          className="w-full h-8 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Admit Patient</span>
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        {/* TAB 2: NURSING CHECKLIST */}
-        <TabsContent value="nursing" className="space-y-4 pt-2">
-          <Card>
-            <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm">Pending Inpatient Nursing Orders & Checklists</CardTitle>
-                <p className="text-xs text-slate-500">Scheduled vitals, IV infusions, and post-op wound dressings</p>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 divide-y divide-slate-100">
-              {nursingTasks.length > 0 ? (
-                nursingTasks.map((t: any) => (
-                  <div key={t.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="purple" className="text-[10px] font-bold">Bed: {t.bed_number}</Badge>
-                        <span className="font-bold text-slate-900 text-sm">{t.patient_name}</span>
-                        <Badge variant="outline" className="text-[10px]">{t.task_type}</Badge>
-                      </div>
-                      <p className="text-xs text-slate-700 font-medium">{t.description}</p>
-                      <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Freq: {t.frequency} · Scheduled: {formatDateTime(t.scheduled_time)}</span>
-                      </p>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      onClick={() => completeTaskMutation.mutate(t.id)}
-                      disabled={completeTaskMutation.isPending}
-                      className="h-8 px-4 rounded-md text-xs font-bold bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white shadow-sm gap-1.5"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Complete Task</span>
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-10 text-slate-400 text-xs">
-                  All nursing station tasks are up to date!
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* TAB 3: INPATIENT REGISTER */}
-        <TabsContent value="admissions" className="space-y-4 pt-2">
-          <Card>
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-sm">Active Inpatient Admissions (Current Census)</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3.5">Admission #</th>
-                    <th className="p-3.5">Patient Details</th>
-                    <th className="p-3.5">Bed / Ward</th>
-                    <th className="p-3.5">Admitted On</th>
-                    <th className="p-3.5">Attending Doctor</th>
-                    <th className="p-3.5">Total Accrued</th>
-                    <th className="p-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {admissions.map((adm: any) => (
-                    <tr key={adm.id} className="hover:bg-slate-50">
-                      <td className="p-3.5 font-mono font-bold text-[rgb(var(--clr-primary))]">{adm.admission_number}</td>
-                      <td className="p-3.5">
-                        <p className="font-bold text-slate-900">{adm.patient_name}</p>
-                        <p className="text-[11px] text-slate-500">{adm.patient_mrn}</p>
-                      </td>
-                      <td className="p-3.5">
-                        <Badge variant="secondary" className="font-bold">{adm.bed_number}</Badge>
-                      </td>
-                      <td className="p-3.5 text-slate-600">{formatDateTime(adm.admission_date)}</td>
-                      <td className="p-3.5 text-slate-800 font-semibold">{adm.admitting_doctor}</td>
-                      <td className="p-3.5 font-bold text-slate-900">{formatCurrency(adm.total_accrued_amount)}</td>
-                      <td className="p-3.5 text-right">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => dischargeMutation.mutate(adm.id)}
-                          className="h-7 text-xs font-bold rounded-lg"
-                        >
-                          Discharge
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* ADMISSION SHEET */}
-      <Sheet open={admitSheetOpen} onOpenChange={setAdmitSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle className="text-base font-bold text-slate-900">
-              Inpatient Bed Admission — {selectedBedForAdmission?.bed_number}
-            </SheetTitle>
-            <SheetDescription className="text-xs text-slate-500">
-              Assign patient and treatment package to vacant bed ({selectedBedForAdmission?.bed_type}).
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-4 py-3">
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Select Patient Search</label>
-              <input
-                type="text"
-                list="ipdPatientsList"
-                placeholder="Type name or ID to search..."
-                value={
-                  patients.find((p: any) => p.id === selectedPatientId)
-                    ? `${patients.find((p: any) => p.id === selectedPatientId)?.name} (${patients.find((p: any) => p.id === selectedPatientId)?.mrn || patients.find((p: any) => p.id === selectedPatientId)?.vid})`
-                    : selectedPatientId
-                }
-                onChange={(e) => {
-                  const match = patients.find((p: any) => `${p.name} (${p.mrn || p.vid})` === e.target.value);
-                  setSelectedPatientId(match ? match.id : e.target.value);
-                }}
-                className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-              />
-              <datalist id="ipdPatientsList">
-                {patients.map((p: any) => (
-                  <option key={p.id} value={`${p.name} (${p.mrn || p.vid})`} />
-                ))}
-              </datalist>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Admission Diagnosis</label>
-              <Input
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                placeholder="e.g. Post OPU Ovarian Hyperstimulation (OHSS) Monitoring"
-                className="h-9 text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Treatment / Care Package</label>
-              <Input
-                value={packageName}
-                onChange={(e) => setPackageName(e.target.value)}
-                placeholder="e.g. Laparoscopy Post-OP Care Package"
-                className="h-9 text-xs"
-              />
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Daily Bed Rate:</span>
-                <span className="font-bold text-slate-900">{formatCurrency(selectedBedForAdmission?.daily_rate || 2000)} / day</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Initial Billing Charge:</span>
-                <span className="font-bold text-emerald-700">{formatCurrency(selectedBedForAdmission?.daily_rate || 2000)}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Special Nursing Instructions</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="e.g. Strict fluid balance chart, bed rest for 24h, notify if BP < 100/60."
-                className="w-full bg-slate-50 border border-slate-300 rounded-md p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-              />
-            </div>
-          </div>
-
-          <SheetFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAdmitSheetOpen(false)}
-              className="rounded-md h-9 text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => admitMutation.mutate()}
-              disabled={admitMutation.isPending}
-              className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{admitMutation.isPending ? 'Admitting...' : 'Confirm Admission'}</span>
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      {/* Admission Sheet */}
+      <AdmissionSheet
+        isOpen={admitSheetOpen}
+        onClose={() => setAdmitSheetOpen(false)}
+        selectedBed={selectedBedForAdmission}
+        patients={patients}
+        selectedPatientId={selectedPatientId}
+        setSelectedPatientId={setSelectedPatientId}
+        doctors={doctors}
+        selectedDoctorId={selectedDoctorId}
+        setSelectedDoctorId={setSelectedDoctorId}
+        diagnosis={diagnosis}
+        setDiagnosis={setDiagnosis}
+        packageName={packageName}
+        setPackageName={setPackageName}
+        notes={notes}
+        setNotes={setNotes}
+        isAdmitting={admitMutation.isPending}
+        onConfirmAdmit={() => admitMutation.mutate()}
+      />
     </PageLayout>
   );
 }

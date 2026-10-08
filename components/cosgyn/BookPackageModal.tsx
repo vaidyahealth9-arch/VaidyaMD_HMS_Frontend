@@ -303,6 +303,8 @@ export default function BookPackageModal({
                   setBookingPackagePrice(10000);
                 } else if (id === 'custom_tesla') {
                   setBookingPackagePrice(4000);
+                } else if (id === 'custom_combo') {
+                  setBookingPackagePrice(13500);
                 }
               }}
               className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer"
@@ -312,6 +314,7 @@ export default function BookPackageModal({
               <optgroup label="Single Standalone Sessions">
                 <option value="custom_jet">Single Session: Jet Plasma</option>
                 <option value="custom_tesla">Single Session: Tesla Chair</option>
+                <option value="custom_combo">Single Session: Jet Plasma + Tesla Chair</option>
               </optgroup>
               <optgroup label="Pre-configured Packages">
                 {treatments.map((t: any) => (
@@ -324,7 +327,7 @@ export default function BookPackageModal({
           </div>
 
           {/* Package Summary */}
-          {selectedTreatment && (
+          {selectedTreatment ? (
             <div className="p-3 bg-pink-50/70 border border-pink-200 rounded-lg flex items-center justify-between">
               <div>
                 <span className="font-bold text-pink-950 text-xs">{selectedTreatment.name}</span>
@@ -336,7 +339,38 @@ export default function BookPackageModal({
               </div>
               <span className="font-extrabold text-pink-700 text-sm font-mono">{formatCurrency(selectedTreatment.price)}</span>
             </div>
-          )}
+          ) : selectedTreatmentId === 'custom_combo' ? (
+            <div className="p-3 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-900 text-xs">Single Session: Jet Plasma &amp; Tesla Chair</span>
+                <div className="flex gap-3 text-[11px] text-slate-700 mt-0.5">
+                  <span className="text-primary font-semibold">⚡ Jet Plasma: 1 session</span>
+                  <span className="text-purple-700 font-semibold">🪑 Tesla Chair: 1 session</span>
+                </div>
+              </div>
+              <span className="font-extrabold text-pink-700 text-sm font-mono">{formatCurrency(bookingPackagePrice || 13500)}</span>
+            </div>
+          ) : selectedTreatmentId === 'custom_jet' ? (
+            <div className="p-3 bg-pink-50/70 border border-pink-200 rounded-lg flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-900 text-xs">Single Session: Jet Plasma</span>
+                <div className="flex gap-3 text-[11px] text-primary mt-0.5 font-semibold">
+                  <span>⚡ Jet Plasma: 1 session</span>
+                </div>
+              </div>
+              <span className="font-extrabold text-pink-700 text-sm font-mono">{formatCurrency(bookingPackagePrice || 10000)}</span>
+            </div>
+          ) : selectedTreatmentId === 'custom_tesla' ? (
+            <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-900 text-xs">Single Session: Tesla Chair</span>
+                <div className="flex gap-3 text-[11px] text-purple-700 mt-0.5 font-semibold">
+                  <span>🪑 Tesla Chair: 1 session</span>
+                </div>
+              </div>
+              <span className="font-extrabold text-purple-700 text-sm font-mono">{formatCurrency(bookingPackagePrice || 4000)}</span>
+            </div>
+          ) : null}
 
           {/* 3. INDEPENDENT MODALITY CONFIGURATION */}
           <div className="space-y-3 pt-1">
@@ -349,14 +383,14 @@ export default function BookPackageModal({
             </div>
 
             {/* Modality 1: Cosmetic Gynae / Jet Plasma */}
-            {(selectedTreatment?.jet_plasma_sessions > 0 || selectedTreatmentId === 'custom_jet') && (
+            {(selectedTreatment?.jet_plasma_sessions > 0 || selectedTreatmentId === 'custom_jet' || selectedTreatmentId === 'custom_combo') && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-primary flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5" />
-                    <span>Cosmetic Gynae / Jet Plasma Suite ({selectedTreatment?.jet_plasma_sessions || 1} Sessions)</span>
+                    <span>Jet Plasma Suite ({selectedTreatment?.jet_plasma_sessions || 1} Sessions)</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-medium">Vaginal rejuvenation</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Mucosal regeneration &amp; tissue therapy</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -409,14 +443,14 @@ export default function BookPackageModal({
             )}
 
             {/* Modality 2: Tesla Chair */}
-            {(selectedTreatment?.tesla_chair_sessions > 0 || selectedTreatmentId === 'custom_tesla') && (
+            {(selectedTreatment?.tesla_chair_sessions > 0 || selectedTreatmentId === 'custom_tesla' || selectedTreatmentId === 'custom_combo') && (
               <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-purple-900 flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-purple-700" />
                     <span>Tesla Chair Pelvic Floor Suite ({selectedTreatment?.tesla_chair_sessions || 1} Sessions)</span>
                   </span>
-                  <span className="text-[10px] text-purple-700 font-medium">Independent pelvic floor protocol</span>
+                  <span className="text-[10px] text-purple-700 font-medium">HIFEM pelvic floor rehabilitation</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">

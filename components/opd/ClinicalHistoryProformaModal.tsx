@@ -36,6 +36,14 @@ import {
   generateExaminationNarrative,
   ProformaSentenceView,
   ProformaPrintView,
+  ProformaHeaderSection,
+  ProformaCoupleSection,
+  ProformaFemaleSection,
+  ProformaMaleSection,
+  ProformaInvestigationsSection,
+  ProformaExamSection,
+  ProformaPlanSection,
+  ProformaSpecialtySections,
 } from './proforma';
 import type {
   ClinicalHistoryProformaModalProps,
@@ -851,1684 +859,259 @@ export default function ClinicalHistoryProformaModal({
             MODE 1: STRUCTURED FORM ENTRY
             ========================================================================= */}
         {viewMode === 'form' && (
-          <div className="space-y-6 text-xs text-slate-800">
-            {/* Action Banner for Sentence Sync */}
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-lg p-3 flex items-center justify-between gap-3 text-emerald-900">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                <span className="text-xs font-medium">
-                  <strong>Live Sentence Generator Active:</strong> Every option you fill is
-                  instantly converted into a readable narrative and synced directly into Present
-                  History.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewMode('sentence')}
-                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-2xs whitespace-nowrap"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>View Readable Sentence Form</span>
-              </button>
-            </div>
+          <div className="p-4 sm:p-5 space-y-6 overflow-y-auto max-h-[78vh] custom-scrollbar">
+            <ProformaHeaderSection
+              inline={inline}
+              referredBy={referredBy}
+              setReferredBy={setReferredBy}
+              livesIn={livesIn}
+              setLivesIn={setLivesIn}
+              seenByDr={seenByDr}
+              setSeenByDr={setSeenByDr}
+              staffInAttendance={staffInAttendance}
+              setStaffInAttendance={setStaffInAttendance}
+              reasonForConsultation={reasonForConsultation}
+              setReasonForConsultation={setReasonForConsultation}
+            />
 
-            {/* Section 1: Referral & Header */}
-            {!inline ? (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8] flex items-center gap-2">
-                  <span>1. Referral &amp; Consultation Details</span>
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Referred by
-                    </label>
-                    <input
-                      type="text"
-                      value={referredBy}
-                      onChange={(e) => setReferredBy(e.target.value)}
-                      placeholder="Doctor / Clinic name"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Lives in</label>
-                    <input
-                      type="text"
-                      value={livesIn}
-                      onChange={(e) => setLivesIn(e.target.value)}
-                      placeholder="City / Region"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Seen by Dr
-                    </label>
-                    <input
-                      type="text"
-                      value={seenByDr}
-                      onChange={(e) => setSeenByDr(e.target.value)}
-                      placeholder="Consultant Doctor"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Staff in attendance
-                    </label>
-                    <input
-                      type="text"
-                      value={staffInAttendance}
-                      onChange={(e) => setStaffInAttendance(e.target.value)}
-                      placeholder="Nurse / Assistant"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div className="col-span-2 sm:col-span-4">
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Reason for consultation <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={reasonForConsultation}
-                      onChange={(e) => setReasonForConsultation(e.target.value)}
-                      placeholder="Primary reason for visit..."
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-3.5 space-y-1.5">
-                <label className="block text-[11px] font-bold text-slate-700">
-                  Reason for Consultation / Presenting Complaint <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={reasonForConsultation}
-                  onChange={(e) => setReasonForConsultation(e.target.value)}
-                  placeholder="Primary reason for visit (e.g. Primary infertility for 3 years, irregular cycles)..."
-                  className="vmd-input text-xs w-full"
-                />
-              </div>
-            )}
+            <ProformaCoupleSection
+              activeTab={activeTab}
+              fertilityType={fertilityType}
+              setFertilityType={setFertilityType}
+              fertilityFactor={fertilityFactor}
+              setFertilityFactor={setFertilityFactor}
+              marriedInYear={marriedInYear}
+              setMarriedInYear={setMarriedInYear}
+              tryingForPregnancy={tryingForPregnancy}
+              setTryingForPregnancy={setTryingForPregnancy}
+              consanguinity={consanguinity}
+              setConsanguinity={setConsanguinity}
+            />
 
-            {/* Section 2: Couple Fertility Infertility Status */}
-            {activeTab === 'fertility' && (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                  2. Couple Infertility Profile
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Primary / Secondary
-                    </label>
-                    <select
-                      value={fertilityType}
-                      onChange={(e) => setFertilityType(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select Infertility Type...</option>
-                      <option value="Primary">Primary Infertility</option>
-                      <option value="Secondary">Secondary Infertility</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Male / Female / Couple
-                    </label>
-                    <select
-                      value={fertilityFactor}
-                      onChange={(e) => setFertilityFactor(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select Infertility Factor...</option>
-                      <option value="Couple">Couple Factor</option>
-                      <option value="Female">Female Factor</option>
-                      <option value="Male">Male Factor</option>
-                      <option value="Unexplained">Unexplained</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Married in year
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 2021"
-                      value={marriedInYear}
-                      onChange={(e) => setMarriedInYear(e.target.value)}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Trying for pregnancy (yrs)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 3 years"
-                      value={tryingForPregnancy}
-                      onChange={(e) => setTryingForPregnancy(e.target.value)}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Consanguinity
-                    </label>
-                    <select
-                      value={consanguinity}
-                      onChange={(e) => setConsanguinity(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select Consanguinity...</option>
-                      <option value="Non-Consanguineous">Non-Consanguineous</option>
-                      <option value="Consanguineous (1st Degree)">Consanguineous (1st Degree)</option>
-                      <option value="Consanguineous (2nd Degree)">Consanguineous (2nd Degree)</option>
-                      <option value="Consanguineous">Consanguineous</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
+            <ProformaFemaleSection
+              inline={inline}
+              femaleName={femaleName}
+              setFemaleName={setFemaleName}
+              femaleProfession={femaleProfession}
+              setFemaleProfession={setFemaleProfession}
+              femaleWeight={femaleWeight}
+              setFemaleWeight={setFemaleWeight}
+              femaleBmi={femaleBmi}
+              setFemaleBmi={setFemaleBmi}
+              femalePallor={femalePallor}
+              setFemalePallor={setFemalePallor}
+              femalePedalEdema={femalePedalEdema}
+              setFemalePedalEdema={setFemalePedalEdema}
+              femaleGoitre={femaleGoitre}
+              setFemaleGoitre={setFemaleGoitre}
+              femaleBp={femaleBp}
+              setFemaleBp={setFemaleBp}
+              periodsEvery={periodsEvery}
+              setPeriodsEvery={setPeriodsEvery}
+              durationBleeding={durationBleeding}
+              setDurationBleeding={setDurationBleeding}
+              lmp={lmp}
+              setLmp={setLmp}
+              periodsPainful={periodsPainful}
+              setPeriodsPainful={setPeriodsPainful}
+              periodsHeavy={periodsHeavy}
+              setPeriodsHeavy={setPeriodsHeavy}
+              ageAtMenarche={ageAtMenarche}
+              setAgeAtMenarche={setAgeAtMenarche}
+              menstrualAdditional={menstrualAdditional}
+              setMenstrualAdditional={setMenstrualAdditional}
+              gpal={gpal}
+              setGpal={setGpal}
+              obRows={obRows}
+              setObRows={setObRows}
+              addObRow={addObRow}
+              removeObRow={removeObRow}
+              contraceptionHistory={contraceptionHistory}
+              setContraceptionHistory={setContraceptionHistory}
+              femaleSmoking={femaleSmoking}
+              setFemaleSmoking={setFemaleSmoking}
+              femaleGutka={femaleGutka}
+              setFemaleGutka={setFemaleGutka}
+              femaleAlcohol={femaleAlcohol}
+              setFemaleAlcohol={setFemaleAlcohol}
+              femaleToddy={femaleToddy}
+              setFemaleToddy={setFemaleToddy}
+              femaleCoffee={femaleCoffee}
+              setFemaleCoffee={setFemaleCoffee}
+              femaleAdmissions={femaleAdmissions}
+              setFemaleAdmissions={setFemaleAdmissions}
+              femaleRegularMed={femaleRegularMed}
+              setFemaleRegularMed={setFemaleRegularMed}
+              femaleTb={femaleTb}
+              setFemaleTb={setFemaleTb}
+              femaleBleedingDisorders={femaleBleedingDisorders}
+              setFemaleBleedingDisorders={setFemaleBleedingDisorders}
+              femaleGalactorrhoea={femaleGalactorrhoea}
+              setFemaleGalactorrhoea={setFemaleGalactorrhoea}
+              femaleAllergies={femaleAllergies}
+              setFemaleAllergies={setFemaleAllergies}
+              femaleCervicalSmear={femaleCervicalSmear}
+              setFemaleCervicalSmear={setFemaleCervicalSmear}
+              femalePastSurgical={femalePastSurgical}
+              setFemalePastSurgical={setFemalePastSurgical}
+              femaleFamilyHistory={femaleFamilyHistory}
+              setFemaleFamilyHistory={setFemaleFamilyHistory}
+            />
 
-            {/* Section 3: Female Partner Assessment */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                {inline ? 'Female Clinical Assessment' : '3. Female Partner Assessment'}
-              </h3>
-              {!inline && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Female Name
-                    </label>
-                    <input
-                      type="text"
-                      value={femaleName}
-                      onChange={(e) => setFemaleName(e.target.value)}
-                      className="vmd-input text-xs font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Profession
-                    </label>
-                    <input
-                      type="text"
-                      value={femaleProfession}
-                      onChange={(e) => setFemaleProfession(e.target.value)}
-                      placeholder="e.g. Teacher, Engineer"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Weight (kg)
-                    </label>
-                    <input
-                      type="number"
-                      value={femaleWeight}
-                      onChange={(e) => setFemaleWeight(e.target.value)}
-                      placeholder="kg"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">BMI</label>
-                    <input
-                      type="text"
-                      value={femaleBmi}
-                      onChange={(e) => setFemaleBmi(e.target.value)}
-                      placeholder="e.g. 23.4"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              )}
+            <ProformaMaleSection
+              inline={inline}
+              activeTab={activeTab}
+              maleName={maleName}
+              setMaleName={setMaleName}
+              maleProfession={maleProfession}
+              setMaleProfession={setMaleProfession}
+              maleWeight={maleWeight}
+              setMaleWeight={setMaleWeight}
+              maleBmi={maleBmi}
+              setMaleBmi={setMaleBmi}
+              malePallor={malePallor}
+              setMalePallor={setMalePallor}
+              malePedalEdema={malePedalEdema}
+              setMalePedalEdema={setMalePedalEdema}
+              maleBp={maleBp}
+              setMaleBp={setMaleBp}
+              frequencyIntercourse={frequencyIntercourse}
+              setFrequencyIntercourse={setFrequencyIntercourse}
+              maleLastSi={maleLastSi}
+              setMaleLastSi={setMaleLastSi}
+              maleErectileIssues={maleErectileIssues}
+              setMaleErectileIssues={setMaleErectileIssues}
+              maleDyspareunia={maleDyspareunia}
+              setMaleDyspareunia={setMaleDyspareunia}
+              maleScrotalInjury={maleScrotalInjury}
+              setMaleScrotalInjury={setMaleScrotalInjury}
+              maleMumps={maleMumps}
+              setMaleMumps={setMaleMumps}
+              maleSmoking={maleSmoking}
+              setMaleSmoking={setMaleSmoking}
+              maleGutka={maleGutka}
+              setMaleGutka={setMaleGutka}
+              maleAlcohol={maleAlcohol}
+              setMaleAlcohol={setMaleAlcohol}
+              maleToddy={maleToddy}
+              setMaleToddy={setMaleToddy}
+              maleCoffee={maleCoffee}
+              setMaleCoffee={setMaleCoffee}
+              maleAdmissions={maleAdmissions}
+              setMaleAdmissions={setMaleAdmissions}
+              maleRegularMed={maleRegularMed}
+              setMaleRegularMed={setMaleRegularMed}
+              maleTb={maleTb}
+              setMaleTb={setMaleTb}
+              maleAllergies={maleAllergies}
+              setMaleAllergies={setMaleAllergies}
+              malePastSurgical={malePastSurgical}
+              setMalePastSurgical={setMalePastSurgical}
+              maleFamilyHistory={maleFamilyHistory}
+              setMaleFamilyHistory={setMaleFamilyHistory}
+            />
 
-              {/* Menstrual History */}
-              <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-3">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                  MENSTRUAL HISTORY
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Periods every (days)
-                    </label>
-                    <input
-                      type="text"
-                      value={periodsEvery}
-                      onChange={(e) => setPeriodsEvery(e.target.value)}
-                      placeholder="28-30"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Duration bleeding (days)
-                    </label>
-                    <input
-                      type="text"
-                      value={durationBleeding}
-                      onChange={(e) => setDurationBleeding(e.target.value)}
-                      placeholder="4-5"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Periods painful?
-                    </label>
-                    <select
-                      value={periodsPainful}
-                      onChange={(e) => setPeriodsPainful(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes (Dysmenorrhea)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Periods heavy?
-                    </label>
-                    <select
-                      value={periodsHeavy}
-                      onChange={(e) => setPeriodsHeavy(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes (Menorrhagia)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Age at menarche
-                    </label>
-                    <input
-                      type="text"
-                      value={ageAtMenarche}
-                      onChange={(e) => setAgeAtMenarche(e.target.value)}
-                      placeholder="13"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">LMP</label>
-                    <input
-                      type="date"
-                      value={lmp}
-                      onChange={(e) => setLmp(e.target.value)}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
+            <ProformaInvestigationsSection
+              invAmh={invAmh}
+              setInvAmh={setInvAmh}
+              invFsh={invFsh}
+              setInvFsh={setInvFsh}
+              invLh={invLh}
+              setInvLh={setInvLh}
+              invTsh={invTsh}
+              setInvTsh={setInvTsh}
+              invTubalPatency={invTubalPatency}
+              setInvTubalPatency={setInvTubalPatency}
+              invHysteroLap={invHysteroLap}
+              setInvHysteroLap={setInvHysteroLap}
+              invSemenAnalysis={invSemenAnalysis}
+              setInvSemenAnalysis={setInvSemenAnalysis}
+              invDfi={invDfi}
+              setInvDfi={setInvDfi}
+              fertilityTreatments={fertilityTreatments}
+              setFertilityTreatments={setFertilityTreatments}
+              fertilityCounselingDone={fertilityCounselingDone}
+              setFertilityCounselingDone={setFertilityCounselingDone}
+            />
 
-              {/* Obstetric & Contraception */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      OBSTETRIC HISTORY
-                    </span>
-                    <input
-                      type="text"
-                      value={gpal}
-                      onChange={(e) => setGpal(e.target.value)}
-                      placeholder="G0 P0 L0 A0"
-                      className="vmd-input text-xs w-36 h-7"
-                    />
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-slate-500 text-[10px] border-b border-slate-200">
-                          <th className="p-1 text-left">Year</th>
-                          <th className="p-1 text-left">Place</th>
-                          <th className="p-1 text-left">Outcome</th>
-                          <th className="p-1 w-6"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {obRows.map((r, i) => (
-                          <tr key={i} className="border-b border-slate-100">
-                            <td className="p-1">
-                              <input
-                                type="text"
-                                placeholder="Year"
-                                value={r.year}
-                                onChange={(e) => {
-                                  const c = [...obRows];
-                                  c[i].year = e.target.value;
-                                  setObRows(c);
-                                }}
-                                className="vmd-input text-xs h-7"
-                              />
-                            </td>
-                            <td className="p-1">
-                              <input
-                                type="text"
-                                placeholder="Place"
-                                value={r.place}
-                                onChange={(e) => {
-                                  const c = [...obRows];
-                                  c[i].place = e.target.value;
-                                  setObRows(c);
-                                }}
-                                className="vmd-input text-xs h-7"
-                              />
-                            </td>
-                            <td className="p-1">
-                              <input
-                                type="text"
-                                placeholder="Full Term / Miscarriage"
-                                value={r.outcome}
-                                onChange={(e) => {
-                                  const c = [...obRows];
-                                  c[i].outcome = e.target.value;
-                                  setObRows(c);
-                                }}
-                                className="vmd-input text-xs h-7"
-                              />
-                            </td>
-                            <td className="p-1 text-center">
-                              <button
-                                type="button"
-                                onClick={() => removeObRow(i)}
-                                className="text-slate-400 hover:text-rose-600"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addObRow}
-                    className="text-[10px] text-[#2878a8] font-bold flex items-center gap-1 hover:underline"
-                  >
-                    <Plus className="w-3 h-3" /> Add Pregnancy Row
-                  </button>
-                </div>
+            <ProformaExamSection
+              paFindings={paFindings}
+              setPaFindings={setPaFindings}
+              paScars={paScars}
+              setPaScars={setPaScars}
+              psVulvaVagina={psVulvaVagina}
+              setPsVulvaVagina={setPsVulvaVagina}
+              psCervixHealthy={psCervixHealthy}
+              setPsCervixHealthy={setPsCervixHealthy}
+              psCervixEctropion={psCervixEctropion}
+              setPsCervixEctropion={setPsCervixEctropion}
+              psCervicalSmearDone={psCervicalSmearDone}
+              setPsCervicalSmearDone={setPsCervicalSmearDone}
+              psBleedingOnTouch={psBleedingOnTouch}
+              setPsBleedingOnTouch={setPsBleedingOnTouch}
+              pvUterusPosition={pvUterusPosition}
+              setPvUterusPosition={setPvUterusPosition}
+              pvUterusSize={pvUterusSize}
+              setPvUterusSize={setPvUterusSize}
+              pvUterusMobility={pvUterusMobility}
+              setPvUterusMobility={setPvUterusMobility}
+              pvFornicesTenderness={pvFornicesTenderness}
+              setPvFornicesTenderness={setPvFornicesTenderness}
+              threeDScan={threeDScan}
+              setThreeDScan={setThreeDScan}
+              fertilityCounselingDone={fertilityCounselingDone}
+              setFertilityCounselingDone={setFertilityCounselingDone}
+              factorsInFavour={factorsInFavour}
+              setFactorsInFavour={setFactorsInFavour}
+              factorsNotInFavour={factorsNotInFavour}
+              setFactorsNotInFavour={setFactorsNotInFavour}
+            />
 
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                    CONTRACEPTION HISTORY
-                  </span>
-                  <input
-                    type="text"
-                    value={contraceptionHistory}
-                    onChange={(e) => setContraceptionHistory(e.target.value)}
-                    placeholder="e.g. None / Barrier method / OCPs used 1 yr ago"
-                    className="vmd-input text-xs"
-                  />
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {['None', 'Barrier / Condom', 'Oral Contraceptives', 'IUD / Cu-T', 'Natural'].map(
-                      (opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => setContraceptionHistory(opt)}
-                          className="px-2 py-0.5 rounded bg-slate-100 text-[10px] hover:bg-slate-200 text-slate-700"
-                        >
-                          {opt}
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
+            <ProformaPlanSection
+              inline={inline}
+              factorsInFavour={factorsInFavour}
+              setFactorsInFavour={setFactorsInFavour}
+              factorsNotInFavour={factorsNotInFavour}
+              setFactorsNotInFavour={setFactorsNotInFavour}
+              recommendedWifeTests={recommendedWifeTests}
+              setRecommendedWifeTests={setRecommendedWifeTests}
+              recommendedHusbandTests={recommendedHusbandTests}
+              setRecommendedHusbandTests={setRecommendedHusbandTests}
+              recSemenAnalysis={recSemenAnalysis}
+              setRecSemenAnalysis={setRecSemenAnalysis}
+              recDfi={recDfi}
+              setRecDfi={setRecDfi}
+              pendingHusbandTests={pendingHusbandTests}
+              setPendingHusbandTests={setPendingHusbandTests}
+              pendingWifeTests={pendingWifeTests}
+              setPendingWifeTests={setPendingWifeTests}
+              fertilityFoods={fertilityFoods}
+              setFertilityFoods={setFertilityFoods}
+              fertilitySupplements={fertilitySupplements}
+              setFertilitySupplements={setFertilitySupplements}
+              followUpPlan={followUpPlan}
+              setFollowUpPlan={setFollowUpPlan}
+              finalDiagnosis={finalDiagnosis}
+              setFinalDiagnosis={setFinalDiagnosis}
+            />
 
-              {/* Female Habits: Smoking, Gutka, Alcohol, Toddy, Coffee */}
-              <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                  FEMALE HABITS / LIFESTYLE
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Smoking</label>
-                    <select
-                      value={femaleSmoking}
-                      onChange={(e) => setFemaleSmoking(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                      <option value="Ex-smoker">Ex-smoker</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Gutka</label>
-                    <select
-                      value={femaleGutka}
-                      onChange={(e) => setFemaleGutka(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Alcohol</label>
-                    <select
-                      value={femaleAlcohol}
-                      onChange={(e) => setFemaleAlcohol(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Social">Social</option>
-                      <option value="Regular">Regular</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Toddy</label>
-                    <select
-                      value={femaleToddy}
-                      onChange={(e) => setFemaleToddy(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Coffee</label>
-                    <select
-                      value={femaleCoffee}
-                      onChange={(e) => setFemaleCoffee(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="None">None</option>
-                      <option value="1 cup/day">1 cup/day</option>
-                      <option value="2 cups/day">2 cups/day</option>
-                      <option value=">2 cups/day">&gt; 2 cups/day</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Female Past Medical History */}
-              <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-3">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                  PAST MEDICAL HISTORY (FEMALE)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Hospital admissions (Non-surgical)
-                    </label>
-                    <input
-                      type="text"
-                      value={femaleAdmissions}
-                      onChange={(e) => setFemaleAdmissions(e.target.value)}
-                      placeholder="Nil"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Regular medication
-                    </label>
-                    <input
-                      type="text"
-                      value={femaleRegularMed}
-                      onChange={(e) => setFemaleRegularMed(e.target.value)}
-                      placeholder="None / Thyroxine 25mcg"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">History of TB</label>
-                    <select
-                      value={femaleTb}
-                      onChange={(e) => setFemaleTb(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      H/O bleeding or clotting disorders
-                    </label>
-                    <select
-                      value={femaleBleedingDisorders}
-                      onChange={(e) => setFemaleBleedingDisorders(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      H/O Galactorrhoea
-                    </label>
-                    <select
-                      value={femaleGalactorrhoea}
-                      onChange={(e) => setFemaleGalactorrhoea(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Allergies</label>
-                    <input
-                      type="text"
-                      value={femaleAllergies}
-                      onChange={(e) => setFemaleAllergies(e.target.value)}
-                      placeholder="No known drug allergies (NKDA)"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      Cervical smears
-                    </label>
-                    <input
-                      type="text"
-                      value={femaleCervicalSmear}
-                      onChange={(e) => setFemaleCervicalSmear(e.target.value)}
-                      placeholder="Not done / Normal Pap smear 1 year ago"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      PAST SURGICAL HISTORY
-                    </label>
-                    <input
-                      type="text"
-                      value={femalePastSurgical}
-                      onChange={(e) => setFemalePastSurgical(e.target.value)}
-                      placeholder="Nil / Laparoscopy / Appendectomy"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">
-                      FAMILY HISTORY OF DM, HTN, CANCERS
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {['DM', 'HTN', 'Cancers', 'Thyroid', 'None'].map((cond) => (
-                        <button
-                          key={cond}
-                          type="button"
-                          onClick={() =>
-                            toggleArrayItem(
-                              femaleFamilyHistory,
-                              setFemaleFamilyHistory,
-                              cond
-                            )
-                          }
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                            femaleFamilyHistory.includes(cond)
-                              ? 'bg-[#2878a8] text-white border-[#2878a8]'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
-                        >
-                          {cond}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Female Physical Examination: Pallor, Pedal edema, Goitre, BP */}
-              <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                  EXAMINATION (FEMALE)
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">O/E Pallor</label>
-                    <select
-                      value={femalePallor}
-                      onChange={(e) => setFemalePallor(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No pallor</option>
-                      <option value="Present">Pallor present</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Pedal Edema</label>
-                    <select
-                      value={femalePedalEdema}
-                      onChange={(e) => setFemalePedalEdema(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No pedal edema</option>
-                      <option value="Present">Pedal edema present</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Goitre</label>
-                    <select
-                      value={femaleGoitre}
-                      onChange={(e) => setFemaleGoitre(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select...</option>
-                      <option value="No">No goitre</option>
-                      <option value="Present">Goitre present</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">BP (mm Hg)</label>
-                    <input
-                      type="text"
-                      value={femaleBp}
-                      onChange={(e) => setFemaleBp(e.target.value)}
-                      placeholder="120/80"
-                      className="vmd-input text-xs font-semibold"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 4: Male Partner Assessment (Fertility Tab) */}
-            {activeTab === 'fertility' && (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                  {inline ? 'Male Clinical Assessment' : '4. Male Partner Assessment'}
-                </h3>
-                {!inline && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Male Name
-                      </label>
-                      <input
-                        type="text"
-                        value={maleName}
-                        onChange={(e) => setMaleName(e.target.value)}
-                        className="vmd-input text-xs font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Profession
-                      </label>
-                      <input
-                        type="text"
-                        value={maleProfession}
-                        onChange={(e) => setMaleProfession(e.target.value)}
-                        placeholder="Profession"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                        Weight (kg)
-                      </label>
-                      <input
-                        type="number"
-                        value={maleWeight}
-                        onChange={(e) => setMaleWeight(e.target.value)}
-                        placeholder="kg"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">BMI</label>
-                      <input
-                        type="text"
-                        value={maleBmi}
-                        onChange={(e) => setMaleBmi(e.target.value)}
-                        placeholder="BMI"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Male Sexual History */}
-                <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                    REPRODUCTIVE &amp; SEXUAL HISTORY
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Problems with erection / ejaculation?
-                      </label>
-                      <select
-                        value={maleErectileIssues}
-                        onChange={(e) => setMaleErectileIssues(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Erection Issues">Erection Issues</option>
-                        <option value="Premature Ejaculation">Premature Ejaculation</option>
-                        <option value="Delayed Ejaculation">Delayed Ejaculation</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Frequency of intercourse / week
-                      </label>
-                      <input
-                        type="text"
-                        value={frequencyIntercourse}
-                        onChange={(e) => setFrequencyIntercourse(e.target.value)}
-                        placeholder="2-3 times"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Pain during sexual intercourse?
-                      </label>
-                      <select
-                        value={maleDyspareunia}
-                        onChange={(e) => setMaleDyspareunia(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Last SI</label>
-                      <input
-                        type="text"
-                        value={maleLastSi}
-                        onChange={(e) => setMaleLastSi(e.target.value)}
-                        placeholder="e.g. 2 days ago"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Injuries in groin / scrotum
-                      </label>
-                      <select
-                        value={maleScrotalInjury}
-                        onChange={(e) => setMaleScrotalInjury(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Mumps in past / child
-                      </label>
-                      <select
-                        value={maleMumps}
-                        onChange={(e) => setMaleMumps(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Male Habits */}
-                <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                    MALE HABITS / LIFESTYLE
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Smoking</label>
-                      <select
-                        value={maleSmoking}
-                        onChange={(e) => setMaleSmoking(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Gutka</label>
-                      <select
-                        value={maleGutka}
-                        onChange={(e) => setMaleGutka(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Alcohol</label>
-                      <select
-                        value={maleAlcohol}
-                        onChange={(e) => setMaleAlcohol(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Social">Social</option>
-                        <option value="Regular">Regular</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Toddy</label>
-                      <select
-                        value={maleToddy}
-                        onChange={(e) => setMaleToddy(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Coffee</label>
-                      <select
-                        value={maleCoffee}
-                        onChange={(e) => setMaleCoffee(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="None">None</option>
-                        <option value="1 cup/day">1 cup/day</option>
-                        <option value="2 cups/day">2 cups/day</option>
-                        <option value=">2 cups/day">&gt; 2 cups/day</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Male Medical & Examination */}
-                <div className="p-3.5 bg-white border border-slate-200 rounded-md space-y-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
-                    PAST MEDICAL, SURGICAL &amp; EXAMINATION (MALE)
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Hospital admissions
-                      </label>
-                      <input
-                        type="text"
-                        value={maleAdmissions}
-                        onChange={(e) => setMaleAdmissions(e.target.value)}
-                        placeholder="Nil"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Regular medication
-                      </label>
-                      <input
-                        type="text"
-                        value={maleRegularMed}
-                        onChange={(e) => setMaleRegularMed(e.target.value)}
-                        placeholder="None"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        History of TB
-                      </label>
-                      <select
-                        value={maleTb}
-                        onChange={(e) => setMaleTb(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Allergies</label>
-                      <input
-                        type="text"
-                        value={maleAllergies}
-                        onChange={(e) => setMaleAllergies(e.target.value)}
-                        placeholder="NKDA"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Past Surgical History
-                      </label>
-                      <input
-                        type="text"
-                        value={malePastSurgical}
-                        onChange={(e) => setMalePastSurgical(e.target.value)}
-                        placeholder="Nil"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">O/E Pallor</label>
-                      <select
-                        value={malePallor}
-                        onChange={(e) => setMalePallor(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No pallor</option>
-                        <option value="Present">Pallor present</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">
-                        Pedal edema
-                      </label>
-                      <select
-                        value={malePedalEdema}
-                        onChange={(e) => setMalePedalEdema(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select...</option>
-                        <option value="No">No pedal edema</option>
-                        <option value="Present">Pedal edema</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block mb-0.5">BP (mm Hg)</label>
-                      <input
-                        type="text"
-                        value={maleBp}
-                        onChange={(e) => setMaleBp(e.target.value)}
-                        placeholder="120/80"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Section 5: Fertility Investigations & Past Treatments */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                5. Fertility Investigations &amp; Treatments
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Serum AMH (ng/mL)
-                  </label>
-                  <input
-                    type="text"
-                    value={invAmh}
-                    onChange={(e) => setInvAmh(e.target.value)}
-                    placeholder="e.g. 2.8 ng/mL"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">FSH</label>
-                  <input
-                    type="text"
-                    value={invFsh}
-                    onChange={(e) => setInvFsh(e.target.value)}
-                    placeholder="e.g. 6.4 mIU/mL"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">LH</label>
-                  <input
-                    type="text"
-                    value={invLh}
-                    onChange={(e) => setInvLh(e.target.value)}
-                    placeholder="e.g. 5.1 mIU/mL"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">TSH</label>
-                  <input
-                    type="text"
-                    value={invTsh}
-                    onChange={(e) => setInvTsh(e.target.value)}
-                    placeholder="e.g. 1.8 mIU/L"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Tubal patency (HSG/HyCoSy)
-                  </label>
-                  <input
-                    type="text"
-                    value={invTubalPatency}
-                    onChange={(e) => setInvTubalPatency(e.target.value)}
-                    placeholder="Bilateral tubes patent"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Hysteroscopy / Laparoscopy
-                  </label>
-                  <input
-                    type="text"
-                    value={invHysteroLap}
-                    onChange={(e) => setInvHysteroLap(e.target.value)}
-                    placeholder="Not done / Normal cavity"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Semen analysis
-                  </label>
-                  <input
-                    type="text"
-                    value={invSemenAnalysis}
-                    onChange={(e) => setInvSemenAnalysis(e.target.value)}
-                    placeholder="Normozoospermia"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    Sperm DFI (%)
-                  </label>
-                  <input
-                    type="text"
-                    value={invDfi}
-                    onChange={(e) => setInvDfi(e.target.value)}
-                    placeholder="e.g. 14%"
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div className="col-span-2 sm:col-span-4">
-                  <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                    FERTILITY TREATMENTS (PAST)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={fertilityTreatments}
-                    onChange={(e) => setFertilityTreatments(e.target.value)}
-                    placeholder="e.g. Ovulation Induction 3 cycles elsewhere, no IUI/IVF yet..."
-                    className="vmd-input text-xs"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Section 6: Consultation Notes & Physical Examination (P/A, P/S, P/V, 3D Scan) */}
-            <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                6. Consultation Notes &amp; Clinical Pelvic Examination
-              </h3>
-
-              <div className="p-3 bg-white border border-slate-200 rounded-md">
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer text-slate-800">
-                  <input
-                    type="checkbox"
-                    checked={fertilityCounselingDone}
-                    onChange={(e) => setFertilityCounselingDone(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#2878a8] border-slate-300 focus:ring-[#2878a8]"
-                  />
-                  <span>
-                    Fertility explained including hormones, ovulation, tubal patency and semen
-                  </span>
-                </label>
-              </div>
-
-              {/* P/A, P/S, P/V */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* P/A */}
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                    P/A (PER ABDOMEN)
-                  </span>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Soft / Findings</label>
-                    <input
-                      type="text"
-                      value={paFindings}
-                      onChange={(e) => setPaFindings(e.target.value)}
-                      placeholder="Soft, non-tender"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Scars</label>
-                    <input
-                      type="text"
-                      value={paScars}
-                      onChange={(e) => setPaScars(e.target.value)}
-                      placeholder="None / LSCS scar"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* P/S */}
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                    P/S (PER SPECULUM)
-                  </span>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">
-                      Vulva / Vagina
-                    </label>
-                    <input
-                      type="text"
-                      value={psVulvaVagina}
-                      onChange={(e) => setPsVulvaVagina(e.target.value)}
-                      placeholder="Healthy"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5 pt-1">
-                    <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(psCervixHealthy)}
-                        onChange={(e) => setPsCervixHealthy(e.target.checked)}
-                        className="rounded text-[#2878a8]"
-                      />
-                      <span>Cervix appears healthy</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={psCervixEctropion}
-                        onChange={(e) => setPsCervixEctropion(e.target.checked)}
-                        className="rounded text-[#2878a8]"
-                      />
-                      <span>Cervix ectropion noted</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={psCervicalSmearDone}
-                        onChange={(e) => setPsCervicalSmearDone(e.target.checked)}
-                        className="rounded text-[#2878a8]"
-                      />
-                      <span>Cervical smear done (LBC)</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={psBleedingOnTouch}
-                        onChange={(e) => setPsBleedingOnTouch(e.target.checked)}
-                        className="rounded text-[#2878a8]"
-                      />
-                      <span>
-                        {psBleedingOnTouch ? 'Bleeding on touch noted' : 'No bleeding noted on touch'}
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* P/V */}
-                <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                    P/V (PER VAGINUM)
-                  </span>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Uterus Position</label>
-                    <select
-                      value={pvUterusPosition}
-                      onChange={(e) => setPvUterusPosition(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select Position...</option>
-                      <option value="Anteverted">Anteverted</option>
-                      <option value="Retroverted">Retroverted</option>
-                      <option value="Midposition">Midposition</option>
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-0.5">Size</label>
-                      <input
-                        type="text"
-                        value={pvUterusSize}
-                        onChange={(e) => setPvUterusSize(e.target.value)}
-                        placeholder="Normal / Bulky"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-0.5">Mobility</label>
-                      <select
-                        value={pvUterusMobility}
-                        onChange={(e) => setPvUterusMobility(e.target.value)}
-                        className="vmd-input text-xs"
-                      >
-                        <option value="">Select Mobility...</option>
-                        <option value="Mobile">Mobile</option>
-                        <option value="Fixed">Fixed</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">
-                      Fornices: Tenderness
-                    </label>
-                    <input
-                      type="text"
-                      value={pvFornicesTenderness}
-                      onChange={(e) => setPvFornicesTenderness(e.target.value)}
-                      placeholder="Absent / Tenderness noted"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 3D Scan & Factors */}
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    3-D Scan Findings
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={threeDScan}
-                    onChange={(e) => setThreeDScan(e.target.value)}
-                    placeholder="Uterus architecture, cavity, endometrial thickness, antral follicle count..."
-                    className="vmd-input text-xs"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-emerald-800 mb-1">
-                      Factors in favour
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorsInFavour}
-                      onChange={(e) => setFactorsInFavour(e.target.value)}
-                      placeholder="e.g. Good ovarian reserve, patent tubes, age..."
-                      className="vmd-input text-xs border-emerald-200 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-rose-800 mb-1">
-                      Factors not in favour
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorsNotInFavour}
-                      onChange={(e) => setFactorsNotInFavour(e.target.value)}
-                      placeholder="e.g. Duration of infertility, elevated DFI, elevated BMI..."
-                      className="vmd-input text-xs border-rose-200 focus:ring-rose-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 7 & 8: Investigations & Plan - Consolidated into Section 2 when inline */}
-            {inline ? (
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <FlaskConical className="w-4 h-4 text-[#2878a8] shrink-0" />
-                  <span>
-                    <strong>Investigations, Prescriptions &amp; Review Plan:</strong> Managed centrally in <strong>Section 2 (Assessment, Orders &amp; Management Plan)</strong> below to eliminate duplicate inputs.
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Section 7: Recommended Basic Investigations Checklists */}
-                <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                    7. Recommended Basic Investigations Checklist
-                  </h3>
-
-                  {/* Wife & Husband Checklists */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                      <span className="text-[11px] font-bold text-slate-800 block">
-                        Wife - Recommended Tests
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {defaultWifeTests.map((test) => (
-                          <button
-                            key={test}
-                            type="button"
-                            onClick={() =>
-                              toggleArrayItem(
-                                recommendedWifeTests,
-                                setRecommendedWifeTests,
-                                test
-                              )
-                            }
-                            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                              recommendedWifeTests.includes(test)
-                                ? 'bg-[#2878a8] text-white border-[#2878a8]'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {recommendedWifeTests.includes(test) ? '✓ ' : '+ '}
-                            {test}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                      <span className="text-[11px] font-bold text-slate-800 block">
-                        Husband - Recommended Tests
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {defaultHusbandTests.map((test) => (
-                          <button
-                            key={test}
-                            type="button"
-                            onClick={() =>
-                              toggleArrayItem(
-                                recommendedHusbandTests,
-                                setRecommendedHusbandTests,
-                                test
-                              )
-                            }
-                            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                              recommendedHusbandTests.includes(test)
-                                ? 'bg-[#2878a8] text-white border-[#2878a8]'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {recommendedHusbandTests.includes(test) ? '✓ ' : '+ '}
-                            {test}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Semen & DFI Timings instructions */}
-                  <div className="space-y-2 p-3 bg-amber-50/60 border border-amber-200/80 rounded-md">
-                    <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={recSemenAnalysis}
-                        onChange={(e) => setRecSemenAnalysis(e.target.checked)}
-                        className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
-                      />
-                      <span>
-                        Semen analysis (Attend with 3 to 7 days abstinence, BY APPOINTMENT ONLY) Between
-                        9 AM TO 11 AM
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-2 text-xs font-semibold text-amber-950 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={recDfi}
-                        onChange={(e) => setRecDfi(e.target.checked)}
-                        className="w-4 h-4 rounded text-amber-600 border-amber-300 mt-0.5"
-                      />
-                      <span>
-                        Sperm DNA Fragmentation DFI (Attend with 2 days abstinence, BY APPOINTMENT ONLY)
-                        Between 9 AM TO 11 AM
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* Pending Pre-op / Serology Panels */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                      <span className="text-[11px] font-bold text-slate-800 block">
-                        Pending - Husband Panel
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {defaultPendingHusband.map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() =>
-                              toggleArrayItem(
-                                pendingHusbandTests,
-                                setPendingHusbandTests,
-                                p
-                              )
-                            }
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-                              pendingHusbandTests.includes(p)
-                                ? 'bg-slate-800 text-white border-slate-800'
-                                : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                      <span className="text-[11px] font-bold text-slate-800 block">
-                        Pending - Wife Panel
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {defaultPendingWife.map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() =>
-                              toggleArrayItem(pendingWifeTests, setPendingWifeTests, p)
-                            }
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-                              pendingWifeTests.includes(p)
-                                ? 'bg-slate-800 text-white border-slate-800'
-                                : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 8: Advised Fertility Foods, Supplements & Follow-up */}
-                <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                    8. Advised Regimen, Foods &amp; Review Plan
-                  </h3>
-
-                  <div className="p-3 bg-white border border-slate-200 rounded-md space-y-2">
-                    <span className="text-[11px] font-bold text-slate-700 block">
-                      Fertility Foods
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {defaultFoods.map((f) => (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => toggleArrayItem(fertilityFoods, setFertilityFoods, f)}
-                          className={`px-2 py-1 rounded text-[10px] font-semibold border ${
-                            fertilityFoods.includes(f)
-                              ? 'bg-emerald-700 text-white border-emerald-700'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          {fertilityFoods.includes(f) ? '✓ ' : '+ '}
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                        Fertility Supplements
-                      </label>
-                      <input
-                        type="text"
-                        value={fertilitySupplements}
-                        onChange={(e) => setFertilitySupplements(e.target.value)}
-                        placeholder="Antioxidants, CoQ10, Folic Acid, Vitamin D3"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                        Review Plan
-                      </label>
-                      <input
-                        type="text"
-                        value={followUpPlan}
-                        onChange={(e) => setFollowUpPlan(e.target.value)}
-                        placeholder="See with reports for and 3D scan + Smear/Speculum"
-                        className="vmd-input text-xs"
-                      />
-                    </div>
-                    <div className="col-span-1 sm:col-span-2">
-                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                        Provisional Diagnosis <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={finalDiagnosis}
-                        onChange={(e) => setFinalDiagnosis(e.target.value)}
-                        placeholder="Provisional Diagnosis"
-                        className="vmd-input text-xs font-bold text-slate-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Gynaecology Specific Form Card */}
-            {activeTab === 'gynaecology' && (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                  9. Gynaecology Screening &amp; Findings
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      Cervical Smear Result
-                    </label>
-                    <input
-                      type="text"
-                      value={gynaeSmearResult}
-                      onChange={(e) => setGynaeSmearResult(e.target.value)}
-                      placeholder="e.g. NILM (Negative for intraepithelial lesion or malignancy)"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      HPV Screening Status
-                    </label>
-                    <input
-                      type="text"
-                      value={gynaeHpv}
-                      onChange={(e) => setGynaeHpv(e.target.value)}
-                      placeholder="e.g. High Risk HPV Negative"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Obstetric Specific Form Card */}
-            {activeTab === 'obstetric' && (
-              <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-3">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8]">
-                  9. Obstetric &amp; Antenatal Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      Expected Date of Delivery (EDD)
-                    </label>
-                    <input
-                      type="date"
-                      value={edd}
-                      onChange={(e) => setEdd(e.target.value)}
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      Gestational Age
-                    </label>
-                    <input
-                      type="text"
-                      value={gestationalAge}
-                      onChange={(e) => setGestationalAge(e.target.value)}
-                      placeholder="e.g. 12 weeks 3 days"
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      Mode of Conception
-                    </label>
-                    <select
-                      value={conceptionMode}
-                      onChange={(e) => setConceptionMode(e.target.value)}
-                      className="vmd-input text-xs"
-                    >
-                      <option value="">Select Mode...</option>
-                      <option value="Spontaneous">Spontaneous</option>
-                      <option value="IVF-ET">IVF-ET (In Vitro Fertilization)</option>
-                      <option value="IUI">IUI (Intrauterine Insemination)</option>
-                      <option value="Ovulation Induction">Ovulation Induction</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                      Current Pregnancy Notes
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={currentPregnancyNotes}
-                      onChange={(e) => setCurrentPregnancyNotes(e.target.value)}
-                      placeholder="e.g. Single intrauterine viable gestation, dating scan concordant, mild morning nausea..."
-                      className="vmd-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            <ProformaSpecialtySections
+              activeTab={activeTab}
+              contraceptionHistory={contraceptionHistory}
+              setContraceptionHistory={setContraceptionHistory}
+              gynaeSmearResult={gynaeSmearResult}
+              setGynaeSmearResult={setGynaeSmearResult}
+              gynaeHpv={gynaeHpv}
+              setGynaeHpv={setGynaeHpv}
+              edd={edd}
+              setEdd={setEdd}
+              gestationalAge={gestationalAge}
+              setGestationalAge={setGestationalAge}
+              conceptionMode={conceptionMode}
+              setConceptionMode={setConceptionMode}
+              currentPregnancyNotes={currentPregnancyNotes}
+              setCurrentPregnancyNotes={setCurrentPregnancyNotes}
+            />
           </div>
         )}
 

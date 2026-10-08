@@ -5,4 +5,7 @@ export { default as InvoiceLineItemsEditor } from './InvoiceLineItemsEditor';
 export { default as RecordPaymentModal } from './RecordPaymentModal';
 export { default as ReceiptModal } from './ReceiptModal';
 export { default as NewInvoiceSheet } from './NewInvoiceSheet';
+export { default as InvoicesTab } from './tabs/InvoicesTab';
+export { default as PackagesTab } from './tabs/PackagesTab';
 export type { DataTableColumn } from '@/components/common/DataTable';
+

@@ -114,14 +114,24 @@ export default function PatientProfilePage() {
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
 
+  const actionFromUrl = searchParams.get('action');
+
   useEffect(() => {
     if (tabFromUrl) {
-      const resolved = tabFromUrl === 'visits' ? 'workbench' : tabFromUrl;
+      const resolved =
+        tabFromUrl === 'visits'
+          ? 'workbench'
+          : tabFromUrl === 'treatment_cycles' || tabFromUrl === 'treatment-cycles'
+          ? 'treatment'
+          : tabFromUrl;
       if (resolved !== activeTab) {
         setActiveTab(resolved);
       }
     }
-  }, [tabFromUrl]);
+    if (actionFromUrl === 'new') {
+      setIsCreatingCycle(true);
+    }
+  }, [tabFromUrl, actionFromUrl]);
 
   useEffect(() => {
     if (appointmentIdFromUrl) {
@@ -332,6 +342,7 @@ export default function PatientProfilePage() {
         {activeTab === 'treatment' && (
           <TreatmentCyclesTab
             patientId={patientId}
+            patient={patient}
             partner={partner}
             userId={user?.id || ''}
             cycles={cycles}

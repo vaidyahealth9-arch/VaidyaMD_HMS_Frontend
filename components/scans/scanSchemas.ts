@@ -169,14 +169,22 @@ export const getScanKeyHighlights = (rec: any): { label: string; value: string }
 
   // Female Ultrasound Highlights
   if (schema === 'follicular_scan') {
-    if (d.endometrial_thickness || d.endometrium_thickness_mm) {
-      highlights.push({ label: 'Endometrium', value: `${d.endometrial_thickness || d.endometrium_thickness_mm} mm` });
+    const et = d.uterine_lining || d.endometrial_thickness || d.endometrium_thickness_mm || d.endometrium;
+    if (et) {
+      highlights.push({ label: 'Endometrium', value: `${et} mm` });
     }
-    if (d.right_ovary_lead_follicle_mm) {
-      highlights.push({ label: 'Right Lead', value: `${d.right_ovary_lead_follicle_mm} mm` });
+    const r = d.follicles_right || d.follicle_sizes_right || (d.right_ovary_lead_follicle_mm ? `${d.right_ovary_lead_follicle_mm} mm` : null);
+    if (r) {
+      highlights.push({ label: 'Right', value: String(r).length > 12 ? `${String(r).slice(0, 10)}...` : String(r) });
     }
-    if (d.left_ovary_lead_follicle_mm) {
-      highlights.push({ label: 'Left Lead', value: `${d.left_ovary_lead_follicle_mm} mm` });
+    const l = d.follicles_left || d.follicle_sizes_left || (d.left_ovary_lead_follicle_mm ? `${d.left_ovary_lead_follicle_mm} mm` : null);
+    if (l) {
+      highlights.push({ label: 'Left', value: String(l).length > 12 ? `${String(l).slice(0, 10)}...` : String(l) });
+    }
+    if ((d.afc_right !== undefined && d.afc_right !== '') || (d.afc_left !== undefined && d.afc_left !== '')) {
+      highlights.push({ label: 'AFC', value: `R:${d.afc_right || 0} L:${d.afc_left || 0}` });
+    } else if (d.antral_follicle_count_afc || d.afc) {
+      highlights.push({ label: 'AFC', value: String(d.antral_follicle_count_afc || d.afc) });
     }
     if (d.cycle_day) {
       highlights.push({ label: 'Day', value: `CD ${d.cycle_day}` });

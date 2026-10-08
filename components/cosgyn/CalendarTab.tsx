@@ -189,7 +189,7 @@ export default function CalendarTab({
                   <th className="p-3 bg-pink-50/50 text-pink-950">
                     <div className="flex items-center gap-1.5">
                       <span>⚡</span>
-                      <span>Jet Plasma Suite (Vaginal Rejuvenation)</span>
+                      <span>Jet Plasma Suite (Mucosal Therapy)</span>
                     </div>
                   </th>
                 )}

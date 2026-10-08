@@ -602,6 +602,15 @@
   box-sizing: border-box;
 }
 
+/* Landscape Screen Preview Styling */
+.a4-print-sheet.a4-landscape-page {
+  width: 100%;
+  max-width: 297mm;
+  min-height: 210mm;
+  height: 210mm;
+  aspect-ratio: 297 / 210;
+}
+
 /* Continuous Print Layout Table (Screen Preview) */
 .print-layout-table {
   width: 100%;
@@ -672,6 +681,15 @@
     box-shadow: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Physical Print: Landscape A4 Sheet */
+  .a4-print-sheet.a4-landscape-page {
+    width: 297mm !important;
+    min-height: 209mm !important;
+    height: 209mm !important;
+    max-height: 210mm !important;
+    overflow: hidden !important;
   }
 
   /* Suppress trailing empty page on last sheet */

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageLayout from '@/components/common/PageLayout';
+import PageHeader from '@/components/common/PageHeader';
 import TabBar from '@/components/common/TabBar';
 import PrintableCosGynScheduleModal from '@/components/common/PrintableCosGynScheduleModal';
 import { cosgynApi, patientsApi } from '@/lib/api';
@@ -147,7 +148,7 @@ export default function CosGynDashboard() {
     // 1. Jet Plasma / Cosmetic Gynae Procedure Sessions
     const numJp = selectedTreatment
       ? selectedTreatment.jet_plasma_sessions
-      : selectedTreatmentId === 'custom_jet'
+      : (selectedTreatmentId === 'custom_jet' || selectedTreatmentId === 'custom_combo')
       ? 1
       : 0;
 
@@ -167,7 +168,7 @@ export default function CosGynDashboard() {
     // 2. Tesla Chair Pelvic Floor Sessions
     const numTc = selectedTreatment
       ? selectedTreatment.tesla_chair_sessions
-      : selectedTreatmentId === 'custom_tesla'
+      : (selectedTreatmentId === 'custom_tesla' || selectedTreatmentId === 'custom_combo')
       ? 1
       : 0;
 
@@ -490,12 +491,20 @@ export default function CosGynDashboard() {
 
     let finalTreatmentId = selectedTreatmentId;
     let singleEquipment = undefined;
+    let customTreatmentName = undefined;
+
     if (selectedTreatmentId === 'custom_jet') {
       finalTreatmentId = 'manual';
       singleEquipment = 'Jet Plasma';
+      customTreatmentName = 'Single Session: Jet Plasma';
     } else if (selectedTreatmentId === 'custom_tesla') {
       finalTreatmentId = 'manual';
       singleEquipment = 'Tesla Chair';
+      customTreatmentName = 'Single Session: Tesla Chair';
+    } else if (selectedTreatmentId === 'custom_combo') {
+      finalTreatmentId = 'manual';
+      singleEquipment = 'Jet Plasma + Tesla Chair';
+      customTreatmentName = 'Single Session: Jet Plasma & Tesla Chair';
     }
 
     const finalAmount = bookingPackagePrice || selectedTreatment?.price || 0;
@@ -513,6 +522,7 @@ export default function CosGynDashboard() {
     createPlanMutation.mutate({
       patient_id: selectedPatientId,
       treatment_id: finalTreatmentId !== 'manual' ? finalTreatmentId : undefined,
+      treatment_name: customTreatmentName || selectedTreatment?.name,
       equipment: singleEquipment,
       custom_sessions: customSessionsPayload,
       total_amount: finalAmount,
@@ -581,32 +591,25 @@ export default function CosGynDashboard() {
   return (
     <PageLayout className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-400 text-white flex items-center justify-center shadow-md shadow-pink-200">
-            <Sparkles className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 leading-tight">Cosmetic Gynecology &amp; Aesthetics</h1>
-              <Badge variant="purple" className="text-[10px] font-bold uppercase">
-                Specialty Suite
-              </Badge>
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Automated multi-modality scheduling for Tesla Chair pelvic floor therapy, Jet Plasma rejuvenation, and patient cards
-            </p>
-          </div>
-        </div>
-
-        <Button
-          onClick={() => handleOpenBookingModal()}
-          className="gap-2 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white font-bold h-10 px-4 rounded-lg shadow-sm text-xs cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Book Package &amp; Schedule Sessions</span>
-        </Button>
-      </div>
+      <PageHeader
+        title="Cosmetic Gynecology & Aesthetics"
+        titleBadge={
+          <Badge variant="purple" className="text-[10px] font-bold uppercase">
+            Specialty Suite
+          </Badge>
+        }
+        subtitle="Automated multi-modality scheduling for Tesla Chair pelvic floor therapy, Jet Plasma mucosal therapy, and patient cards"
+        icon={Sparkles}
+        actions={
+          <Button
+            onClick={() => handleOpenBookingModal()}
+            className="gap-2 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 text-white font-bold h-10 px-4 rounded-lg shadow-sm text-xs cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Book Package &amp; Schedule Sessions</span>
+          </Button>
+        }
+      />
 
       {actionSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm animate-in fade-in">
@@ -648,7 +651,7 @@ export default function CosGynDashboard() {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Jet Plasma Sessions</p>
               <p className="text-2xl font-black text-slate-900 mt-1">{jetPlasmaCount}</p>
-              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Vaginal rejuvenation</p>
+              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Mucosal &amp; tissue therapy</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Zap className="w-5 h-5" />
@@ -672,12 +675,11 @@ export default function CosGynDashboard() {
 
       {/* Tabs */}
       <TabBar
-        variant="underline"
         tabs={[
-          { id: 'packages_booked', label: 'Booked Packages', icon: Package, badge: bookedPlans.length },
-          { id: 'schedule', label: `Equipment Sessions & Appointments (${filteredSessions.length})`, icon: List },
-          { id: 'calendar', label: 'Calendar & Vacancy Slot Matrix', icon: Calendar },
-          { id: 'packages', label: `Treatment Packages & Protocols (${treatments.length})`, icon: Sparkles },
+          { id: 'packages_booked', label: 'Booked Packages', icon: Package, badge: bookedPlans.length || undefined },
+          { id: 'schedule', label: 'Equipment Sessions', icon: List, badge: filteredSessions.length || undefined },
+          { id: 'calendar', label: 'Calendar & Vacancy Matrix', icon: Calendar },
+          { id: 'packages', label: 'Treatment Packages', icon: Sparkles, badge: treatments.length || undefined },
         ]}
         activeTab={activeTab}
         onChange={(id) => setActiveTab(id as any)}

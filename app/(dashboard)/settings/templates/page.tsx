@@ -5,7 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { templatesApi } from '@/lib/api';
 import DynamicForm from '@/components/dynamic-form/DynamicForm';
 import PageLayout from '@/components/common/PageLayout';
-import { Lock, Settings, Save, AlertTriangle } from 'lucide-react';
+import PageHeader from '@/components/common/PageHeader';
+import { Badge } from '@/shared/ui/badge';
+import { Lock, Settings, Save, AlertTriangle, Plus } from 'lucide-react';
 
 export default function TemplateManagerPage() {
   const { user, activeRole } = useAuth();
@@ -162,19 +164,26 @@ export default function TemplateManagerPage() {
 
   return (
     <PageLayout className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2"><Settings className="w-7 h-7 text-[rgb(var(--clr-primary))]" /><h1 className="text-2xl font-bold text-slate-900 tracking-tight">Template Manager</h1></div>
-          <p className="text-slate-500 text-sm mt-1">Customize dynamic clinical form schemas with live sandbox validation</p>
-        </div>
-        <button
-          onClick={handleCreateNewTemplate}
-          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-md shadow-md transition-colors self-start md:self-auto"
-        >
-          + Create Custom Template
-        </button>
-      </div>
+      {/* Standardized Header */}
+      <PageHeader
+        icon={Settings}
+        title="Template Manager"
+        titleBadge={
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-mono text-[10px]">
+            Live Sandbox
+          </Badge>
+        }
+        subtitle="Customize dynamic clinical form schemas with live sandbox validation"
+        actions={
+          <button
+            onClick={handleCreateNewTemplate}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-semibold rounded-md transition-colors shadow-2xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Custom Template</span>
+          </button>
+        }
+      />
 
       {/* Workspace split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">

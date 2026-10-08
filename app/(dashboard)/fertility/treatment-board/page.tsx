@@ -3,38 +3,29 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/common/PageLayout';
+import PageHeader from '@/components/common/PageHeader';
 import {
   Activity,
   Search,
-  Filter,
   Plus,
-  Calendar,
   Clock,
-  Sparkles,
   ChevronRight,
-  Heart,
-  FileText,
   Microscope,
-  CheckCircle2,
-  AlertCircle,
   Pill,
-  X,
-  ExternalLink,
-  ShieldCheck,
   Download,
   Baby,
-  Syringe,
   FlaskConical,
-  Stethoscope,
+  X,
 } from 'lucide-react';
-import { treatmentCyclesApi, patientsApi, getApiBase } from '@/lib/api';
+import { treatmentCyclesApi, getApiBase } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import TreatmentCycleWizard from '@/components/fertility/TreatmentCycleWizard';
-import StimulationCalendarGrid from '@/components/fertility/StimulationCalendarGrid';
+import StartCyclePatientModal from '@/components/fertility/StartCyclePatientModal';
+import { PlanDetailsSubTabContent } from '@/components/fertility/plan-details';
 import StatutoryConsentModal from '@/components/fertility/StatutoryConsentModal';
 import EmbryoTransferDischargeModal from '@/components/fertility/EmbryoTransferDischargeModal';
 import OPUAspirationReportModal from '@/components/fertility/OPUAspirationReportModal';
 import MasterEmbryologyRecordModal from '@/components/fertility/MasterEmbryologyRecordModal';
+import TreatmentBoardTable from '@/components/fertility/TreatmentBoardTable';
 
 export default function TreatmentBoardPage() {
   const { user } = useAuth();
@@ -45,7 +36,7 @@ export default function TreatmentBoardPage() {
   const [stageFilter, setStageFilter] = useState('ALL');
 
   // Modals state
-  const [showWizard, setShowWizard] = useState(false);
+  const [showSelectPatientModal, setShowSelectPatientModal] = useState(false);
   const [activeCalendarCycle, setActiveCalendarCycle] = useState<any | null>(null);
   const [activeConsentCycle, setActiveConsentCycle] = useState<any | null>(null);
   const [activeEtDischargeCycle, setActiveEtDischargeCycle] = useState<any | null>(null);
@@ -59,7 +50,7 @@ export default function TreatmentBoardPage() {
       const res = await treatmentCyclesApi.list();
       setCycles(Array.isArray(res) ? res : []);
     } catch (err) {
-      console.error('Failed to load treatment cycles', err);
+      console.error('Failed to load cycles', err);
     } finally {
       setIsLoading(false);
     }
@@ -70,68 +61,64 @@ export default function TreatmentBoardPage() {
   }, []);
 
   const handleExportNationalArtRegistry = async (format: 'csv' | 'json' = 'csv') => {
-    setIsExportingRegistry(true);
     try {
-      if (format === 'csv') {
-        const apiBase = getApiBase();
-        window.open(`${apiBase}/plugins/fertility/treatment-cycles/art-registry-export?format=csv`, '_blank');
-      } else {
-        const data = await treatmentCyclesApi.getArtRegistryExport({ format: 'json' });
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `national_art_registry_export_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+      setIsExportingRegistry(true);
+      const url = `${getApiBase()}/fertility/cycles/export-national-registry?format=${format}`;
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(url, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+        },
+      });
+
+      if (!res.ok) throw new Error('Registry export failed');
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `National_ART_Registry_Export_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (err: any) {
-      console.error('Export error', err);
-      alert('Failed to export National ART Registry: ' + (err.message || 'Unknown error'));
+      alert(`Export Error: ${err.message}`);
     } finally {
       setIsExportingRegistry(false);
     }
   };
 
-  // Compute stats
+  // KPI Calculations
   const totalActive = cycles.filter((c) => c.status === 'running').length;
-
-  const inStimulation = cycles.filter((c) => {
-    if (c.status !== 'running') return false;
-    const stim = c.sentinel_dates?.stim_start;
-    const trig = c.sentinel_dates?.trigger;
-    return stim && (!trig || new Date(trig) > new Date());
-  }).length;
-
+  const inStimulation = cycles.filter(
+    (c) => c.status === 'running' && c.sentinel_dates?.stim_start && !c.sentinel_dates?.opu_date
+  ).length;
   const triggerDue = cycles.filter((c) => {
     if (c.status !== 'running') return false;
-    const trig = c.sentinel_dates?.trigger;
-    const opu = c.sentinel_dates?.opu;
-    if (!trig) return false;
-    const trigDate = new Date(trig);
-    const now = new Date();
-    const diffHours = (trigDate.getTime() - now.getTime()) / 3600000;
-    return diffHours >= -24 && diffHours <= 48 && (!opu || new Date(opu) >= now);
+    const stim = c.sentinel_dates?.stim_start;
+    if (!stim) return false;
+    const stimDay = Math.floor((Date.now() - new Date(stim).getTime()) / 86400000) + 1;
+    return stimDay >= 10 && !c.sentinel_dates?.opu_date;
   }).length;
+  const opuEtScheduled = cycles.filter(
+    (c) => c.status === 'running' && (c.sentinel_dates?.opu_date || c.sentinel_dates?.transfer_date)
+  ).length;
 
-  const opuEtScheduled = cycles.filter((c) => {
-    if (c.status !== 'running') return false;
-    const opu = c.sentinel_dates?.opu;
-    const et = c.sentinel_dates?.et;
-    return opu || et;
-  }).length;
-
-  // Filter cycles
+  // Filter Pipeline
   const filteredCycles = cycles.filter((c) => {
-    // Type filter
     if (typeFilter !== 'ALL' && c.treatment_type !== typeFilter) return false;
 
-    // Stage filter
-    if (stageFilter === 'RUNNING' && c.status !== 'running') return false;
-    if (stageFilter === 'COMPLETED' && c.status !== 'completed') return false;
-    if (stageFilter === 'PLANNED' && c.status !== 'planned') return false;
+    if (stageFilter === 'STIMULATION') {
+      if (!c.sentinel_dates?.stim_start || c.sentinel_dates?.opu_date) return false;
+    } else if (stageFilter === 'OPU_DUE') {
+      if (!c.sentinel_dates?.opu_date) return false;
+    } else if (stageFilter === 'TRANSFER_DUE') {
+      if (!c.sentinel_dates?.transfer_date) return false;
+    } else if (stageFilter === 'COMPLETED') {
+      if (c.status !== 'completed') return false;
+    }
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = (c.patient_name || '').toLowerCase().includes(q);
@@ -147,46 +134,34 @@ export default function TreatmentBoardPage() {
   return (
     <PageLayout className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                ART Treatment Board
-              </h1>
-              <p className="text-slate-500 text-xs sm:text-sm">
-                Active cycle cohort, stimulation day tracking, dual-partner EMR & clinical workflow
-              </p>
-            </div>
+      <PageHeader
+        title="ART Treatment Board"
+        subtitle="Active cycle cohort, stimulation day tracking, dual-partner EMR & clinical workflow"
+        icon={Activity}
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => handleExportNationalArtRegistry('csv')}
+              disabled={isExportingRegistry}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-bold rounded-md transition-all shadow-2xs"
+              title="Export official statutory register under ART Regulation Act 2021"
+            >
+              <Download className="w-4 h-4 text-primary" />
+              <span>National ART Register (CSV)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSelectPatientModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-md transition-all shadow-md shadow-primary/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Treatment Cycle</span>
+            </button>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => handleExportNationalArtRegistry('csv')}
-            disabled={isExportingRegistry}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-bold rounded-md transition-all shadow-2xs"
-            title="Export official statutory register under ART Regulation Act 2021"
-          >
-            <Download className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
-            <span>National ART Register (CSV)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowWizard(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-md transition-all shadow-md shadow-primary/20"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Treatment Cycle</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* KPI Stats Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -211,7 +186,7 @@ export default function TreatmentBoardPage() {
             <Pill className="w-4 h-4 text-primary" />
           </div>
           <p className="text-3xl font-bold text-slate-900 mt-1">{inStimulation}</p>
-          <span className="text-[11px] font-semibold text-[rgb(var(--clr-primary))] mt-1 block">
+          <span className="text-[11px] font-semibold text-primary mt-1 block">
             Active daily gonadotropin injections
           </span>
         </div>
@@ -238,7 +213,7 @@ export default function TreatmentBoardPage() {
           </div>
           <p className="text-3xl font-bold text-slate-900 mt-1">{opuEtScheduled}</p>
           <span className="text-[11px] font-semibold text-rose-600 mt-1 block">
-            Theatre & Embryology bookings
+            Theatre &amp; Embryology bookings
           </span>
         </div>
       </div>
@@ -298,325 +273,47 @@ export default function TreatmentBoardPage() {
             <option value="IVF">Standard IVF</option>
             <option value="FET">Frozen Embryo Transfer (FET)</option>
             <option value="ICSI_FET">ICSI + Freeze-All</option>
-            <option value="IUI_H">IUI — Husband</option>
-            <option value="IUI_D">IUI — Donor</option>
-            <option value="EGG_FREEZING">Social Egg Freezing</option>
-            <option value="SURROGACY">Surrogacy</option>
+            <option value="IUI">Intrauterine Insemination (IUI)</option>
+            <option value="IUI_D">IUI with Donor Semen (IUI-D)</option>
+            <option value="DONOR_OOCYTE">Donor Oocyte ICSI</option>
+            <option value="SURGICAL_SPERM">TESA / PESA ICSI</option>
+            <option value="PGT_A">PGT-A Screening Cycle</option>
           </select>
 
-          {/* Stage Status Pills */}
-          <div className="flex p-1 bg-slate-100 rounded-md">
-            {[
-              { id: 'ALL', label: 'All' },
-              { id: 'RUNNING', label: 'Active' },
-              { id: 'PLANNED', label: 'Planned' },
-              { id: 'COMPLETED', label: 'Completed' },
-            ].map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => setStageFilter(st.id)}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                  stageFilter === st.id
-                    ? 'bg-white text-slate-800 shadow-2xs font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {st.label}
-              </button>
-            ))}
-          </div>
+          {/* Clinical Stage Filter */}
+          <select
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value)}
+            className="vmd-input text-xs py-2 px-3 font-semibold text-slate-700 bg-slate-50"
+          >
+            <option value="ALL">All Clinical Stages</option>
+            <option value="STIMULATION">In Stimulation (Days 2-12)</option>
+            <option value="OPU_DUE">OPU Scheduled / Triggered</option>
+            <option value="TRANSFER_DUE">Embryo Transfer Scheduled</option>
+            <option value="COMPLETED">Completed Cycles</option>
+          </select>
         </div>
       </div>
 
       {/* Main Treatment Board Table */}
-      <div className="bg-white border border-slate-200/90 rounded-lg overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3.5 px-4">Cycle ID</th>
-                <th className="py-3.5 px-4">Female Patient (Wife)</th>
-                <th className="py-3.5 px-4">Male Partner (Husband)</th>
-                <th className="py-3.5 px-4">Treatment Type</th>
-                <th className="py-3.5 px-4">Cycle Day</th>
-                <th className="py-3.5 px-4">Milestones (LMP / Stim / OPU / ET)</th>
-                <th className="py-3.5 px-4">Status &amp; Issues</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-400">
-                    <div className="w-8 h-8 border-2 border-[rgb(var(--clr-primary))] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    Loading active treatment cycles...
-                  </td>
-                </tr>
-              ) : filteredCycles.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-400 italic">
-                    No treatment cycles match the selected criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredCycles.map((cycle) => {
-                  const sDates = cycle.sentinel_dates || {};
-                  const lmp = sDates.lmp_day1 || cycle.start_date;
-                  const stim = sDates.stim_start;
+      <TreatmentBoardTable
+        cycles={filteredCycles}
+        isLoading={isLoading}
+        onConsent={(cycle) => setActiveConsentCycle(cycle)}
+        onOpu={(cycle) => setActiveOpuCycle(cycle)}
+        onEmbryology={(cycle) => setActiveEmbryologyCycle(cycle)}
+        onEtDischarge={(cycle) => setActiveEtDischargeCycle(cycle)}
+        onStimGrid={(cycle) => setActiveCalendarCycle(cycle)}
+      />
 
-                  const cycleDayNum = lmp
-                    ? Math.max(1, Math.floor((Date.now() - new Date(lmp).getTime()) / 86400000) + 1)
-                    : null;
-
-                  const stimDayNum = stim
-                    ? Math.max(1, Math.floor((Date.now() - new Date(stim).getTime()) / 86400000) + 1)
-                    : null;
-
-                  const fNotes = cycle.patient_clinical_notes || [];
-                  const mNotes = cycle.partner_clinical_notes || [];
-
-                  return (
-                    <tr key={cycle.id} className="hover:bg-slate-50/60 transition-colors">
-                      {/* Cycle ID */}
-                      <td className="py-4 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
-                        <span className="bg-primary/10 px-2 py-1 rounded-lg border border-primary/20">
-                          {cycle.cycle_id}
-                        </span>
-                        <div className="text-[10px] text-slate-400 font-normal mt-1">
-                          Attempt #{cycle.attempt_number || 1}
-                        </div>
-                      </td>
-
-                      {/* Female Patient */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-pink-50 border border-pink-200 text-pink-700 flex items-center justify-center text-[10px] font-bold">
-                            ♀
-                          </span>
-                          <div>
-                            <Link
-                              href={`/patients/${cycle.patient_id}`}
-                              className="font-bold text-slate-900 hover:text-[rgb(var(--clr-primary))] transition-colors flex items-center gap-1 group"
-                            >
-                              <span>{cycle.patient_name || 'Female Patient'}</span>
-                              <ExternalLink className="w-3 h-3 text-slate-300 group-hover:text-[rgb(var(--clr-primary))]" />
-                            </Link>
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
-                              <span>VID: {cycle.patient_vid || 'Pending'}</span>
-                              {cycle.patient_age && <span>• {cycle.patient_age} yrs</span>}
-                              {cycle.patient_blood_group && (
-                                <span className="font-bold text-rose-700 bg-rose-50 px-1 rounded">
-                                  {cycle.patient_blood_group}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Male Partner */}
-                      <td className="py-4 px-4">
-                        {cycle.partner_name ? (
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-md bg-primary/10 border border-primary/20 text-slate-800 flex items-center justify-center text-[10px] font-bold">
-                              ♂
-                            </span>
-                            <div>
-                              <p className="font-bold text-slate-800">{cycle.partner_name}</p>
-                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
-                                <span>VID: {cycle.partner_vid || 'Pending'}</span>
-                                {cycle.partner_age && <span>• {cycle.partner_age} yrs</span>}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px] italic">Not linked</span>
-                        )}
-                      </td>
-
-                      {/* Treatment Type */}
-                      <td className="py-4 px-4">
-                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200/80">
-                          {cycle.treatment_type}
-                        </span>
-                      </td>
-
-                      {/* Cycle Day */}
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {cycleDayNum ? (
-                          <div className="space-y-1">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Day {cycleDayNum}
-                            </span>
-                            {stimDayNum && (
-                              <div className="text-[10px] font-semibold text-amber-700 flex items-center gap-1">
-                                <Syringe className="w-3 h-3" />
-                                <span>Stim Day {stimDayNum}</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">—</span>
-                        )}
-                      </td>
-
-                      {/* Sentinel Milestones */}
-                      <td className="py-4 px-4">
-                        <div className="grid grid-cols-2 gap-1 text-[10px] min-w-[200px]">
-                          <div>
-                            <span className="text-slate-400 block font-medium">LMP:</span>
-                            <span className="font-mono text-slate-700">{sDates.lmp_day1 || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-medium">Stim Start:</span>
-                            <span className="font-mono text-slate-700">{sDates.stim_start || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-medium">Trigger:</span>
-                            <span className="font-mono text-amber-700 font-bold">{sDates.trigger || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-medium">OPU / ET:</span>
-                            <span className="font-mono text-slate-800 font-bold">
-                              {sDates.opu || sDates.et || '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Status & Issues */}
-                      <td className="py-4 px-4">
-                        <div className="space-y-1.5">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              cycle.status === 'running'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : cycle.status === 'completed'
-                                ? 'bg-primary/10 text-primary border border-primary/20'
-                                : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}
-                          >
-                            {cycle.status}
-                          </span>
-
-                          {/* Issues preview tag */}
-                          {(fNotes.length > 0 || mNotes.length > 0) && (
-                            <div className="flex flex-wrap gap-1 max-w-xs">
-                              {fNotes.slice(0, 1).map((n: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200 truncate max-w-[130px]"
-                                  title={n}
-                                >
-                                  ♀ {n}
-                                </span>
-                              ))}
-                              {mNotes.slice(0, 1).map((n: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-slate-800 border border-primary/20 truncate max-w-[130px]"
-                                  title={n}
-                                >
-                                  ♂ {n}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Action buttons */}
-                      <td className="py-4 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setActiveConsentCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-md font-bold text-[11px] transition-colors border border-amber-200 flex items-center gap-1"
-                            title="Statutory Consents (ART Act 2021 Forms 8, 11, 13, 15)"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Consent</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setActiveOpuCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-md font-bold text-[11px] transition-colors border border-purple-200 flex items-center gap-1"
-                            title="OPU Aspiration & Egg Retrieval Report"
-                          >
-                            <Syringe className="w-3.5 h-3.5 text-purple-600" />
-                            <span>OPU</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setActiveEmbryologyCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary rounded-md font-bold text-[11px] transition-colors border border-primary/20 flex items-center gap-1"
-                            title="Master Embryology & Insemination Form"
-                          >
-                            <Microscope className="w-3.5 h-3.5 text-primary" />
-                            <span>Embryo</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setActiveEtDischargeCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-md font-bold text-[11px] transition-colors border border-pink-200 flex items-center gap-1"
-                            title="Embryo Transfer Discharge Protocol & Luteal Support Schedule"
-                          >
-                            <Baby className="w-3.5 h-3.5 text-pink-600" />
-                            <span>ET Protocol</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setActiveCalendarCycle(cycle)}
-                            className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/15 text-slate-800 rounded-md font-bold text-[11px] transition-colors border border-primary/20 flex items-center gap-1"
-                            title="Open Day-by-Day Medication Calendar Grid"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>Stim Grid</span>
-                          </button>
-
-                          <Link
-                            href={`/ivf-lab?cycleId=${cycle.id}&tab=embryology`}
-                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-bold text-[11px] transition-colors flex items-center gap-1"
-                            title="Open in IVF Lab Embryology Matrix"
-                          >
-                            <Microscope className="w-3.5 h-3.5" />
-                            <span>Lab</span>
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal 1: Treatment Cycle Wizard */}
-      {showWizard && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="max-w-4xl w-full my-auto shadow-2xl rounded-lg">
-            <TreatmentCycleWizard
-              patientId=""
-              userId={user?.id || ''}
-              onSuccess={() => {
-                setShowWizard(false);
-                loadCycles();
-              }}
-              onCancel={() => setShowWizard(false)}
-            />
-          </div>
-        </div>
+      {/* MODALS */}
+      {showSelectPatientModal && (
+        <StartCyclePatientModal
+          open={showSelectPatientModal}
+          onClose={() => setShowSelectPatientModal(false)}
+        />
       )}
 
-      {/* Modal 2: Stimulation Calendar Grid Modal */}
       {activeCalendarCycle && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[94vh] overflow-y-auto p-6 shadow-2xl relative">
@@ -646,16 +343,13 @@ export default function TreatmentBoardPage() {
               </button>
             </div>
 
-            <StimulationCalendarGrid
-              cycleId={activeCalendarCycle.id}
-              startDate={activeCalendarCycle.sentinel_dates?.stim_start || activeCalendarCycle.sentinel_dates?.lmp_day1 || activeCalendarCycle.start_date}
+            <PlanDetailsSubTabContent
+              activeCycle={activeCalendarCycle}
+              cycleCalendar={{ days: activeCalendarCycle.medication_calendar || [] }}
               initialDays={activeCalendarCycle.medication_calendar}
-              treatmentType={activeCalendarCycle.treatment_type}
-              sentinelDates={activeCalendarCycle.sentinel_dates}
               patient={activeCalendarCycle.patient}
-              doctor={activeCalendarCycle.doctor || activeCalendarCycle.treating_consultant}
-              cycleNumber={activeCalendarCycle.attempt_number || activeCalendarCycle.code}
-              onCalendarSaved={() => {
+              partner={activeCalendarCycle.partner}
+              onRefreshData={() => {
                 loadCycles();
               }}
             />
@@ -663,7 +357,6 @@ export default function TreatmentBoardPage() {
         </div>
       )}
 
-      {/* Modal 3: Statutory Consent Modal (ART Act 2021) */}
       {activeConsentCycle && (
         <StatutoryConsentModal
           patient={{
@@ -694,7 +387,6 @@ export default function TreatmentBoardPage() {
         />
       )}
 
-      {/* Modal 4: Embryo Transfer Discharge Protocol */}
       {activeEtDischargeCycle && (
         <EmbryoTransferDischargeModal
           cycle={activeEtDischargeCycle}
@@ -722,7 +414,6 @@ export default function TreatmentBoardPage() {
         />
       )}
 
-      {/* Modal 5: OPU Aspiration Report (Egg Retrieval) */}
       {activeOpuCycle && (
         <OPUAspirationReportModal
           cycle={activeOpuCycle}
@@ -750,7 +441,6 @@ export default function TreatmentBoardPage() {
         />
       )}
 
-      {/* Modal 6: Master Embryology & Insemination Record */}
       {activeEmbryologyCycle && (
         <MasterEmbryologyRecordModal
           cycle={activeEmbryologyCycle}

@@ -1,15 +1,28 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Plus, X, FileCheck, FlaskConical, Users, Calendar } from 'lucide-react';
-import TreatmentCycleWizard from '@/components/fertility/TreatmentCycleWizard';
-import StimulationCalendarGrid from '@/components/fertility/StimulationCalendarGrid';
+import { Activity, Plus, Check, FileCheck, FlaskConical, Users } from 'lucide-react';
 import { treatmentCyclesApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
+import {
+  CycleSubTab,
+  TreatmentCycleRecord,
+  TreatmentCyclesOverviewTable,
+  TreatmentCycleSubTabs,
+  IntendedTreatmentPanel,
+  GametesPanel,
+  PgsPgdPanel,
+  TreatmentPlanPanel,
+  EndometrialMonitoringPanel,
+  SummaryPanel,
+  PlanDetailsSubTabContent,
+  createEmptyDraftCycle,
+} from '@/components/fertility/plan-details';
 
 interface TreatmentCyclesTabProps {
   patientId: string;
+  patient?: any;
   partner?: any;
   userId: string;
   cycles: any[];
@@ -28,6 +41,7 @@ interface TreatmentCyclesTabProps {
 
 export default function TreatmentCyclesTab({
   patientId,
+  patient,
   partner,
   userId,
   cycles,
@@ -48,373 +62,261 @@ export default function TreatmentCyclesTab({
   const isCreatingCycle = propIsCreating !== undefined ? propIsCreating : internalIsCreating;
   const setIsCreatingCycle = propSetIsCreating || setInternalIsCreating;
 
-  const [showMatrixModal, setShowMatrixModal] = useState(false);
-  const [addingMedDay, setAddingMedDay] = useState<number | null>(null);
-  const [newMedForm, setNewMedForm] = useState({ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: '' });
-  const [isSavingMed, setIsSavingMed] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<CycleSubTab>(
+    isCreatingCycle ? 'intended' : 'plan_details'
+  );
 
-  // Automatically refresh calendar when activeCycle changes
+  const [draftCycle, setDraftCycle] = useState<TreatmentCycleRecord>(() =>
+    createEmptyDraftCycle(patientId, (cycles?.length || 0) + 1)
+  );
+  const [draftCalendar, setDraftCalendar] = useState<any>({ days: [] });
+  const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
+
   useEffect(() => {
-    if (activeCycle?.id && (!cycleCalendar || cycleCalendar.cycle_id !== activeCycle.cycle_id)) {
-      treatmentCyclesApi.getCalendar(activeCycle.id)
-        .then((cal: any) => setCycleCalendar(cal))
-        .catch(() => {});
+    if (isCreatingCycle) {
+      setActiveSubTab('intended');
+      setDraftCycle((prev) => ({
+        ...prev,
+        patient_id: patientId,
+        attempt_number: (cycles?.length || 0) + 1,
+      }));
     }
-  }, [activeCycle?.id]);
+  }, [isCreatingCycle, cycles?.length, patientId]);
 
-  const handleAddMedicationToCycle = async (dayNumber: number) => {
-    if (!newMedForm.drug_name.trim() || !activeCycle) return;
-    setIsSavingMed(true);
-    try {
-      await treatmentCyclesApi.addMedication(activeCycle.id, {
-        day_number: dayNumber,
-        ...newMedForm,
-      });
-      setAddingMedDay(null);
-      setNewMedForm({ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: '' });
-      // Refresh calendar
-      treatmentCyclesApi.getCalendar(activeCycle.id)
-        .then((cal: any) => setCycleCalendar(cal))
-        .catch(() => {});
-    } catch (err: any) {
-      toast.error('Failed to add medication', err.message || 'An error occurred');
-    } finally {
-      setIsSavingMed(false);
+  const handleCycleUpdated = (updated: TreatmentCycleRecord) => {
+    if (isCreatingCycle) {
+      setDraftCycle(updated);
+      if (updated.medication_calendar) setDraftCalendar({ days: updated.medication_calendar });
+    } else {
+      setActiveCycle(updated);
+      onRefreshData();
     }
   };
 
-  return (
-    <div className="space-y-6 w-full">
-      {isCreatingCycle ? (
-        <div className="space-y-4 w-full animate-in fade-in">
-          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-5 py-3 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
-                <Activity className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Initiate New Treatment Cycle</h2>
-                <p className="text-[11px] text-slate-500">
-                  Configure stimulation protocol, sentinel milestone dates &amp; gonadotropins
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsCreatingCycle(false)}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors flex items-center gap-1.5 shadow-2xs border border-slate-200"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Cancel &amp; Return</span>
-            </button>
-          </div>
+  const handleFinalizeCreateCycle = async (forcedStatus?: 'planned' | 'running') => {
+    setIsSubmittingDraft(true);
+    try {
+      const finalStatus = forcedStatus || draftCycle.status || 'running';
+      const payload = {
+        patient_id: patientId,
+        partner_id: partner?.id || undefined,
+        treating_doctor_id: draftCycle.treating_doctor_id || userId,
+        treatment_type: draftCycle.treatment_type || 'ICSI',
+        attempt_number: Number(draftCycle.attempt_number || 1),
+        status: finalStatus,
+        start_date: draftCycle.start_date || new Date().toISOString().split('T')[0],
+        female_factors: draftCycle.female_factors || [],
+        male_factors: draftCycle.male_factors || [],
+        treatment_at_other_centre: draftCycle.treatment_at_other_centre || false,
+        previous_centre_name: draftCycle.previous_centre_name || undefined,
+        protocol_template_id: (draftCycle as any).protocol_template_id || undefined,
+        sentinel_dates: draftCycle.sentinel_dates || {},
+        gametes_source: draftCycle.gametes_source || {},
+        pgs_pgd_data: draftCycle.pgs_pgd_data || {},
+        endometrial_monitoring: draftCycle.endometrial_monitoring || [],
+        medication_calendar: draftCalendar?.days || draftCycle.medication_calendar || [],
+        remarks: draftCycle.remarks || '',
+        created_by: userId,
+      };
 
-          <TreatmentCycleWizard
-            patientId={patientId}
-            partnerId={partner?.id}
-            userId={userId}
-            onCancel={() => setIsCreatingCycle(false)}
-            onSuccess={(newCycle) => {
-              setIsCreatingCycle(false);
-              onRefreshData();
-              if (newCycle) {
-                setActiveCycle(newCycle);
-                treatmentCyclesApi.getCalendar(newCycle.id)
-                  .then((cal: any) => setCycleCalendar(cal))
-                  .catch(() => {});
+      const created = await treatmentCyclesApi.create(payload);
+      toast.success('Treatment Cycle Started', `${created.cycle_id || 'Cycle'} created successfully with status ${finalStatus === 'running' ? 'In Progress' : 'Planned'}.`);
+      setIsCreatingCycle(false);
+      onRefreshData();
+      if (created) {
+        setActiveCycle(created);
+        treatmentCyclesApi.getCalendar(created.id).then((cal: any) => setCycleCalendar(cal)).catch(() => {});
+      }
+    } catch (err: any) {
+      toast.error('Failed to create cycle', err.message || 'An error occurred');
+    } finally {
+      setIsSubmittingDraft(false);
+    }
+  };
+
+  const displayCycle = isCreatingCycle ? draftCycle : activeCycle;
+  const displayCalendar = isCreatingCycle ? draftCalendar : cycleCalendar;
+
+  const quickActions = [
+    { label: 'Consents', icon: FileCheck, cls: 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800', onClick: onOpenConsentModal },
+    { label: 'OPU Report', icon: Activity, cls: 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-800', onClick: onOpenOpuModal },
+    { label: 'Embryology', icon: FlaskConical, cls: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-800', onClick: onOpenEmbryologyModal },
+    { label: 'ET Protocol', icon: Users, cls: 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700', onClick: onOpenEtDischargeModal },
+  ];
+
+  const subTabContent = useMemo(() => {
+    if (!displayCycle) return null;
+    switch (activeSubTab) {
+      case 'intended':
+        return <IntendedTreatmentPanel cycle={displayCycle} partner={partner} onUpdateCycle={handleCycleUpdated} onNavigateNext={() => setActiveSubTab('gametes')} />;
+      case 'gametes':
+        return <GametesPanel cycle={displayCycle} onUpdateCycle={handleCycleUpdated} onNavigateNext={() => setActiveSubTab('pgs_pgd')} />;
+      case 'pgs_pgd':
+        return <PgsPgdPanel cycle={displayCycle} onUpdateCycle={handleCycleUpdated} onNavigateNext={() => setActiveSubTab('treatment_plan')} />;
+      case 'treatment_plan':
+        return <TreatmentPlanPanel cycle={displayCycle} onUpdateCycle={handleCycleUpdated} onNavigateNext={() => setActiveSubTab('endometrial')} />;
+      case 'endometrial':
+        return <EndometrialMonitoringPanel cycle={displayCycle} onUpdateCycle={handleCycleUpdated} onNavigateNext={() => setActiveSubTab('plan_details')} />;
+      case 'summary':
+        return <SummaryPanel cycle={displayCycle} patient={patient} partner={partner} onUpdateCycle={handleCycleUpdated} onStartCycle={isCreatingCycle ? () => handleFinalizeCreateCycle('running') : undefined} />;
+      case 'plan_details':
+      default:
+        return (
+          <PlanDetailsSubTabContent
+            activeCycle={displayCycle}
+            cycleCalendar={displayCalendar}
+            initialDays={displayCalendar?.days || displayCycle?.medication_calendar || []}
+            onDaysChange={(savedDays, protocolInfo) => {
+              if (isCreatingCycle) {
+                setDraftCalendar({ days: savedDays });
+                setDraftCycle((prev) => ({
+                  ...prev,
+                  medication_calendar: savedDays,
+                  ...(protocolInfo?.protocolId ? { protocol_template_id: protocolInfo.protocolId } : {}),
+                  ...(protocolInfo?.protocolName
+                    ? {
+                        sentinel_dates: {
+                          ...(prev.sentinel_dates || {}),
+                          protocol_name: protocolInfo.protocolName,
+                        },
+                      }
+                    : {}),
+                }));
               }
             }}
+            patient={patient}
+            partner={partner}
+            onRefreshData={onRefreshData}
+            onNavigateNext={() => setActiveSubTab('summary')}
           />
-        </div>
-      ) : activeCycle ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+        );
+    }
+  }, [activeSubTab, displayCycle, displayCalendar, partner, patient, isCreatingCycle]);
+
+  return (
+    <div className="space-y-6 w-full animate-in fade-in duration-200">
+      <TreatmentCyclesOverviewTable
+        cycles={cycles as TreatmentCycleRecord[]}
+        activeCycleId={activeCycle?.id}
+        onSelectCycle={(c) => {
+          setIsCreatingCycle(false);
+          setActiveCycle(c);
+          treatmentCyclesApi.getCalendar(c.id).then((cal: any) => setCycleCalendar(cal)).catch(() => {});
+        }}
+      />
+
+      {isCreatingCycle || activeCycle ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">
-                  {activeCycle.cycle_id}
-                </span>
-                {cycles.length > 1 && (
-                  <select
-                    value={activeCycle.id}
-                    onChange={(e) => {
-                      const found = cycles.find((c) => c.id === e.target.value);
-                      if (found) {
-                        setActiveCycle(found);
-                        treatmentCyclesApi.getCalendar(found.id)
-                          .then((cal: any) => setCycleCalendar(cal))
-                          .catch(() => {});
-                      }
-                    }}
-                    className="text-xs font-bold bg-slate-100 border border-slate-200 rounded px-2 py-0.5 text-slate-700 cursor-pointer"
-                  >
-                    {cycles.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.cycle_id} — {c.treatment_type} (Attempt #{c.attempt_number})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mt-1">
-                {activeCycle.treatment_type} Cycle (Attempt #{activeCycle.attempt_number})
-              </h2>
-              <p className="text-xs text-slate-500">
-                {activeCycle.treatment_type?.includes('FET') ? (
+                {isCreatingCycle ? (
                   <>
-                    LMP Day 1: <strong>{activeCycle.sentinel_dates?.lmp_day1 || '—'}</strong> · P0 Date: <strong>{activeCycle.sentinel_dates?.p0_date || '—'}</strong> · Transfer Date: <strong>{activeCycle.sentinel_dates?.et || activeCycle.sentinel_dates?.transfer_date || '—'}</strong> · β-hCG: <strong>{activeCycle.sentinel_dates?.beta_hcg_date || '—'}</strong>
-                  </>
-                ) : activeCycle.treatment_type?.includes('IUI') || activeCycle.treatment_type?.includes('OI') ? (
-                  <>
-                    Cycle Day 1: <strong>{activeCycle.sentinel_dates?.lmp_day1 || '—'}</strong> · Trigger: <strong>{activeCycle.sentinel_dates?.trigger || '—'}</strong> · Insemination: <strong>{activeCycle.sentinel_dates?.insemination || activeCycle.sentinel_dates?.opu || '—'}</strong> · β-hCG: <strong>{activeCycle.sentinel_dates?.beta_hcg_date || '—'}</strong>
+                    <span className="font-mono text-xs font-bold bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded border border-amber-200">NEW CYCLE (DRAFT)</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">Attempt #{draftCycle?.attempt_number || 1}</span>
                   </>
                 ) : (
                   <>
-                    Stimulation Start: <strong>{activeCycle.sentinel_dates?.stim_start || activeCycle.sentinel_dates?.lmp_day1 || '—'}</strong> · Trigger: <strong>{activeCycle.sentinel_dates?.trigger || '—'}</strong> · OPU: <strong>{activeCycle.sentinel_dates?.opu || '—'}</strong> · ET: <strong>{activeCycle.sentinel_dates?.et || '—'}</strong>
+                    <span className="font-mono text-xs font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded border border-primary/20">{activeCycle?.cycle_id}</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">{activeCycle?.status || 'Running'}</span>
                   </>
+                )}
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 mt-1">
+                {displayCycle?.treatment_type || 'Treatment'} Cycle {isCreatingCycle ? '(Drafting New Cycle)' : `(Attempt #${displayCycle?.attempt_number || 1})`}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isCreatingCycle ? (
+                  <span>Start: <strong>{displayCycle?.start_date || 'Today'}</strong> · Complete tabs and click <strong>&quot;Finalize &amp; Start Cycle&quot;</strong></span>
+                ) : (
+                  <span>Start: <strong>{activeCycle?.start_date || '—'}</strong> · Est. Trigger: <strong>{activeCycle?.sentinel_dates?.trigger || activeCycle?.sentinel_dates?.trigger_datetime || 'Pending'}</strong> · Est. OPU: <strong>{activeCycle?.sentinel_dates?.opu || activeCycle?.sentinel_dates?.opu_datetime || '—'}</strong></span>
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-              <button
-                type="button"
-                onClick={() => setShowMatrixModal(true)}
-                className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary rounded-md font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
-                title="Prescription Matrix & Protocol Grid"
-              >
-                <Calendar className="w-3.5 h-3.5 text-primary" />
-                <span>Prescription Matrix</span>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenConsentModal}
-                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-                title="Statutory Consent Forms"
-              >
-                <FileCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span>Consents</span>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenOpuModal}
-                className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-                title="Egg Retrieval / OPU Aspiration Report"
-              >
-                <Activity className="w-3.5 h-3.5 text-purple-600" />
-                <span>OPU Report</span>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenEmbryologyModal}
-                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-                title="Master Embryology & Insemination Form"
-              >
-                <FlaskConical className="w-3.5 h-3.5 text-primary" />
-                <span>Embryology Form</span>
-              </button>
-              <button
-                type="button"
-                onClick={onOpenEtDischargeModal}
-                className="px-2.5 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-700 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-                title="Embryo Transfer Discharge Protocol"
-              >
-                <Users className="w-3.5 h-3.5 text-pink-600" />
-                <span>ET Protocol</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCreatingCycle(true)}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Cycle</span>
-              </button>
-              <button
-                onClick={() => router.push(`/ivf-lab?cycle_id=${activeCycle.id}`)}
-                className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors shadow-sm flex items-center gap-1"
-              >
-                <span>IVF Lab →</span>
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isCreatingCycle ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingCycle(false);
+                      setDraftCycle(createEmptyDraftCycle(patientId, (cycles?.length || 0) + 1));
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancel Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFinalizeCreateCycle('running')}
+                    disabled={isSubmittingDraft}
+                    className="px-4 py-1.5 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isSubmittingDraft ? 'Starting Cycle...' : 'Finalize & Start Cycle'}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  {quickActions.map((act) => (
+                    <button key={act.label} type="button" onClick={act.onClick} className={`px-2.5 py-1.5 border rounded-md font-bold text-xs flex items-center gap-1 cursor-pointer ${act.cls}`}>
+                      <act.icon className="w-3.5 h-3.5" />
+                      <span>{act.label}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/ivf-lab?cycle_id=${activeCycle.id}`)}
+                    className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>IVF Lab →</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Day by Day Timetable */}
-          {cycleCalendar && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">
-                    Day-by-Day {activeCycle.treatment_type || 'Treatment'} Timetable &amp; Milestones
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Sentinel milestones and scheduled daily medications for this cycle
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowMatrixModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-mid transition-colors bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20"
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Open Interactive Matrix Grid →</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {cycleCalendar.days?.map((d: any) => (
-                  <div
-                    key={d.day_number}
-                    className={`p-3 rounded-lg border ${
-                      d.milestone || d.phase ? 'border-accent/40 bg-accent-light/50 shadow-sm' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between border-b pb-1 mb-1">
-                      <span className="font-bold text-xs text-slate-800">{d.display_date}</span>
-                      <span className="text-[10px] text-slate-400">{d.day_of_week}</span>
-                    </div>
-                    {(d.milestone || d.phase) && (
-                      <p className="text-xs font-bold text-primary-mid mb-1">
-                        {d.milestone || d.phase}
-                      </p>
-                    )}
-                    {d.stim_day_label && (
-                      <span className="inline-block text-[10px] font-semibold text-slate-500 mb-1">
-                        {d.stim_day_label}
-                      </span>
-                    )}
-                    {d.medications?.map((m: any, idx: number) => (
-                      <div key={idx} className="bg-slate-50 p-1.5 rounded text-[11px] font-medium text-slate-700 mt-1">
-                        <strong>{m.drug_name}</strong> — {m.dose} ({m.frequency})
-                        {m.instructions && <span className="block text-[10px] text-slate-400">{m.instructions}</span>}
-                      </div>
-                    ))}
+          <TreatmentCycleSubTabs
+            activeTab={activeSubTab}
+            onSelectTab={(tab) => {
+              if (isCreatingCycle && !draftCycle.treatment_type && tab !== 'intended') {
+                toast.warning('Step 1 Required', 'Please select Treatment Modality in Step 1 to unlock subsequent cycle steps.');
+                return;
+              }
+              setActiveSubTab(tab);
+            }}
+            onAddNewCycle={() => {
+              setDraftCycle(createEmptyDraftCycle(patientId, (cycles?.length || 0) + 1));
+              setDraftCalendar({ days: [] });
+              setIsCreatingCycle(true);
+              setActiveSubTab('intended');
+            }}
+            isDraftMode={isCreatingCycle}
+            isModalitySelected={Boolean(draftCycle.treatment_type)}
+          />
 
-                    {addingMedDay === d.day_number ? (
-                      <div className="mt-2 p-2 bg-surface-muted rounded-md border border-primary/20 space-y-2 text-xs">
-                        <input
-                          type="text"
-                          placeholder="Drug name (e.g. Inj. Recagon 225 IU)"
-                          value={newMedForm.drug_name}
-                          onChange={(e) => setNewMedForm({ ...newMedForm, drug_name: e.target.value })}
-                          className="vmd-input text-xs py-1 px-2 w-full font-bold"
-                          autoFocus
-                        />
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            placeholder="Dose"
-                            value={newMedForm.dose}
-                            onChange={(e) => setNewMedForm({ ...newMedForm, dose: e.target.value })}
-                            className="vmd-input text-xs py-1 px-2 w-1/2"
-                          />
-                          <select
-                            value={newMedForm.frequency}
-                            onChange={(e) => setNewMedForm({ ...newMedForm, frequency: e.target.value })}
-                            className="vmd-input text-xs py-1 px-2 w-1/2"
-                          >
-                            <option value="OD">OD</option>
-                            <option value="BD">BD</option>
-                            <option value="TDS">TDS</option>
-                            <option value="Stat">Stat</option>
-                            <option value="SOS">SOS</option>
-                          </select>
-                        </div>
-                        <div className="flex justify-end gap-1.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setAddingMedDay(null)}
-                            className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-700"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isSavingMed || !newMedForm.drug_name.trim()}
-                            onClick={() => handleAddMedicationToCycle(d.day_number)}
-                            className="px-2.5 py-1 text-[10px] font-bold bg-primary text-white rounded-lg hover:bg-primary-mid transition-colors shadow-sm disabled:opacity-50"
-                          >
-                            {isSavingMed ? 'Adding...' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddingMedDay(d.day_number);
-                          setNewMedForm({ drug_name: '', dose: '1 tab', frequency: 'OD', instructions: '' });
-                        }}
-                        className="w-full mt-2 py-1 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 rounded-lg border border-dashed border-primary/20 transition-colors"
-                      >
-                        + Add Medication
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {subTabContent}
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg p-12 text-center space-y-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center space-y-3 shadow-2xs">
           <Activity className="w-8 h-8 text-primary mx-auto opacity-70" />
-          <h3 className="text-sm font-bold text-slate-800">No Treatment Cycle Active</h3>
+          <h3 className="text-sm font-bold text-slate-800">No Treatment Cycle Selected</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            No active IVF, ICSI, or IUI treatment cycle is currently recorded for this patient. Start a new cycle to configure stimulation protocols, sentinel milestones, and medication timetables.
+            Select a cycle from the overview table above or click <strong>&quot;Add New Cycle&quot;</strong> to configure a treatment timetable.
           </p>
           <button
             type="button"
-            onClick={() => setIsCreatingCycle(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors shadow-sm"
+            onClick={() => {
+              setDraftCycle(createEmptyDraftCycle(patientId, (cycles?.length || 0) + 1));
+              setDraftCalendar({ days: [] });
+              setIsCreatingCycle(true);
+              setActiveSubTab('intended');
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors shadow-2xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add New Cycle</span>
           </button>
-        </div>
-      )}
-
-      {/* Interactive Prescription Matrix Modal */}
-      {showMatrixModal && activeCycle && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Prescription Matrix &amp; Protocol Grid — {activeCycle.treatment_type} (Cycle {activeCycle.cycle_id})
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Live day-by-day prescription dosing, sentinel milestones, and folliculometry
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowMatrixModal(false)}
-                className="w-7 h-7 rounded-lg bg-slate-200/70 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex-1">
-              <StimulationCalendarGrid
-                cycleId={activeCycle.id}
-                startDate={activeCycle.sentinel_dates?.stim_start || activeCycle.sentinel_dates?.lmp_day1 || activeCycle.start_date}
-                initialDays={cycleCalendar?.days || activeCycle.medication_calendar}
-                treatmentType={activeCycle.treatment_type}
-                protocolCategory={activeCycle.treatment_type?.includes('FET') ? 'fet' : 'stimulation'}
-                sentinelDates={activeCycle.sentinel_dates}
-                onCalendarSaved={() => {
-                  treatmentCyclesApi.getCalendar(activeCycle.id)
-                    .then((cal: any) => setCycleCalendar(cal))
-                    .catch(() => {});
-                  onRefreshData();
-                }}
-              />
-            </div>
-          </div>
         </div>
       )}
     </div>

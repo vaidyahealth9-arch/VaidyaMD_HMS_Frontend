@@ -412,34 +412,51 @@ export default function UnifiedScanWorkbench({
                               )}
                             </td>
                             <td className="py-2.5 px-3">
-                              {d.endometrial_thickness || d.endometrium_thickness_mm ? (
+                              {d.uterine_lining || d.endometrial_thickness || d.endometrium_thickness_mm || d.endometrium ? (
                                 <span className="font-bold text-slate-900">
-                                  {d.endometrial_thickness || d.endometrium_thickness_mm} mm
+                                  {d.uterine_lining || d.endometrial_thickness || d.endometrium_thickness_mm || d.endometrium} mm
                                 </span>
                               ) : (
                                 '—'
                               )}
                             </td>
                             <td className="py-2.5 px-3">
-                              {d.right_ovary_lead_follicle_mm ? (
+                              {d.follicles_right || d.follicle_sizes_right || d.right_ovary || d.right_ovary_lead_follicle_mm ? (
                                 <span className="text-emerald-700 font-bold">
-                                  Lead: {d.right_ovary_lead_follicle_mm} mm
+                                  {d.right_ovary_lead_follicle_mm
+                                    ? `Lead: ${d.right_ovary_lead_follicle_mm} mm`
+                                    : `${d.follicles_right || d.follicle_sizes_right || d.right_ovary} mm`}
                                 </span>
                               ) : (
                                 '—'
                               )}
                             </td>
                             <td className="py-2.5 px-3">
-                              {d.left_ovary_lead_follicle_mm ? (
+                              {d.follicles_left || d.follicle_sizes_left || d.left_ovary || d.left_ovary_lead_follicle_mm ? (
                                 <span className="text-indigo-700 font-bold">
-                                  Lead: {d.left_ovary_lead_follicle_mm} mm
+                                  {d.left_ovary_lead_follicle_mm
+                                    ? `Lead: ${d.left_ovary_lead_follicle_mm} mm`
+                                    : `${d.follicles_left || d.follicle_sizes_left || d.left_ovary} mm`}
                                 </span>
                               ) : (
                                 '—'
                               )}
                             </td>
                             <td className="py-2.5 px-3 font-mono text-[11px]">
-                              {d.antral_follicle_count_afc || d.afc || '—'}
+                              {(() => {
+                                if ((d.afc_right !== undefined && d.afc_right !== '') || (d.afc_left !== undefined && d.afc_left !== '')) {
+                                  const r = d.afc_right !== undefined && d.afc_right !== '' ? d.afc_right : '—';
+                                  const l = d.afc_left !== undefined && d.afc_left !== '' ? d.afc_left : '—';
+                                  const hasNum = !isNaN(Number(d.afc_right)) || !isNaN(Number(d.afc_left));
+                                  const total = hasNum ? (Number(d.afc_right || 0) + Number(d.afc_left || 0)) : null;
+                                  return (
+                                    <span className="font-semibold text-slate-800">
+                                      R:{r} | L:{l} {total !== null ? `(${total})` : ''}
+                                    </span>
+                                  );
+                                }
+                                return d.antral_follicle_count_afc || d.afc || d.afc_total || '—';
+                              })()}
                             </td>
                             <td className="py-2.5 px-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">

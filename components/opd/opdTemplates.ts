@@ -1,0 +1,475 @@
+import { ClinicalTemplateItem } from './TemplateManagementDialog';
+
+export const CLINICAL_TEMPLATES: ClinicalTemplateItem[] = [
+  {
+    id: 'clinical_fertility_proforma',
+    name: 'Fertility Consultation Proforma (WHO/ART)',
+    complaint: 'Fertility Consultation. Couple evaluation for planned conception.',
+    hopi: '[Couple Fertility Consultation]\n- Duration trying for pregnancy: \n- Factors identified: \n- Menstrual cycle history: \n- Coital history: \n- Prior investigations & interventions: ',
+    diagnosis: 'Primary / Secondary Infertility (Couple Workup)',
+    investigations: 'Pelvic USG TVS, Serum AMH, Day 2/3 FSH/LH/E2, Semen Analysis (WHO 6th), Viral Markers (HIV, HBsAg, HCV)',
+    plan: '1. Review baseline investigation reports\n2. Plan treatment protocol (OI / IUI / IVF-ICSI)\n3. Pre-ART statutory screening and counsel couple',
+  },
+  {
+    id: 'clinical_follicular_scan',
+    name: 'Ovulation Induction & Follicular Scan',
+    complaint: 'Follow-up for follicle tracking / stimulation cycle.',
+    hopi: 'Patient on ovarian stimulation cycle monitoring. Serial folliculometry tracking follicular development and endometrial lining.',
+    diagnosis: 'Stimulated Ovulatory Cycle / Folliculometry',
+    investigations: 'Serial Follicular Ultrasound (TVS), Serum E2/P4 if indicated',
+    plan: '1. Continue ongoing stimulation protocol as directed\n2. Schedule repeat follicular tracking scan in 48 hours\n3. Timed intercourse instructions explained to couple',
+  },
+  {
+    id: 'clinical_pcos_review',
+    name: 'PCOS Metabolic & Lifestyle Review',
+    complaint: 'Oligomenorrhea, weight gain, hirsutism, irregular menstrual cycles.',
+    hopi: 'Irregular cycles with delayed periods. History of acne and difficulty managing weight. Evaluating metabolic and ovulatory status.',
+    diagnosis: 'Polycystic Ovarian Syndrome (PCOS Phenotype)',
+    investigations: 'Fasting Insulin, Fasting Glucose (HOMA-IR), Lipid Profile, Serum Total Testosterone, Pelvic USG TVS',
+    plan: '1. Low glycemic index diet, regular aerobic exercise 45 mins/day\n2. Tab Myo-inositol + D-Chiro-Inositol 2g BD\n3. Tab Gluformin 500 SR (Metformin) OD post-dinner if insulin resistance confirmed\n4. Review after 6 weeks',
+  },
+  {
+    id: 'clinical_anc_1st_tri',
+    name: 'Antenatal Checkup (ANC) - 1st Trimester',
+    complaint: 'Confirmed pregnancy (UPT +ve). Routine first trimester antenatal care.',
+    hopi: 'Spontaneous / ART conception. Mild nausea, no spotting, no abnormal discharge, no abdominal cramps.',
+    diagnosis: 'Intrauterine Gestation - 1st Trimester (Antenatal Care)',
+    investigations: 'Dating / Viability USG, Complete Blood Count, Blood Group & Rh, Thyroid Profile (TSH), HbA1c, Rubella IgG, Double Marker (11-13 weeks)',
+    plan: '1. Tab Folvite 5mg (Folic Acid) OD morning\n2. Tab Doxylamine + Pyridoxine SOS for nausea\n3. Balanced nutrition and hydration (>2.5L/day)\n4. Viability scan review at next visit',
+  },
+  {
+    id: 'clinical_general_opd',
+    name: 'General OPD / Medical Review',
+    complaint: 'General health checkup / symptomatic evaluation.',
+    hopi: 'Patient presenting for routine outpatient clinical evaluation and supportive management.',
+    diagnosis: 'General Clinical Review',
+    investigations: 'Complete Blood Count (CBC), Urine Routine & Microscopy',
+    plan: '1. Symptomatic medical management\n2. Adequate hydration and balanced nutrition\n3. Review SOS or in 1 week if symptoms persist',
+  },
+];
+
+export interface RxTemplate {
+  id: string;
+  name: string;
+  category: string;
+  medications: Array<{
+    drug_name: string;
+    dose: string;
+    frequency: string;
+    duration?: string;
+    instructions: string;
+  }>;
+  advice?: string;
+}
+
+export const COMMON_INVESTIGATION_OPTIONS = [
+  'Pelvic TVS Scan',
+  'Serum AMH',
+  'Day 2/3 FSH & LH',
+  'Serum Estradiol (E2)',
+  'Serum Progesterone (P4)',
+  'Serum Prolactin',
+  'Thyroid (TSH)',
+  'Semen Analysis (WHO 6th)',
+  'CASA Semen Analysis',
+  'Sperm DFI',
+  'Viral Markers (HIV, HBsAg, HCV)',
+  'Complete Blood Picture (CBP)',
+  'Blood Group & Rh',
+  'HbA1c',
+  'Tubal Patency (HSG)',
+  'Diagnostic Hysteroscopy',
+  'Karyotyping (Couple)',
+];
+
+export const RX_TEMPLATES: RxTemplate[] = [
+  {
+    id: 'rx_antagonist_stim',
+    name: 'Antagonist Protocol Daily Stimulation Rx',
+    category: 'IVF Stimulation',
+    medications: [
+      {
+        drug_name: 'Inj Recombinant FSH (Gonal-F / Follisurge) 225 IU',
+        dose: '225 IU',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Subcutaneous injection daily at 8:00 PM (Days 2 to 6)',
+      },
+      {
+        drug_name: 'Inj HMG (Menopur) 75 IU',
+        dose: '75 IU',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Subcutaneous / IM injection daily at 8:00 PM (From Day 6 onward)',
+      },
+      {
+        drug_name: 'Inj GnRH Antagonist (Cetrotide) 0.25mg',
+        dose: '0.25mg',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Subcutaneous injection daily at 8:00 AM (From Day 6 until trigger)',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Morning after breakfast',
+      },
+    ],
+    advice: 'Report on Day 6 for TVS follicular tracking scan and Serum E2/P4 levels. Maintain adequate hydration (>2.5 L/day).',
+  },
+  {
+    id: 'rx_ppos_stim',
+    name: 'PPOS Protocol Daily Rx (Progestin Primed)',
+    category: 'IVF Stimulation',
+    medications: [
+      {
+        drug_name: 'Inj Recombinant FSH (Follisurge) 225 IU',
+        dose: '225 IU',
+        frequency: 'OD',
+        duration: '10 days',
+        instructions: 'SC daily at 8:00 PM from Day 2 until trigger',
+      },
+      {
+        drug_name: 'Tab Meprate 10mg (Medroxyprogesterone Acetate)',
+        dose: '10mg',
+        frequency: 'OD',
+        duration: '10 days',
+        instructions: 'Oral once daily with meals starting Day 2 until trigger day',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Morning after breakfast',
+      },
+    ],
+    advice: 'Serial follicular scans starting Day 6. Freeze-all cycle planned; embryo transfer in subsequent HRT cycle.',
+  },
+  {
+    id: 'rx_hrt_fet',
+    name: 'HRT-FET Preparation Protocol Rx (Endometrial Priming)',
+    category: 'FET Preparation',
+    medications: [
+      {
+        drug_name: 'Tab Evatone 2mg (Estradiol Valerate)',
+        dose: '2mg',
+        frequency: 'TDS',
+        duration: '14 days',
+        instructions: 'Take after meals at 8 AM, 2 PM, 8 PM',
+      },
+      {
+        drug_name: 'Tab Ecosprin 75mg (Aspirin)',
+        dose: '75mg',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Take after lunch',
+      },
+      {
+        drug_name: 'Cap Susten 400mg (Micronized Natural Progesterone)',
+        dose: '400mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Vaginal insertion upon confirmed endometrial thickness >= 8mm (P0 date)',
+      },
+      {
+        drug_name: 'Tab Duphaston 10mg (Dydrogesterone)',
+        dose: '10mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Oral luteal booster; take after food',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Morning after breakfast',
+      },
+    ],
+    advice: 'Report on Day 12 of estrogen for endometrial Doppler ultrasound. Initiate progesterone strictly as per P0 instructions.',
+  },
+  {
+    id: 'rx_iui_letrozole',
+    name: 'IUI / Timed Intercourse Ovulation Induction Rx',
+    category: 'IUI / OI',
+    medications: [
+      {
+        drug_name: 'Tab Letroz 2.5mg (Letrozole)',
+        dose: '2.5mg',
+        frequency: 'BD',
+        duration: '5 days',
+        instructions: 'Take from Cycle Day 2 to Day 6 after meals',
+      },
+      {
+        drug_name: 'Tab Fertyl 50mg (Clomiphene Citrate)',
+        dose: '50mg',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Take from Cycle Day 2 to Day 6',
+      },
+      {
+        drug_name: 'Tab Fertisure F',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Post-lunch with water for egg quality',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Daily morning after breakfast',
+      },
+    ],
+    advice: 'Come for Day 9 / Day 10 TVS follicular scan. Trigger injection will be scheduled when lead follicle reaches >= 18mm.',
+  },
+  {
+    id: 'rx_post_fet_luteal',
+    name: 'Post-FET / Post-IUI Comprehensive Luteal Phase Support',
+    category: 'FET Luteal Support',
+    medications: [
+      {
+        drug_name: 'Cap Susten 400mg (Micronized Natural Progesterone)',
+        dose: '400mg',
+        frequency: 'BD',
+        duration: '15 days',
+        instructions: 'Vaginal insertion twice daily (morning & bedtime)',
+      },
+      {
+        drug_name: 'Tab Duphaston 10mg (Dydrogesterone)',
+        dose: '1 tab',
+        frequency: 'BD',
+        duration: '15 days',
+        instructions: 'Oral twice daily after meals',
+      },
+      {
+        drug_name: 'Tab Evatone 2mg (Estradiol Valerate)',
+        dose: '2mg',
+        frequency: 'BD',
+        duration: '15 days',
+        instructions: 'Oral twice daily after meals',
+      },
+      {
+        drug_name: 'Inj Clexane 40mg (Enoxaparin Sodium)',
+        dose: '40mg',
+        frequency: 'OD',
+        duration: '15 days',
+        instructions: 'Subcutaneous injection once daily post-dinner',
+      },
+      {
+        drug_name: 'Tab Ecosprin 75mg (Aspirin)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '15 days',
+        instructions: 'Oral once daily after lunch',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Oral once daily morning',
+      },
+    ],
+    advice: 'Strict adherence to medications. Serum Beta-hCG blood test on Day 14 post-embryo transfer. Contact clinic immediately if vaginal bleeding occurs.',
+  },
+  {
+    id: 'rx_pcos_metabolic',
+    name: 'PCOS Insulin Sensitization & Cycle Regularization',
+    category: 'PCOS & Ovulation',
+    medications: [
+      {
+        drug_name: 'Tab Diane 35 (Cyproterone + Ethinylestradiol)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '21 days',
+        instructions: 'Take 1 tab daily starting Day 1 or 2 of menses for 21 days',
+      },
+      {
+        drug_name: 'Tab Gluformin 500 SR (Metformin)',
+        dose: '500mg',
+        frequency: 'BD',
+        duration: '60 days',
+        instructions: 'Take with meals to minimize gastrointestinal discomfort',
+      },
+      {
+        drug_name: 'Tab Fertisure F',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '60 days',
+        instructions: 'Post-lunch with water for oocyte quality enhancement',
+      },
+      {
+        drug_name: 'Tab Folvite 5mg (Folic Acid)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '60 days',
+        instructions: 'Morning after breakfast',
+      },
+    ],
+    advice: 'Low GI diet and 30-45 mins moderate exercise daily. Baseline lipid and HbA1c monitoring. Review after 2 months.',
+  },
+  {
+    id: 'rx_male_antioxidant',
+    name: 'Male Subfertility & Spermatogenesis Booster',
+    category: 'Andrology / Male',
+    medications: [
+      {
+        drug_name: 'Tab Nurokind LC (L-Carnitine + Mecobalamin + Folic Acid)',
+        dose: '1 tab',
+        frequency: 'BD',
+        duration: '90 days',
+        instructions: 'Twice daily after meals for 90 days',
+      },
+      {
+        drug_name: 'Cap CoQ 100mg (Coenzyme Q10)',
+        dose: '100mg',
+        frequency: 'BD',
+        duration: '90 days',
+        instructions: 'Twice daily after meals with water',
+      },
+      {
+        drug_name: 'Tab Evion LC (Levocarnitine + Vitamin E)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '90 days',
+        instructions: 'Once daily post-lunch',
+      },
+      {
+        drug_name: 'Tab Fertyl 25mg (Clomiphene Citrate)',
+        dose: '25mg',
+        frequency: 'OD',
+        duration: '60 days',
+        instructions: 'Alternate days on Mon/Wed/Fri for 60 days',
+      },
+    ],
+    advice: 'Avoid tight clothing, hot tubs, and laptop on lap. Repeat Semen Analysis (WHO 6th Ed) with CASA after 90 days.',
+  },
+  {
+    id: 'rx_dub_menorrhagia',
+    name: 'Dysfunctional Uterine Bleeding (DUB) / Menorrhagia Control',
+    category: 'Gynaecology / Bleeding',
+    medications: [
+      {
+        drug_name: 'Tab Trapic MF (Tranexamic Acid 500mg + Mefenamic Acid 250mg)',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Take during heavy flow days with meals',
+      },
+      {
+        drug_name: 'Tab Regestrone 5mg (Norethisterone)',
+        dose: '5mg',
+        frequency: 'TDS',
+        duration: '10 days',
+        instructions: 'Take three times daily after food to arrest bleeding',
+      },
+      {
+        drug_name: 'Tab Livogen Z (Iron + Folic Acid + Zinc)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '30 days',
+        instructions: 'Take once daily after dinner to replenish iron reserves',
+      },
+      {
+        drug_name: 'Cap Pan-D',
+        dose: '1 cap',
+        frequency: 'OD',
+        duration: '7 days',
+        instructions: 'Morning empty stomach 30 mins before breakfast',
+      },
+    ],
+    advice: 'Monitor sanitary pad counts. Report immediately if dizziness or heavy clots persist. Repeat hemogram after bleeding stops.',
+  },
+  {
+    id: 'rx_opu_recovery',
+    name: 'OPU Post-Egg Retrieval Recovery & OHSS Prophylaxis',
+    category: 'Post-OPU / Daycare',
+    medications: [
+      {
+        drug_name: 'Tab Caberlin 0.5mg (Cabergoline)',
+        dose: '0.5mg',
+        frequency: 'OD',
+        duration: '8 days',
+        instructions: 'At bedtime for 8 days to prevent OHSS',
+      },
+      {
+        drug_name: 'Tab Augmentin 625 Duo',
+        dose: '1 tab',
+        frequency: 'BD',
+        duration: '5 days',
+        instructions: 'Twice daily after food for 5 days',
+      },
+      {
+        drug_name: 'Tab Dolo 650 (Paracetamol)',
+        dose: '1 tab',
+        frequency: 'SOS',
+        duration: '3 days',
+        instructions: 'As needed for lower abdominal cramping (max 3/day)',
+      },
+      {
+        drug_name: 'Tab Chymoral Forte',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Take 30 mins before meals for pelvic edema relief',
+      },
+      {
+        drug_name: 'Cap Pan-D',
+        dose: '1 cap',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Morning before breakfast',
+      },
+    ],
+    advice: 'High-protein diet (egg whites, paneer, protein shake) and electrolyte-rich fluids (coconut water, ORS) > 3L/day. Contact clinic if severe abdominal distension occurs.',
+  },
+  {
+    id: 'rx_general_opd',
+    name: 'General OPD / Acute Infection & Pain Relief',
+    category: 'General OPD',
+    medications: [
+      {
+        drug_name: 'Tab Augmentin 625 Duo (Amoxicillin + Clavulanic Acid)',
+        dose: '1 tab',
+        frequency: 'BD',
+        duration: '5 days',
+        instructions: 'Take after food',
+      },
+      {
+        drug_name: 'Tab Dolo 650 (Paracetamol 650mg)',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '3 days',
+        instructions: 'For fever / body ache',
+      },
+      {
+        drug_name: 'Cap Pan-D (Pantoprazole + Domperidone)',
+        dose: '1 cap',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'Morning 30 mins before food',
+      },
+      {
+        drug_name: 'Tab Levocet M (Levocetirizine 5mg + Montelukast 10mg)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '5 days',
+        instructions: 'At bedtime for allergy/cough/rhinitis',
+      },
+      {
+        drug_name: 'Tab Cip-Zox (Chlorzoxazone + Paracetamol)',
+        dose: '1 tab',
+        frequency: 'BD',
+        duration: '3 days',
+        instructions: 'For muscle spasm and severe body pain',
+      },
+    ],
+    advice: 'Complete antibiotic course. Stay well hydrated. Review in OPD if symptoms persist after 3 days.',
+  },
+];
+

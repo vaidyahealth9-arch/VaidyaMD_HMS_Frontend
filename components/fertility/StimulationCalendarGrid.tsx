@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import PrintableStimulationSheetModal from './PrintableStimulationSheetModal';
 import {
   Calendar,
   Save,
@@ -95,40 +96,6 @@ export interface StimulationCalendarGridProps {
   cycleNumber?: string | number;
 }
 
-const IVF_ICSI_DRUGS = [
-  { name: 'Rec-FSH (Gonal-F / Puregon)', defaultDose: '225 IU', route: 'SC', frequency: 'OD Evening' },
-  { name: 'HMG (Menopur)', defaultDose: '75 IU', route: 'IM', frequency: 'OD Morning' },
-  { name: 'GnRH Antagonist (Cetrotide 0.25mg)', defaultDose: '0.25 mg', route: 'SC', frequency: 'OD Morning' },
-  { name: 'Ovulation Trigger (Ovitrelle 250mcg)', defaultDose: '250 mcg', route: 'SC', frequency: 'Stat Night' },
-  { name: 'Micronized Progesterone (Susten 400mg)', defaultDose: '400 mg', route: 'PV', frequency: 'BD' },
-  { name: 'Oral Estradiol Valerate (Progynova 2mg)', defaultDose: '2 mg', route: 'PO', frequency: 'TDS' },
-];
-
-const FET_DRUGS = [
-  { name: 'Oral Estradiol Valerate (Progynova 2mg)', defaultDose: '2 mg', route: 'PO', frequency: 'TDS' },
-  { name: 'Micronized Progesterone (Susten 400mg)', defaultDose: '400 mg', route: 'PV', frequency: 'BD' },
-  { name: 'Dydrogesterone (Duphaston 10mg)', defaultDose: '10 mg', route: 'PO', frequency: 'BD' },
-  { name: 'Aspirin / Ecosprin 75mg', defaultDose: '75 mg', route: 'PO', frequency: 'OD' },
-  { name: 'Methylfolate / Folvite 5mg', defaultDose: '5 mg', route: 'PO', frequency: 'OD' },
-  { name: 'Inj Progesterone (Proluton 100mg)', defaultDose: '100 mg', route: 'IM', frequency: 'OD' },
-];
-
-const IUI_DRUGS = [
-  { name: 'Tab Letrozole (Femara 2.5mg)', defaultDose: '2.5 mg', route: 'PO', frequency: 'OD' },
-  { name: 'Tab Clomiphene Citrate 50mg', defaultDose: '50 mg', route: 'PO', frequency: 'OD' },
-  { name: 'Inj HMG (Menopur 75 IU)', defaultDose: '75 IU', route: 'IM', frequency: 'Alt Days' },
-  { name: 'Inj hCG / Ovitrelle 250mcg (Trigger)', defaultDose: '250 mcg', route: 'SC', frequency: 'Stat' },
-  { name: 'Micronized Progesterone (Susten 200mg)', defaultDose: '200 mg', route: 'PV', frequency: 'BD' },
-  { name: 'Tab Folvite (Folic Acid 5mg)', defaultDose: '5 mg', route: 'PO', frequency: 'OD' },
-];
-
-const getTailoredDefaultDrugs = (treatmentType?: string, protocolCategory?: string) => {
-  const upper = (treatmentType || '').toUpperCase();
-  if (upper.includes('FET') || protocolCategory === 'fet') return FET_DRUGS;
-  if (upper.includes('IUI') || upper.includes('OI')) return IUI_DRUGS;
-  return IVF_ICSI_DRUGS;
-};
-
 // Helper: parse follicle sizes into colored badges
 export function parseFollicleTokens(follicleStr?: string): {
   tokens: { mm: number; category: 'mature' | 'intermediate' | 'small' }[];
@@ -158,48 +125,6 @@ export function parseFollicleTokens(follicleStr?: string): {
     smallCount: tokens.filter((t) => t.category === 'small').length,
   };
 }
-
-const STANDARD_PRESETS = [
-  {
-    id: 'antagonist_standard',
-    name: 'Flexible GnRH Antagonist (Rec-FSH 225 IU + Cetrotide)',
-    rules: [
-      { drug_name: 'Rec-FSH (Gonal-F / Puregon)', dose: '225 IU', start: 2, end: 11 },
-      { drug_name: 'GnRH Antagonist (Cetrotide 0.25mg)', dose: '0.25 mg', start: 6, end: 11 },
-      { drug_name: 'Ovulation Trigger (Ovitrelle 250mcg)', dose: '250 mcg', start: 12, end: 12 },
-    ],
-  },
-  {
-    id: 'antagonist_stepdown',
-    name: 'Antagonist Step-Down (Rec-FSH 300 IU → 225 IU + Cetrotide)',
-    rules: [
-      { drug_name: 'Rec-FSH (Gonal-F / Puregon)', dose: '300 IU', start: 2, end: 5 },
-      { drug_name: 'Rec-FSH (Gonal-F / Puregon)', dose: '225 IU', start: 6, end: 11 },
-      { drug_name: 'GnRH Antagonist (Cetrotide 0.25mg)', dose: '0.25 mg', start: 6, end: 11 },
-      { drug_name: 'Ovulation Trigger (Ovitrelle 250mcg)', dose: '250 mcg', start: 12, end: 12 },
-    ],
-  },
-  {
-    id: 'mixed_hmg_fsh',
-    name: 'Mixed Protocol: Rec-FSH 150 IU + Menopur 75 IU + Cetrotide',
-    rules: [
-      { drug_name: 'Rec-FSH (Gonal-F / Puregon)', dose: '150 IU', start: 2, end: 11 },
-      { drug_name: 'HMG (Menopur)', dose: '75 IU', start: 2, end: 11 },
-      { drug_name: 'GnRH Antagonist (Cetrotide 0.25mg)', dose: '0.25 mg', start: 6, end: 11 },
-      { drug_name: 'Ovulation Trigger (Ovitrelle 250mcg)', dose: '250 mcg', start: 12, end: 12 },
-    ],
-  },
-  {
-    id: 'mild_letrozole_hmg',
-    name: 'Mild Stimulation / DuoStim (Letrozole 5mg + Menopur 75 IU)',
-    rules: [
-      { drug_name: 'Tab Letrozole (Femara 2.5mg)', dose: '5 mg', start: 2, end: 6 },
-      { drug_name: 'HMG (Menopur)', dose: '75 IU', start: 4, end: 11 },
-      { drug_name: 'GnRH Antagonist (Cetrotide 0.25mg)', dose: '0.25 mg', start: 7, end: 11 },
-      { drug_name: 'Ovulation Trigger (Ovitrelle 250mcg)', dose: '250 mcg', start: 12, end: 12 },
-    ],
-  },
-];
 
 export default function StimulationCalendarGrid({
   cycleId,
@@ -278,17 +203,14 @@ export default function StimulationCalendarGrid({
   const [viewMode, setViewMode] = useState<'calendar' | 'matrix'>('calendar');
 
   const [totalDays, setTotalDays] = useState(14);
-  const [drugList, setDrugList] = useState<string[]>(
-    getTailoredDefaultDrugs(treatmentType, protocolCategory).map((d) => d.name)
-  );
-
-  useEffect(() => {
-    const tailored = getTailoredDefaultDrugs(treatmentType, protocolCategory);
-    setDrugList((prevList) => {
-      const combined = new Set([...tailored.map((d) => d.name), ...prevList]);
-      return Array.from(combined);
-    });
-  }, [treatmentType, protocolCategory]);
+  const [drugList, setDrugList] = useState<string[]>([
+    'Rec-FSH (Gonal-F / Puregon)',
+    'HMG (Menopur)',
+    'GnRH Antagonist (Cetrotide 0.25mg)',
+    'Ovulation Trigger (Ovitrelle 250mcg)',
+    'Micronized Progesterone (Susten 400mg)',
+    'Oral Estradiol Valerate (Progynova 2mg)',
+  ]);
 
   const [newDrugName, setNewDrugName] = useState('');
   const [showAddDrug, setShowAddDrug] = useState(false);
@@ -311,9 +233,20 @@ export default function StimulationCalendarGrid({
 
   useEffect(() => {
     protocolsApi
-      .list()
+      .list({ include_inactive: false })
       .then((res: any) => {
-        if (Array.isArray(res)) setDbProtocols(res);
+        if (Array.isArray(res)) {
+          setDbProtocols(res);
+          const dbDrugs = new Set<string>();
+          res.forEach((p: any) => {
+            p.rules?.forEach((r: any) => {
+              if (r.drug_name) dbDrugs.add(r.drug_name);
+            });
+          });
+          if (dbDrugs.size > 0) {
+            setDrugList((prev) => Array.from(new Set([...Array.from(dbDrugs), ...prev])));
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -432,9 +365,8 @@ export default function StimulationCalendarGrid({
   const handleInitiateProtocolApply = (protoId: string) => {
     if (!protoId) return;
     const hasExistingMeds = days.some((d) => d.medications && d.medications.length > 0);
-    const standard = STANDARD_PRESETS.find((p) => p.id === protoId);
-    const dbProto = dbProtocols.find((p) => p.id === protoId);
-    const protoName = standard?.name || dbProto?.name || 'Selected Protocol';
+    const dbProto = dbProtocols.find((p: any) => p.id === protoId);
+    const protoName = dbProto?.name || 'Selected Protocol';
 
     if (hasExistingMeds) {
       // Show warning confirmation popup before overriding
@@ -446,37 +378,8 @@ export default function StimulationCalendarGrid({
   };
 
   const executeApplyProtocol = (protoId: string, mode: 'overwrite' | 'merge') => {
-    const standard = STANDARD_PRESETS.find((p) => p.id === protoId);
-    if (standard) {
-      const protoDrugs = Array.from(new Set(standard.rules.map((r) => r.drug_name)));
-      setDrugList(Array.from(new Set([...drugList, ...protoDrugs])));
-
-      setDays((prev) =>
-        prev.map((day) => {
-          // If overwrite mode, clear previous medications for this day first
-          const baseMeds = mode === 'overwrite' ? [] : [...(day.medications || [])];
-
-          for (const rule of standard.rules) {
-            if (day.day_number >= rule.start && day.day_number <= rule.end) {
-              const idx = baseMeds.findIndex((m) => m.drug_name === rule.drug_name);
-              if (idx >= 0) {
-                baseMeds[idx] = { ...baseMeds[idx], dose: rule.dose };
-              } else {
-                baseMeds.push({ drug_name: rule.drug_name, dose: rule.dose });
-              }
-            }
-          }
-          return { ...day, medications: baseMeds };
-        })
-      );
-
-      setSaveMessage(`Applied: ${standard.name} (${mode === 'overwrite' ? 'Replaced schedule' : 'Merged'})`);
-      setTimeout(() => setSaveMessage(null), 3500);
-      return;
-    }
-
     // Database Protocol
-    const proto = dbProtocols.find((p) => p.id === protoId);
+    const proto = dbProtocols.find((p: any) => p.id === protoId);
     if (!proto) return;
 
     const rules = proto.rules || [];
@@ -845,18 +748,9 @@ export default function StimulationCalendarGrid({
                     className="text-[11px] text-slate-800 bg-transparent border-0 font-medium focus:ring-0 pr-1 cursor-pointer max-w-[200px] truncate"
                   >
                     <option value="">— Select Protocol to Apply —</option>
-                    <optgroup label="Standard Protocols">
-                      {STANDARD_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </optgroup>
-                    {dbProtocols.length > 0 && (
-                      <optgroup label="Database Protocols">
-                        {dbProtocols.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </optgroup>
-                    )}
+                    {dbProtocols.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -1717,530 +1611,23 @@ export default function StimulationCalendarGrid({
           {/* ========================================================================= */}
           {/* PRINTABLE MODAL FOR A4 SHEET EXPORT (BOTH CALENDAR & MATRIX VIEWS)        */}
           {/* ========================================================================= */}
-          <PrintableModal
+          <PrintableStimulationSheetModal
             isOpen={showPrintModal}
             onClose={() => setShowPrintModal(false)}
-            title="Ovarian Stimulation Protocol Sheet"
-            subtitle="Official Controlled Ovarian Stimulation & Folliculometry Clinical Record"
-            maxWidth="max-w-5xl"
-          >
-            {({ hideHeader }: { hideHeader: boolean }) => (
-              <div className="w-full flex flex-col items-center">
-                {/* Print View Mode Switcher Toolbar (Screen only) */}
-                <div className="flex flex-wrap items-center justify-between w-full max-w-[210mm] mx-auto mb-4 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-800 print:hidden">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-300">Select Print Layout:</span>
-                    <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setPrintLayoutMode('calendar')}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                          printLayoutMode === 'calendar'
-                            ? 'bg-primary text-white shadow-xs'
-                            : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        <CalendarIcon className="w-3.5 h-3.5" />
-                        <span>7-Day Calendar Grid</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPrintLayoutMode('matrix')}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                          printLayoutMode === 'matrix'
-                            ? 'bg-primary text-white shadow-xs'
-                            : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        <TableIcon className="w-3.5 h-3.5" />
-                        <span>Spreadsheet Matrix Table</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-slate-400 hidden sm:block">
-                    {printLayoutMode === 'calendar'
-                      ? 'Weekly 7-day grid view with medication boxes & scan tags'
-                      : 'High-density multi-parameter tabular matrix'}
-                  </div>
-                </div>
-
-                {/* VIEW 1: 7-DAY CALENDAR GRID PRINT PAGES */}
-                {printLayoutMode === 'calendar' ? (
-                  weekPages.map((weeksForPage, pageIdx) => (
-                    <A4Sheet
-                      key={`cal-page-${pageIdx}`}
-                      className="mb-8 print:mb-0"
-                      header={
-                        <PrintableReportHeader
-                          title="CONTROLLED OVARIAN STIMULATION PROTOCOL"
-                          subtitle={`${effectiveModality} · Weekly Medication & Scan Calendar`}
-                          badge="OVARIAN STIMULATION SHEET"
-                          department="Reproductive Medicine & Infertility"
-                          hideHospitalHeader={hideHeader}
-                          patient={{
-                            name: effectivePatient?.name || effectivePatient?.full_name || 'Patient Record',
-                            vid: effectivePatient?.vid || effectivePatient?.mrn || 'N/A',
-                            age: effectivePatient?.age ? Number(effectivePatient?.age) : undefined,
-                            gender: effectivePatient?.gender || 'Female',
-                            phone: effectivePatient?.phone || effectivePatient?.mobile,
-                            partner_name: effectivePatient?.partner_name,
-                            partner_age: effectivePatient?.partner_age,
-                          }}
-                          doctor={{
-                            name: effectiveDoctor?.name || 'Dr. Reproductive Medicine Specialist',
-                            qualification: effectiveDoctor?.qualification || 'MBBS, MS (OBG), Fellowship in Reproductive Medicine',
-                            reg_number: effectiveDoctor?.reg_number || effectiveDoctor?.registration_number,
-                            department: 'Reproductive Medicine & Infertility',
-                          }}
-                          metaFields={[
-                            { label: 'Cycle ID', value: effectiveCycleCode },
-                            { label: 'Treatment Modality', value: effectiveModality },
-                            { label: 'Stim Start Date', value: startDate || sentinelDates?.stim_start || 'Day 1' },
-                            { label: 'Est. Trigger Date', value: sentinelDates?.trigger || 'Pending Evaluation' },
-                            { label: 'Est. OPU Retrieval', value: sentinelDates?.opu || sentinelDates?.insemination || 'Pending Trigger' },
-                          ]}
-                        />
-                      }
-                      footer={
-                        <PrintableReportFooter
-                          signatoryName={effectiveDoctor?.name || 'Dr. Reproductive Medicine Specialist'}
-                          signatoryQualification={effectiveDoctor?.qualification || 'MBBS, MS (OBG), Fellowship in Reproductive Medicine'}
-                          signatoryTitle="Consultant Gynecologist & ART Specialist"
-                          showSignatory={true}
-                          pageNumber={pageIdx + 1}
-                          totalPages={weekPages.length}
-                          hideHospitalFooter={hideHeader}
-                        />
-                      }
-                    >
-                      {/* Clinical Summary Bar on Page 1 */}
-                      {pageIdx === 0 && (
-                        <div className="mb-3 p-2 bg-slate-50 border border-slate-300 rounded-lg grid grid-cols-3 gap-2 text-[9px]">
-                          <div className="border-r border-slate-200 pr-2">
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              Follicular Cohort (Latest)
-                            </div>
-                            <div className="font-bold text-slate-900 mt-0.5">
-                              Total: {follicleSummary.totalCount} | Mature (≥18mm):{' '}
-                              <span className="text-emerald-700">{follicleSummary.matureCount}</span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              14–17mm: {follicleSummary.intermediateCount} · &lt;14mm: {follicleSummary.smallCount}
-                            </div>
-                          </div>
-                          <div className="border-r border-slate-200 pr-2">
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              Trigger Readiness
-                            </div>
-                            <div className="font-bold mt-0.5">
-                              <span
-                                className={
-                                  follicleSummary.triggerReady
-                                    ? 'text-emerald-700 font-extrabold'
-                                    : 'text-amber-700'
-                                }
-                              >
-                                {follicleSummary.triggerReady ? '✓ Trigger Criteria Met' : 'Stimulation Ongoing'}
-                              </span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              Est. Trigger: {sentinelDates?.trigger || 'Pending Evaluation'}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              OHSS Safety Assessment
-                            </div>
-                            <div className="font-bold mt-0.5">
-                              Peak E2: {maxE2 ? `${maxE2} pg/mL` : '—'} ·{' '}
-                              <span
-                                className={
-                                  isHighOhssRisk
-                                    ? 'text-rose-700'
-                                    : isModerateOhssRisk
-                                    ? 'text-amber-700'
-                                    : 'text-emerald-700'
-                                }
-                              >
-                                {isHighOhssRisk ? 'High Risk' : isModerateOhssRisk ? 'Moderate Risk' : 'Low Risk'}
-                              </span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              {isHighOhssRisk
-                                ? 'Decapeptyl Trigger / Freeze-all recommended'
-                                : 'Standard gonadotropin stimulation protocol'}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 7-Day Weeks */}
-                      <div className="space-y-3">
-                        {weeksForPage.map((week, wIdx) => {
-                          const weekNumber = pageIdx * 2 + wIdx + 1;
-                          return (
-                            <div key={wIdx} className="border border-slate-300 rounded-lg overflow-hidden bg-white">
-                              {/* Week Header */}
-                              <div className="bg-slate-100 border-b border-slate-300 px-3 py-1 flex items-center justify-between text-[10px] font-bold text-slate-800">
-                                <span className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
-                                  <span>Week {weekNumber}</span>
-                                  <span className="text-slate-500 font-normal">
-                                    (Days {week[0]?.day_number} – {week[week.length - 1]?.day_number})
-                                  </span>
-                                </span>
-                                <span className="text-[8.5px] text-slate-500 font-medium">
-                                  {week[0]?.display_date} to {week[week.length - 1]?.display_date}
-                                </span>
-                              </div>
-
-                              {/* 7 Columns */}
-                              <div className="grid grid-cols-7 divide-x divide-slate-300">
-                                {week.map((day) => {
-                                  const rFollicles = parseFollicleTokens(day.right_follicles);
-                                  const lFollicles = parseFollicleTokens(day.left_follicles);
-                                  const hasScan = Boolean(
-                                    day.right_follicles || day.left_follicles || day.endometrium_mm || day.e2_pgml
-                                  );
-                                  const isMilestone = Boolean(day.milestone);
-                                  const isTrigger = day.milestone?.toLowerCase().includes('trigger');
-                                  const isOpu = day.milestone?.toLowerCase().includes('opu');
-
-                                  return (
-                                    <div
-                                      key={day.day_number}
-                                      className={`p-1.5 flex flex-col justify-between min-h-[140px] text-[8.5px] ${
-                                        isTrigger
-                                          ? 'bg-amber-50/60'
-                                          : isOpu
-                                          ? 'bg-rose-50/60'
-                                          : isMilestone
-                                          ? 'bg-primary/5'
-                                          : 'bg-white'
-                                      }`}
-                                    >
-                                      <div>
-                                        <div className="flex items-center justify-between border-b border-slate-200 pb-1 mb-1">
-                                          <span className="font-extrabold text-slate-900 text-[9px]">
-                                            Day {day.day_number}
-                                          </span>
-                                          <span className="text-[7.5px] font-semibold text-slate-500 uppercase">
-                                            {day.day_of_week?.slice(0, 3)}
-                                          </span>
-                                        </div>
-                                        <div className="text-[7.5px] text-slate-400 mb-1">
-                                          {day.display_date?.split(' ').slice(0, 2).join(' ')}
-                                        </div>
-
-                                        {day.milestone && (
-                                          <div className="mb-1">
-                                            <span className="inline-block text-[7px] font-bold px-1 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 leading-tight w-full truncate text-center">
-                                              {day.milestone}
-                                            </span>
-                                          </div>
-                                        )}
-
-                                        <div className="space-y-0.5">
-                                          {day.medications && day.medications.length > 0 ? (
-                                            day.medications.map((m, mIdx) => (
-                                              <div
-                                                key={mIdx}
-                                                className="bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[7.5px] leading-tight"
-                                              >
-                                                <div className="font-bold text-slate-900 truncate" title={m.drug_name}>
-                                                  {m.drug_name.split('(')[0].trim()}
-                                                </div>
-                                                <div className="text-primary font-extrabold text-[7.5px]">
-                                                  {m.dose}
-                                                </div>
-                                              </div>
-                                            ))
-                                          ) : (
-                                            <div className="text-slate-300 italic text-[7.5px] py-1 text-center">
-                                              —
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-1 pt-1 border-t border-slate-200 text-[7px] space-y-0.5">
-                                        {hasScan ? (
-                                          <>
-                                            {day.endometrium_mm && (
-                                              <div className="font-bold text-emerald-800 flex justify-between">
-                                                <span>Endo:</span>
-                                                <span>{day.endometrium_mm}mm</span>
-                                              </div>
-                                            )}
-                                            {(rFollicles.tokens.length > 0 || lFollicles.tokens.length > 0) && (
-                                              <div className="leading-tight text-slate-700">
-                                                {rFollicles.tokens.length > 0 && (
-                                                  <div className="truncate">
-                                                    <span className="font-bold text-rose-700">R:</span>{' '}
-                                                    {rFollicles.tokens.map((t) => `${t.mm}`).join(', ')}
-                                                  </div>
-                                                )}
-                                                {lFollicles.tokens.length > 0 && (
-                                                  <div className="truncate">
-                                                    <span className="font-bold text-rose-700">L:</span>{' '}
-                                                    {lFollicles.tokens.map((t) => `${t.mm}`).join(', ')}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                            {day.e2_pgml && (
-                                              <div className="text-amber-800 font-bold truncate">
-                                                E2: {day.e2_pgml} pg
-                                              </div>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <div className="text-slate-300 text-[7px] text-center">—</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </A4Sheet>
-                  ))
-                ) : (
-                  /* VIEW 2: SPREADSHEET MATRIX TABLE PRINT PAGES */
-                  dayPages.map((daysForPage, pageIdx) => (
-                    <A4Sheet
-                      key={`matrix-page-${pageIdx}`}
-                      className="mb-8 print:mb-0"
-                      header={
-                        <PrintableReportHeader
-                          title="CONTROLLED OVARIAN STIMULATION PROTOCOL"
-                          subtitle={`${effectiveModality} · Clinical Medication & Folliculometry Matrix`}
-                          badge="OVARIAN STIMULATION SHEET"
-                          department="Reproductive Medicine & Infertility"
-                          hideHospitalHeader={hideHeader}
-                          patient={{
-                            name: effectivePatient?.name || effectivePatient?.full_name || 'Patient Record',
-                            vid: effectivePatient?.vid || effectivePatient?.mrn || 'N/A',
-                            age: effectivePatient?.age ? Number(effectivePatient?.age) : undefined,
-                            gender: effectivePatient?.gender || 'Female',
-                            phone: effectivePatient?.phone || effectivePatient?.mobile,
-                            partner_name: effectivePatient?.partner_name,
-                            partner_age: effectivePatient?.partner_age,
-                          }}
-                          doctor={{
-                            name: effectiveDoctor?.name || 'Dr. Reproductive Medicine Specialist',
-                            qualification: effectiveDoctor?.qualification || 'MBBS, MS (OBG), Fellowship in Reproductive Medicine',
-                            reg_number: effectiveDoctor?.reg_number || effectiveDoctor?.registration_number,
-                            department: 'Reproductive Medicine & Infertility',
-                          }}
-                          metaFields={[
-                            { label: 'Cycle ID', value: effectiveCycleCode },
-                            { label: 'Treatment Modality', value: effectiveModality },
-                            { label: 'Stim Start Date', value: startDate || sentinelDates?.stim_start || 'Day 1' },
-                            { label: 'Est. Trigger Date', value: sentinelDates?.trigger || 'Pending Evaluation' },
-                            { label: 'Est. OPU Retrieval', value: sentinelDates?.opu || sentinelDates?.insemination || 'Pending Trigger' },
-                          ]}
-                        />
-                      }
-                      footer={
-                        <PrintableReportFooter
-                          signatoryName={effectiveDoctor?.name || 'Dr. Reproductive Medicine Specialist'}
-                          signatoryQualification={effectiveDoctor?.qualification || 'MBBS, MS (OBG), Fellowship in Reproductive Medicine'}
-                          signatoryTitle="Consultant Gynecologist & ART Specialist"
-                          showSignatory={true}
-                          pageNumber={pageIdx + 1}
-                          totalPages={dayPages.length}
-                          hideHospitalFooter={hideHeader}
-                        />
-                      }
-                    >
-                      {/* Clinical Summary Bar on Page 1 */}
-                      {pageIdx === 0 && (
-                        <div className="mb-3 p-2 bg-slate-50 border border-slate-300 rounded-lg grid grid-cols-3 gap-2 text-[9px]">
-                          <div className="border-r border-slate-200 pr-2">
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              Follicular Cohort (Latest)
-                            </div>
-                            <div className="font-bold text-slate-900 mt-0.5">
-                              Total: {follicleSummary.totalCount} | Mature (≥18mm):{' '}
-                              <span className="text-emerald-700">{follicleSummary.matureCount}</span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              14–17mm: {follicleSummary.intermediateCount} · &lt;14mm: {follicleSummary.smallCount}
-                            </div>
-                          </div>
-                          <div className="border-r border-slate-200 pr-2">
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              Trigger Readiness
-                            </div>
-                            <div className="font-bold mt-0.5">
-                              <span
-                                className={
-                                  follicleSummary.triggerReady
-                                    ? 'text-emerald-700 font-extrabold'
-                                    : 'text-amber-700'
-                                }
-                              >
-                                {follicleSummary.triggerReady ? '✓ Trigger Criteria Met' : 'Stimulation Ongoing'}
-                              </span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              Est. Trigger: {sentinelDates?.trigger || 'Pending Evaluation'}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500">
-                              OHSS Safety Assessment
-                            </div>
-                            <div className="font-bold mt-0.5">
-                              Peak E2: {maxE2 ? `${maxE2} pg/mL` : '—'} ·{' '}
-                              <span
-                                className={
-                                  isHighOhssRisk
-                                    ? 'text-rose-700'
-                                    : isModerateOhssRisk
-                                    ? 'text-amber-700'
-                                    : 'text-emerald-700'
-                                }
-                              >
-                                {isHighOhssRisk ? 'High Risk' : isModerateOhssRisk ? 'Moderate Risk' : 'Low Risk'}
-                              </span>
-                            </div>
-                            <div className="text-slate-600 text-[8px]">
-                              {isHighOhssRisk
-                                ? 'Decapeptyl Trigger / Freeze-all recommended'
-                                : 'Standard gonadotropin stimulation protocol'}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Matrix Table */}
-                      <div className="my-1 border border-slate-300 rounded-lg overflow-hidden bg-white">
-                        <table className="w-full text-left border-collapse text-[8px]">
-                          <thead>
-                            <tr className="bg-slate-200/90 text-slate-800 font-extrabold uppercase text-[7.5px] border-b border-slate-300">
-                              <th colSpan={2} className="p-1.5 border-r border-slate-300">
-                                Timeline &amp; Milestones
-                              </th>
-                              <th
-                                colSpan={printDrugColumns.length}
-                                className="p-1.5 border-r border-slate-300 bg-primary/10 text-primary text-center"
-                              >
-                                Prescribed Medications &amp; Dosages
-                              </th>
-                              <th
-                                colSpan={3}
-                                className="p-1.5 border-r border-slate-300 bg-rose-50 text-rose-900 text-center"
-                              >
-                                Folliculometry &amp; Endometrium
-                              </th>
-                              <th colSpan={2} className="p-1.5 bg-amber-50 text-amber-900 text-center">
-                                Serum Hormones
-                              </th>
-                            </tr>
-                            <tr className="bg-slate-100 text-slate-800 font-bold text-[7.5px] border-b border-slate-300">
-                              <th className="p-1 border-r border-slate-300 min-w-[65px]">Day / Date</th>
-                              <th className="p-1 border-r border-slate-300 min-w-[85px]">Milestone</th>
-                              {printDrugColumns.map((drug) => (
-                                <th
-                                  key={drug}
-                                  className="p-1 border-r border-slate-300 text-center min-w-[65px] truncate max-w-[95px]"
-                                  title={drug}
-                                >
-                                  {drug.split('(')[0].trim()}
-                                </th>
-                              ))}
-                              <th className="p-1 border-r border-slate-300 text-center min-w-[60px]">R. Ovary (mm)</th>
-                              <th className="p-1 border-r border-slate-300 text-center min-w-[60px]">L. Ovary (mm)</th>
-                              <th className="p-1 border-r border-slate-300 text-center min-w-[50px]">Endo (mm)</th>
-                              <th className="p-1 border-r border-slate-300 text-center min-w-[50px]">E2 (pg/mL)</th>
-                              <th className="p-1 text-center min-w-[50px]">P4 (ng/mL)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {daysForPage.map((day, rowIdx) => {
-                              const isTrigger = day.milestone?.toLowerCase().includes('trigger');
-                              const isOpu = day.milestone?.toLowerCase().includes('opu');
-
-                              return (
-                                <tr
-                                  key={day.day_number}
-                                  className={`${
-                                    isTrigger
-                                      ? 'bg-amber-50/70 font-bold'
-                                      : isOpu
-                                      ? 'bg-rose-50/70 font-bold'
-                                      : rowIdx % 2 === 0
-                                      ? 'bg-white'
-                                      : 'bg-slate-50/80'
-                                  }`}
-                                >
-                                  <td className="p-1 border-r border-slate-300 font-bold text-slate-900 whitespace-nowrap">
-                                    Day {day.day_number}{' '}
-                                    <span className="text-[7px] font-normal text-slate-500">
-                                      ({day.display_date?.split(' ').slice(0, 2).join(' ')}, {day.day_of_week?.slice(0, 3)})
-                                    </span>
-                                  </td>
-                                  <td className="p-1 border-r border-slate-300">
-                                    {day.milestone ? (
-                                      <span className="inline-block text-[7px] font-bold px-1 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 truncate max-w-[95px]">
-                                        {day.milestone}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-300">—</span>
-                                    )}
-                                  </td>
-                                  {printDrugColumns.map((drug) => {
-                                    const med = day.medications?.find((m) => m.drug_name === drug);
-                                    const dose = med?.dose;
-                                    return (
-                                      <td
-                                        key={drug}
-                                        className="p-1 border-r border-slate-300 text-center font-bold text-slate-900"
-                                      >
-                                        {dose ? (
-                                          <span className="text-primary font-extrabold">{dose}</span>
-                                        ) : (
-                                          <span className="text-slate-300 font-normal">—</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                                  <td className="p-1 border-r border-slate-300 text-center font-medium">
-                                    {day.right_follicles || <span className="text-slate-300">—</span>}
-                                  </td>
-                                  <td className="p-1 border-r border-slate-300 text-center font-medium">
-                                    {day.left_follicles || <span className="text-slate-300">—</span>}
-                                  </td>
-                                  <td className="p-1 border-r border-slate-300 text-center font-bold text-emerald-800">
-                                    {day.endometrium_mm ? (
-                                      `${day.endometrium_mm} mm`
-                                    ) : (
-                                      <span className="text-slate-300 font-normal">—</span>
-                                    )}
-                                  </td>
-                                  <td className="p-1 border-r border-slate-300 text-center font-bold text-amber-800">
-                                    {day.e2_pgml || <span className="text-slate-300 font-normal">—</span>}
-                                  </td>
-                                  <td className="p-1 text-center font-bold text-amber-800">
-                                    {day.p4_ngml || <span className="text-slate-300 font-normal">—</span>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </A4Sheet>
-                  ))
-                )}
-              </div>
-            )}
-          </PrintableModal>
+            effectiveModality={effectiveModality}
+            effectivePatient={effectivePatient}
+            effectiveDoctor={effectiveDoctor}
+            effectiveCycleCode={effectiveCycleCode}
+            startDate={startDate}
+            sentinelDates={sentinelDates}
+            follicleSummary={follicleSummary}
+            maxE2={maxE2}
+            isHighOhssRisk={isHighOhssRisk}
+            isModerateOhssRisk={isModerateOhssRisk}
+            weekPages={weekPages}
+            dayPages={dayPages}
+            printDrugColumns={printDrugColumns}
+          />
         </>
       )}
     </div>

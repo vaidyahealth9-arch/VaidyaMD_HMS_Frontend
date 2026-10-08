@@ -22,6 +22,7 @@ export interface User {
   role: UserRole | string;
   is_doctor?: boolean;
   department?: string;
+  departments?: string[];
   specialization?: string;
   qualification?: string;
   registration_number?: string;
