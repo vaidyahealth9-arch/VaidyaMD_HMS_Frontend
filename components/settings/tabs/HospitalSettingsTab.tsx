@@ -149,14 +149,34 @@ export default function HospitalSettingsTab({
       const data = await res.json();
       const newLogo = data.url;
       setHospitalProfile((prev: any) => ({ ...prev, logo_url: newLogo }));
-      setLiveReceiptHeader((prev: any) => ({ ...prev, logo_url: newLogo }));
+      const updatedHeader = { ...liveReceiptHeader, logo_url: newLogo };
+      setLiveReceiptHeader(updatedHeader);
       // Immediately persist to backend so it is saved without requiring extra manual action
       try {
-        await adminApi.updateHospitalProfile({ ...hospitalProfile, logo_url: newLogo });
+        const curBranch = hospitalBranches[selectedBranchIndex];
+        const branchesPayload = curBranch
+          ? [
+              {
+                branch_id: curBranch.id,
+                name: curBranch.name,
+                code: curBranch.code,
+                address: curBranch.address,
+                phone: curBranch.phone,
+                email: curBranch.email,
+                gstin: updatedHeader.gstin || curBranch.gstin,
+                receipt_header: updatedHeader,
+              },
+            ]
+          : [];
+        await adminApi.updateHospitalProfile({
+          ...hospitalProfile,
+          logo_url: newLogo,
+          branches: branchesPayload,
+        });
       } catch (saveErr) {
         console.warn('Auto-persist logo notice:', saveErr);
       }
-      alert(`Hospital logo uploaded successfully! (${dims.width} × ${dims.height} px)`);
+      alert(`Hospital logo uploaded and saved successfully! (${dims.width} × ${dims.height} px)`);
     } catch (err: any) {
       alert('Failed to upload logo: ' + (err.message || 'Unknown error'));
     } finally {
@@ -188,8 +208,33 @@ export default function HospitalSettingsTab({
       }
       const data = await res.json();
       const newWatermark = data.url;
-      setLiveReceiptHeader((prev: any) => ({ ...prev, watermark_url: newWatermark }));
-      alert('Watermark background image uploaded successfully! View the live preview on the right.');
+      const updatedHeader = { ...liveReceiptHeader, watermark_url: newWatermark };
+      setLiveReceiptHeader(updatedHeader);
+      // Immediately persist to backend so watermark is saved without requiring manual save
+      try {
+        const curBranch = hospitalBranches[selectedBranchIndex];
+        const branchesPayload = curBranch
+          ? [
+              {
+                branch_id: curBranch.id,
+                name: curBranch.name,
+                code: curBranch.code,
+                address: curBranch.address,
+                phone: curBranch.phone,
+                email: curBranch.email,
+                gstin: updatedHeader.gstin || curBranch.gstin,
+                receipt_header: updatedHeader,
+              },
+            ]
+          : [];
+        await adminApi.updateHospitalProfile({
+          ...hospitalProfile,
+          branches: branchesPayload,
+        });
+      } catch (saveErr) {
+        console.warn('Auto-persist watermark notice:', saveErr);
+      }
+      alert('Watermark background image uploaded and saved successfully! View the live preview on the right.');
     } catch (err: any) {
       alert('Failed to upload watermark image: ' + (err.message || 'Unknown error'));
     } finally {
@@ -198,8 +243,32 @@ export default function HospitalSettingsTab({
     }
   };
 
-  const handleRemoveWatermark = () => {
-    setLiveReceiptHeader((prev: any) => ({ ...prev, watermark_url: '' }));
+  const handleRemoveWatermark = async () => {
+    const updatedHeader = { ...liveReceiptHeader, watermark_url: '' };
+    setLiveReceiptHeader(updatedHeader);
+    try {
+      const curBranch = hospitalBranches[selectedBranchIndex];
+      const branchesPayload = curBranch
+        ? [
+            {
+              branch_id: curBranch.id,
+              name: curBranch.name,
+              code: curBranch.code,
+              address: curBranch.address,
+              phone: curBranch.phone,
+              email: curBranch.email,
+              gstin: updatedHeader.gstin || curBranch.gstin,
+              receipt_header: updatedHeader,
+            },
+          ]
+        : [];
+      await adminApi.updateHospitalProfile({
+        ...hospitalProfile,
+        branches: branchesPayload,
+      });
+    } catch (saveErr) {
+      console.warn('Auto-persist remove watermark notice:', saveErr);
+    }
   };
 
 
