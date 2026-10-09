@@ -50,11 +50,23 @@ export interface PrintableReportHeaderProps {
 
 export function resolveLogoUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+  if (url.startsWith('data:')) {
     return url;
   }
+
   const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   const backendRoot = rawApi.replace(/\/api\/?$/, '');
+
+  // If URL was stored as a GCS direct URL, normalize to clean /uploads/... route
+  const gcsMatch = url.match(/https?:\/\/storage\.googleapis\.com\/[^\/]+-uploads\/(.+)$/);
+  if (gcsMatch) {
+    return `${backendRoot}/uploads/${gcsMatch[1]}`;
+  }
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
   const cleanPath = url.startsWith('/') ? url : `/${url}`;
   return `${backendRoot}${cleanPath}`;
 }
