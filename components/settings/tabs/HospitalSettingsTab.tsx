@@ -335,7 +335,6 @@ export default function HospitalSettingsTab({
                           src={resolveLogoUrl(hospitalProfile.logo_url)}
                           alt="Logo"
                           className="max-w-full max-h-full object-contain"
-                          crossOrigin="anonymous"
                           onError={(e) => { (e.target as any).style.display = 'none'; }}
                         />
                       </div>
@@ -765,7 +764,6 @@ export default function HospitalSettingsTab({
                     src={resolveLogoUrl(hospitalProfile?.logo_url || liveReceiptHeader?.logo_url)}
                     alt="Hospital Logo"
                     className="max-h-24 max-w-full object-contain mx-auto"
-                    crossOrigin="anonymous"
                     onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
