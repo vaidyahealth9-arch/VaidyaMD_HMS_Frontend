@@ -156,12 +156,16 @@ export default function PharmacyPage() {
       created_at: invData.created_at || new Date().toISOString(),
       appointment_source: 'Pharmacy',
       reason_for_attendance: 'Point of Sale Pharmacy Dispense',
-      items: (invData.dispensed_batches || []).map((b: any) => ({
-        description: `${b.item_name} (Batch: ${b.batch_number || 'N/A'}${b.expiry_date ? `, Exp: ${formatDate(b.expiry_date)}` : ''})`,
-        quantity: b.quantity_dispensed || b.quantity || 1,
-        unit_price: b.unit_price || 0,
-        total: b.total_price || (b.quantity_dispensed || b.quantity || 1) * (b.unit_price || 0),
-      })),
+      items: (invData.dispensed_batches || []).map((b: any) => {
+        const qty = b.quantity_dispensed || b.quantity || 1;
+        const uPrice = b.unit_price ?? (b.total_price ? b.total_price / qty : 0);
+        return {
+          description: `${b.item_name} (Batch: ${b.batch_number || 'N/A'}${b.expiry_date ? `, Exp: ${formatDate(b.expiry_date)}` : ''})`,
+          quantity: qty,
+          unit_price: uPrice,
+          total: b.total_price || (qty * uPrice),
+        };
+      }),
       subtotal: invData.total_amount || 0,
       total_amount: invData.total_amount || 0,
       paid_amount: invData.paid_amount || invData.total_amount || 0,
@@ -178,14 +182,18 @@ export default function PharmacyPage() {
       created_at: inv.created_at || new Date().toISOString(),
       appointment_source: inv.appointment_source || 'Pharmacy',
       reason_for_attendance: inv.reason_for_attendance || 'Point of Sale Pharmacy Dispense',
-      items: (Array.isArray(inv.items) ? inv.items : []).map((it: any) => ({
-        description: it.item_name
-          ? `${it.item_name}${it.batch_number ? ` (Batch: ${it.batch_number})` : ''}`
-          : it.description || 'Medication Dispensed',
-        quantity: it.quantity_dispensed || it.quantity || 1,
-        unit_price: it.unit_price || 0,
-        total: it.total_price || it.total || (it.quantity_dispensed || it.quantity || 1) * (it.unit_price || 0),
-      })),
+      items: (Array.isArray(inv.items) ? inv.items : []).map((it: any) => {
+        const qty = it.quantity_dispensed || it.quantity || 1;
+        const uPrice = it.unit_price ?? it.unitPrice ?? it.rate ?? it.price ?? (it.total ? it.total / qty : 0);
+        return {
+          description: it.item_name
+            ? `${it.item_name}${it.batch_number ? ` (Batch: ${it.batch_number})` : ''}`
+            : it.description || 'Medication Dispensed',
+          quantity: qty,
+          unit_price: uPrice,
+          total: it.total_price || it.total || (qty * uPrice),
+        };
+      }),
       subtotal: inv.subtotal || inv.total_amount,
       total_amount: inv.total_amount,
       paid_amount: inv.paid_amount || inv.total_amount,

@@ -47,4 +47,6 @@ export const opdApi = {
   },
   getPatientConsultations: (patientId: string) =>
     request<any[]>(`/core/clinical-records/${patientId}?plugin_id=opd`),
+  deleteConsultation: (recordId: string) =>
+    request<any>(`/core/clinical-records/${recordId}`, { method: 'DELETE' }),
 };

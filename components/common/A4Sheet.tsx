@@ -11,14 +11,14 @@ export interface A4SheetProps {
   watermarkUrl?: string;
   watermarkOpacity?: number;
   className?: string;
+  pageSize?: 'a4' | 'a5';
 }
 
 /**
- * A4Sheet — Self-contained authentic A4 page component.
- * • Dimensions: 210mm x 297mm proportions on screen with paper shadow.
- * • Print: Exact 210mm x 296mm sheet with page-break-after: always.
- * • Strict flex-col layout: Content sits between Header and Footer with ZERO overlap.
- * • Full bleed: Top and bottom stripes reach extreme edges with 0 margin.
+ * A4Sheet — Self-contained authentic A4 / A5 page component with strict flex layout.
+ * • Dimensions: 210mm x 297mm (A4 portrait), 297mm x 210mm (A4 landscape), or 148mm x 210mm (A5) with paper drop-shadow.
+ * • Strict flexbox: Header at top (shrink-0), Content in middle with flex-1, Footer pinned at bottom (mt-auto).
+ * • Zero margin @page enables full-bleed stripes touching paper edges.
  */
 export default function A4Sheet({
   children,
@@ -27,6 +27,7 @@ export default function A4Sheet({
   watermarkUrl,
   watermarkOpacity,
   className = '',
+  pageSize = 'a4',
 }: A4SheetProps) {
   const { currentBranch } = useAuth() || {};
 
@@ -40,9 +41,11 @@ export default function A4Sheet({
       ? watermarkOpacity
       : Number(currentBranch?.receipt_header?.watermark_opacity ?? 0.08);
 
+  const sheetSizeClass = pageSize === 'a5' ? 'a5-print-sheet' : 'a4-print-sheet';
+
   return (
     <div
-      className={`a4-print-sheet relative flex flex-col justify-between bg-white text-slate-900 text-xs ${className}`}
+      className={`${sheetSizeClass} relative flex flex-col justify-between bg-white text-slate-900 text-xs ${className}`}
       style={{ fontFamily: 'Inter, Arial, sans-serif' }}
     >
       {/* Centered Watermark Background on each sheet */}
@@ -60,16 +63,21 @@ export default function A4Sheet({
         </div>
       )}
 
-      {/* Top Header — sits strictly at top */}
-      {header && <div className="shrink-0 relative z-10 w-full">{header}</div>}
+      {header && (
+        <div className="printable-header-container w-full shrink-0 relative z-10">
+          {header}
+        </div>
+      )}
 
-      {/* Middle Content Area — strictly in between header and footer, cannot overlap! */}
-      <div className="a4-sheet-content flex-1 flex flex-col justify-start relative z-10 w-full">
+      <div className="a4-sheet-content flex-1 flex flex-col justify-start relative z-10 w-full min-h-0">
         {children}
       </div>
 
-      {/* Bottom Footer — sits strictly at bottom */}
-      {footer && <div className="shrink-0 mt-auto relative z-10 w-full">{footer}</div>}
+      {footer && (
+        <div className="printable-footer-container w-full shrink-0 mt-auto relative z-10">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

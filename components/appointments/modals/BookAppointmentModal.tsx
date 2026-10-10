@@ -32,6 +32,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'Clinical Review',
     prepTip: 'Both partners recommended for initial workup',
     defaultNotes: 'Initial fertility evaluation & history',
+    defaultFee: 500,
   },
   {
     id: 'tvs_scan',
@@ -41,6 +42,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'Ultrasound',
     prepTip: 'Empty bladder immediately before scan',
     defaultNotes: 'Follicular scan (Day of cycle tracking)',
+    defaultFee: 800,
   },
   {
     id: 'opu',
@@ -50,6 +52,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'OT Daycare',
     prepTip: 'Strict fasting 6h; check trigger timing (34-36h prior)',
     defaultNotes: 'OPU Ovum Pick Up procedure',
+    defaultFee: 25000,
   },
   {
     id: 'et',
@@ -59,6 +62,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'OT Transfer',
     prepTip: 'Full bladder required; drink 3 glasses water 45m prior',
     defaultNotes: 'Embryo transfer procedure',
+    defaultFee: 20000,
   },
   {
     id: 'semen_analysis',
@@ -68,6 +72,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'Andrology',
     prepTip: 'Mandatory 2 to 5 days sexual abstinence required',
     defaultNotes: 'Semen sample collection & analysis',
+    defaultFee: 1000,
   },
   {
     id: 'iui',
@@ -77,6 +82,7 @@ export const DEFAULT_VISIT_TYPES = [
     badge: 'Procedure',
     prepTip: 'Sample prepared 1-2h prior in andrology lab',
     defaultNotes: 'IUI Insemination procedure',
+    defaultFee: 5000,
   },
 ];
 
@@ -122,6 +128,8 @@ const normalizeVisitType = (vt: any, idx: number) => {
     fallback.prepTip;
 
   const defaultNotes = vt.defaultNotes || meta.defaultNotes || fallback.defaultNotes || '';
+  const rawFee = vt.fee ?? vt.price ?? vt.defaultFee ?? meta.fee ?? meta.price ?? meta.amount ?? fallback.defaultFee ?? 500;
+  const defaultFee = Number(rawFee) || 0;
 
   return {
     ...fallback,
@@ -131,6 +139,7 @@ const normalizeVisitType = (vt: any, idx: number) => {
     duration,
     prepTip,
     defaultNotes,
+    defaultFee,
   };
 };
 
@@ -169,7 +178,7 @@ export default function BookAppointmentModal({
       scheduled_at: defaultTime,
       visit_type: 'consultation',
       status: 'scheduled',
-      consultation_fee: 0,
+      consultation_fee: 500,
       notes: '',
     };
   };
@@ -255,11 +264,16 @@ export default function BookAppointmentModal({
   const handleSelectDoctor = (docId: string) => {
     const doc = doctors.find((d) => d.id === docId);
     const autoDept = doc?.departments?.[0] || doc?.specialization || 'Fertility / IVF';
-    setBookForm((prev) => ({
-      ...prev,
-      doctor_id: docId,
-      department: autoDept,
-    }));
+    const docFee = Number(doc?.consultation_fee || doc?.fee);
+    setBookForm((prev) => {
+      const updatedFee = (docFee > 0 && prev.visit_type === 'consultation') ? docFee : prev.consultation_fee;
+      return {
+        ...prev,
+        doctor_id: docId,
+        department: autoDept,
+        consultation_fee: updatedFee,
+      };
+    });
   };
 
   const handleBookAppointment = async (e: React.FormEvent) => {
@@ -277,9 +291,17 @@ export default function BookAppointmentModal({
 
     setIsBooking(true);
     try {
+      const fee = Number(bookForm.consultation_fee) || 0;
+
       await appointmentsApi.create({
-        ...bookForm,
+        patient_id: bookForm.patient_id,
+        doctor_id: bookForm.doctor_id,
+        department: bookForm.department,
         scheduled_at: new Date(bookForm.scheduled_at).toISOString(),
+        visit_type: bookForm.visit_type,
+        status: bookForm.status,
+        consultation_fee: fee,
+        notes: bookForm.notes,
       });
       toast.success(
         'Appointment Confirmed',
@@ -590,10 +612,12 @@ export default function BookAppointmentModal({
                         key={vt.id || vt.record_type}
                         type="button"
                         onClick={() => {
+                          const targetFee = vt.defaultFee ?? 500;
                           setBookForm((prev) => ({
                             ...prev,
                             visit_type: vt.id,
                             notes: prev.notes || vt.defaultNotes || '',
+                            consultation_fee: targetFee,
                           }));
                         }}
                         className={`p-2 rounded-lg text-left border transition-all text-xs flex items-center justify-between cursor-pointer ${
@@ -603,7 +627,12 @@ export default function BookAppointmentModal({
                         }`}
                       >
                         <span className="truncate">{vt.label}</span>
-                        <span className="text-[10px] text-slate-400 font-normal ml-1 flex-shrink-0">{vt.duration}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                          {vt.defaultFee !== undefined && (
+                            <span className="text-[10px] font-bold text-emerald-600">₹{vt.defaultFee}</span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-normal">{vt.duration}</span>
+                        </div>
                       </button>
                     );
                   })}
@@ -620,11 +649,11 @@ export default function BookAppointmentModal({
                 )}
               </div>
 
-              {/* Consultation Fee */}
+              {/* Consultation Fee & Upfront Billing */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                   <span>Consultation Fee (₹)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Auto-queues bill in finance</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Standard tariff</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">₹</span>
@@ -633,11 +662,19 @@ export default function BookAppointmentModal({
                     min="0"
                     step="50"
                     value={bookForm.consultation_fee ?? 0}
-                    onChange={(e) => setBookForm({ ...bookForm, consultation_fee: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setBookForm({
+                        ...bookForm,
+                        consultation_fee: Number(e.target.value),
+                      });
+                    }}
                     placeholder="0"
                     className="vmd-input text-xs py-2 pl-7 font-bold text-slate-800"
                   />
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Tariff recorded for this appointment. Payments, discounts, and settlements are managed via Unified Billing.
+                </p>
               </div>
 
               {/* 5. Clinical Notes & SMS toggle */}

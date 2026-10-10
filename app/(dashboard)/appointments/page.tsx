@@ -311,6 +311,7 @@ export default function AppointmentsPage() {
         onStartConsultation={handleStartConsultation}
         onReschedule={(apt) => setRescheduleApt(apt)}
         onTriage={(apt) => setTriageApt(apt)}
+        onRefresh={() => loadData(true)}
       />
 
       {/* Modals */}

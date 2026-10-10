@@ -473,7 +473,6 @@ export default function SurgicalSpermRetrievalModal({
                 title={`SURGICAL SPERM RETRIEVAL (${procedureType}) REPORT`}
                 subtitle="VaidyaMD Andrology & Reproductive Surgery • Operative & Embryology Assessment"
                 hideHospitalHeader={usePrePrintedPad}
-                onTogglePrePrintedPad={() => setUsePrePrintedPad(!usePrePrintedPad)}
                 patient={{
                   name: patient?.name,
                   vid: patient?.vid,

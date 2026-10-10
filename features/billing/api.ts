@@ -36,8 +36,12 @@ export const billingApi = {
   getInvoice: (id: string) => request<any>(`/core/billing/invoices/${id}`),
   createInvoice: (data: Record<string, unknown>) =>
     request<any>('/core/billing/invoices', { method: 'POST', body: JSON.stringify(data) }),
-  recordPayment: (id: string, data: { amount: number; payment_method: string; upi_pay_mode?: string; notes?: string; discount?: number }) =>
+  recordPayment: (id: string, data: { amount: number; payment_method?: string; upi_pay_mode?: string; notes?: string; discount?: number; split_payments?: any[] }) =>
     request<any>(`/core/billing/invoices/${id}/payment`, { method: 'POST', body: JSON.stringify(data) }),
+  cancelInvoice: (id: string, data: { reason: string; cancelled_by?: string }) =>
+    request<any>(`/core/billing/invoices/${id}/cancel`, { method: 'POST', body: JSON.stringify(data) }),
+  refundInvoice: (id: string, data: { amount: number; reason: string; refund_to_wallet?: boolean; payment_method?: string; notes?: string }) =>
+    request<any>(`/core/billing/invoices/${id}/refund`, { method: 'POST', body: JSON.stringify(data) }),
   listPackages: () => request<any[]>('/core/billing/packages'),
   createPackage: (data: Record<string, unknown>) =>
     request<any>('/core/billing/packages', { method: 'POST', body: JSON.stringify(data) }),

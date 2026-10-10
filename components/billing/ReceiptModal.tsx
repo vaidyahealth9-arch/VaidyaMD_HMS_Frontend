@@ -7,24 +7,34 @@ interface ReceiptModalProps {
   invoice: Invoice | null;
   isOpen: boolean;
   onClose: () => void;
+  defaultLayout?: 'a4' | 'thermal';
 }
 
 /**
  * Receipt / Invoice preview modal — single shared source replacing
- * the 3 inline receipt/print blocks in billing/page, cosgyn/page,
- * and patients/[id]/page.
+ * the inline receipt/print blocks across pages.
  *
- * Directly renders <PrintableInvoice> which provides complete modal
- * overlay, hospital header toggle, itemization, and browser print functionality.
+ * Directly renders <PrintableInvoice> with A4 letterhead or 80mm thermal receipt formats.
  */
-export default function ReceiptModal({ invoice, isOpen, onClose }: ReceiptModalProps) {
+export default function ReceiptModal({ invoice, isOpen, onClose, defaultLayout = 'a4' }: ReceiptModalProps) {
   if (!isOpen || !invoice) return null;
 
   // Ensure items fallback if list endpoint didn't include full line items
   const resolvedInvoice = {
     ...invoice,
     items: (Array.isArray(invoice.items) && invoice.items.length > 0)
-      ? invoice.items
+      ? invoice.items.map((it: any) => {
+          const qty = Number(it.quantity || it.quantity_dispensed || 1);
+          const uPrice = it.unit_price ?? it.unitPrice ?? it.rate ?? it.price ?? (it.total ? Number(it.total) / qty : 0);
+          const tot = it.total ?? it.total_price ?? (qty * Number(uPrice));
+          return {
+            ...it,
+            description: it.description || it.item_name || 'Billable Item',
+            quantity: qty,
+            unit_price: Number(uPrice) || 0,
+            total: Number(tot) || 0,
+          };
+        })
       : [
           {
             description: (invoice as any).reason_for_attendance || `${invoice.appointment_source || 'OPD'} Consultation / Hospital Care Service`,
@@ -39,6 +49,7 @@ export default function ReceiptModal({ invoice, isOpen, onClose }: ReceiptModalP
     <PrintableInvoice
       invoice={resolvedInvoice as any}
       onClose={onClose}
+      defaultLayout={defaultLayout}
     />
   );
 }

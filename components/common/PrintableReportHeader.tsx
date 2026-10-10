@@ -149,20 +149,6 @@ export default function PrintableReportHeader({
 
   return (
     <div className="printable-report-header printable-header-container w-full">
-      {onTogglePrePrintedPad && (
-        <div className="flex justify-end print:hidden px-6 sm:px-8 pt-2 pb-1">
-          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
-            <input
-              type="checkbox"
-              checked={hideHospitalHeader ?? !includeHeader}
-              onChange={onTogglePrePrintedPad}
-              className="rounded text-[#0B4F6C] focus:ring-[#0B4F6C]"
-            />
-            <span>Hide Hospital Header (for pre-printed stationery)</span>
-          </label>
-        </div>
-      )}
-
       {/* ── Header container: standard flex flow at top of sheet on screen and in print ── */}
       <div className="print-header-anchor w-full bg-white shrink-0">
         {/* ── Top Bold Accent Stripe (Full Bleed to Paper Edges) ── */}
@@ -212,9 +198,16 @@ export default function PrintableReportHeader({
                 <h1 className="font-bold text-lg leading-tight text-slate-900 tracking-wide uppercase">
                   {effectiveHospitalName}
                 </h1>
-                {effectiveSubtitle && (
-                  <p className="text-xs font-semibold text-slate-500">{effectiveSubtitle}</p>
-                )}
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                  {department && department !== 'Clinical Department & Medical Records' && (
+                    <span className="font-bold text-slate-700 uppercase tracking-wider">
+                      {department}
+                    </span>
+                  )}
+                  {effectiveSubtitle && (
+                    <span>{department && department !== 'Clinical Department & Medical Records' ? `· ${effectiveSubtitle}` : effectiveSubtitle}</span>
+                  )}
+                </div>
               </div>
             </div>
             {/* ── Small / Thin Divider Line Under Logo ── */}

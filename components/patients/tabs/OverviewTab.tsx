@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
-import FertilityWalletCard from '@/components/fertility/FertilityWalletCard';
+import { PatientWalletCard } from '@/components/billing';
 
 interface OverviewTabProps {
   patientId: string;
@@ -110,7 +110,7 @@ export default function OverviewTab({
           </button>
         </div>
 
-        <FertilityWalletCard
+        <PatientWalletCard
           patientId={patientId}
           patientName={patient?.name}
           patientVid={patient?.vid}

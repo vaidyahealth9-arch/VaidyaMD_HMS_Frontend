@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ToastProvider } from '@/contexts/ToastContext';
+import { BillingProvider } from '@/contexts/BillingContext';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { TooltipProvider } from '@/shared/ui/tooltip';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
@@ -49,7 +50,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <TooltipProvider>
               <AuthProvider>
                 <ToastProvider>
-                  {children}
+                  <BillingProvider>
+                    {children}
+                  </BillingProvider>
                 </ToastProvider>
               </AuthProvider>
             </TooltipProvider>

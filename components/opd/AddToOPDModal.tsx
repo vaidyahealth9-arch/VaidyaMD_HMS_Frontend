@@ -67,6 +67,8 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
     setIsSubmitting(true);
     try {
       const selectedDoc = doctors.find((d) => d.id === selectedDoctorId);
+      const fee = Number(consultationFee) || 0;
+
       await appointmentsApi.create({
         patient_id: patient.id,
         doctor_id: selectedDoctorId,
@@ -74,13 +76,13 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
         scheduled_at: new Date().toISOString(),
         visit_type: visitType,
         status: 'waiting',
-        consultation_fee: Number(consultationFee) || 0,
+        consultation_fee: fee,
         notes: notes.trim() || undefined,
       });
 
       toast.success(
         'Added to OPD Queue',
-        `${patient.name} is now in the waiting room for ${selectedDoc?.name || 'Doctor'} (Fee: ₹${consultationFee})`
+        `${patient.name} queued for ${selectedDoc?.name || 'Doctor'} (Fee: ₹${fee})`
       );
       onClose();
       if (onSuccess) onSuccess();
@@ -154,10 +156,12 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
 
           {/* Consultation Fee */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
-              Consultation Fee (₹)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+                Consultation Fee (₹)
+              </label>
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
               <input
@@ -172,6 +176,11 @@ export default function AddToOPDModal({ open, onClose, patient, onSuccess }: Add
             </div>
             <p className="text-[10px] text-slate-400">Set to 0 if complimentary review or follow-up.</p>
           </div>
+
+          {/* Upfront Payment Section if Fee > 0 */}
+          <p className="text-[11px] text-slate-500">
+            Tariff recorded for this OPD attendance. Payments, discounts, and settlements are managed via Unified Billing.
+          </p>
 
           {/* Visit Type */}
           <div className="space-y-1.5">

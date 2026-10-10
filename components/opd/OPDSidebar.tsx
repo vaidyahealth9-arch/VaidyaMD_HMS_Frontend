@@ -9,6 +9,7 @@ import {
   Printer,
   PanelLeftClose,
   PanelLeftOpen,
+  Trash2,
 } from 'lucide-react';
 import { Badge } from '@/shared/ui/badge';
 import { formatDateTime } from '@/lib/utils';
@@ -27,6 +28,7 @@ interface OPDSidebarProps {
   onSelectRecord: (rec: any) => void;
   onLoadConsultationForEdit: (rec: any) => void;
   onPrintPrevious: (rec: any) => void;
+  onDeleteConsultation?: (rec: any) => void;
   onSelectCounselingNote: (note: CounselingNote) => void;
 }
 
@@ -43,6 +45,7 @@ export default function OPDSidebar({
   onSelectRecord,
   onLoadConsultationForEdit,
   onPrintPrevious,
+  onDeleteConsultation,
   onSelectCounselingNote,
 }: OPDSidebarProps) {
   return (
@@ -175,6 +178,21 @@ export default function OPDSidebar({
                         <Printer className="w-2.5 h-2.5" />
                         <span>Rx</span>
                       </button>
+                      {onDeleteConsultation && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Are you sure you want to delete this consultation record? This cannot be undone.')) {
+                              onDeleteConsultation(rec);
+                            }
+                          }}
+                          className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 hover:border-rose-300 rounded flex items-center justify-center shadow-2xs cursor-pointer transition-colors"
+                          title="Delete Consultation Record"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
                       <Badge
                         variant="outline"
                         className={`text-[9px] px-1.5 py-0 font-medium ${

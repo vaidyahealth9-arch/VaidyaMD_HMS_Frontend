@@ -23,8 +23,15 @@ export const ipdApi = {
     request<Admission[]>(`/core/ipd/admissions${toQueryString(params)}`),
   admitPatient: (data: { patient_id: string; bed_id: string; admitting_doctor_id?: string; diagnosis?: string; package_name?: string; notes?: string }) =>
     request<Admission>('/core/ipd/admissions', { method: 'POST', body: JSON.stringify(data) }),
-  dischargePatient: (admissionId: string, notes?: string) =>
-    request<Admission>(`/core/ipd/admissions/${admissionId}/discharge`, { method: 'POST', body: JSON.stringify({ notes }) }),
+  dischargePatient: (admissionId: string, data?: string | { notes?: string; invoice_id?: string }) => {
+    const payload = typeof data === 'string' ? { notes: data } : (data || {});
+    return request<Admission>(`/core/ipd/admissions/${admissionId}/discharge`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  getDischargeSummary: (admissionId: string) =>
+    request<any>(`/core/ipd/admissions/${admissionId}/discharge-summary`),
   transferBed: (admissionId: string, targetBedId: string) =>
     request<Admission>(`/core/ipd/admissions/${admissionId}/transfer-bed`, { method: 'POST', body: JSON.stringify({ target_bed_id: targetBedId }) }),
   listNursingTasks: (params?: { admission_id?: string; bed_id?: string; status?: string }) =>
