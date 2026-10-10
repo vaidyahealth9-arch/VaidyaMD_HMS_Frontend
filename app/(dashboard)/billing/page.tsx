@@ -45,6 +45,7 @@ export default function BillingPage() {
     items?: LineItem[];
     discount?: number;
     discountType?: 'amount' | 'percentage';
+    packageId?: string;
   }>({});
   const [paymentModalInv, setPaymentModalInv] = useState<Invoice | null>(null);
   const [receiptModalInv, setReceiptModalInv] = useState<Invoice | null>(null);
@@ -105,6 +106,7 @@ export default function BillingPage() {
       items: mappedItems,
       discount: bundleDiscount,
       discountType: 'amount',
+      packageId: pkg.id,
     });
     setShowNewInvoice(true);
   };
@@ -221,6 +223,7 @@ export default function BillingPage() {
         defaultItems={newInvoiceDefaults.items}
         defaultDiscount={newInvoiceDefaults.discount}
         defaultDiscountType={newInvoiceDefaults.discountType}
+        packageId={newInvoiceDefaults.packageId}
       />
     </PageLayout>
   );

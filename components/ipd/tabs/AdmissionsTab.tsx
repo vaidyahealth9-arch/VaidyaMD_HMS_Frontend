@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 interface AdmissionsTabProps {
   admissions: any[];
   onDischarge: (admissionId: string) => void;
+  onInterimBill?: (admissionId: string) => void;
 }
 
 const formatDateTime = (dateStr?: string) => {
@@ -28,6 +29,7 @@ const formatDateTime = (dateStr?: string) => {
 export default function AdmissionsTab({
   admissions,
   onDischarge,
+  onInterimBill,
 }: AdmissionsTabProps) {
   return (
     <div className="space-y-4 pt-2">
@@ -63,14 +65,27 @@ export default function AdmissionsTab({
                       <td className="p-3.5 text-slate-800 font-semibold">{adm.admitting_doctor}</td>
                       <td className="p-3.5 font-bold text-slate-900">{formatCurrency(adm.total_accrued_amount)}</td>
                       <td className="p-3.5 text-right">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => onDischarge(adm.id)}
-                          className="h-7 text-xs font-bold rounded-lg"
-                        >
-                          Discharge
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {onInterimBill && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onInterimBill(adm.id)}
+                              className="h-7 text-xs font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-50"
+                              title="Interim bill for accrued charges"
+                            >
+                              Bill
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => onDischarge(adm.id)}
+                            className="h-7 text-xs font-bold rounded-lg"
+                          >
+                            Discharge
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

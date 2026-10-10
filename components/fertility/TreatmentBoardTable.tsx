@@ -142,9 +142,9 @@ export default function TreatmentBoardTable({
                         <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
                           {cycle.treatment_type || 'Standard IVF'}
                         </span>
-                        {cycle.protocol_type && (
-                          <div className="text-[10px] text-slate-500 font-medium">
-                            {cycle.protocol_type}
+                        {(cycle.protocol_name || cycle.protocol_type) && (
+                          <div className="text-[10px] text-slate-500 font-medium truncate max-w-[140px]" title={cycle.protocol_name || cycle.protocol_type}>
+                            {cycle.protocol_name || cycle.protocol_type}
                           </div>
                         )}
                       </div>

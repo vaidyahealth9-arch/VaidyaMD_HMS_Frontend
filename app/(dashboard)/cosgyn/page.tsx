@@ -28,10 +28,10 @@ import {
   PackageCatalogTab,
   BookPackageModal,
   EditPlanScheduleModal,
-  CosGynBillingModal,
   addDaysToDate,
   getStepDays,
 } from '@/components/cosgyn';
+import { UnifiedInvoiceSheet } from '@/components/billing';
 import type { EditableSessionItem } from '@/components/cosgyn/BookPackageModal';
 
 export default function CosGynDashboard() {
@@ -827,9 +827,21 @@ export default function CosGynDashboard() {
       />
 
       {isBillingModalOpen && billingPlan && (
-        <CosGynBillingModal
+        <UnifiedInvoiceSheet
           isOpen={isBillingModalOpen}
-          billingPlan={billingPlan}
+          defaultPatientId={billingPlan.patient_id}
+          lockedPatient={true}
+          defaultSource="Cosgyn"
+          defaultReason={`CosGyn: ${billingPlan.treatment_name || 'Treatment Package'}`}
+          defaultItems={[
+            {
+              description: `CosGyn Treatment Package: ${billingPlan.treatment_name || 'Cosmetic Gynecology'}`,
+              quantity: 1,
+              unit_price: Number(billingPlan.total_amount) || 0,
+              total: Number(billingPlan.total_amount) || 0,
+              service_code: 'COSGYN-PKG',
+            },
+          ]}
           onClose={() => {
             setIsBillingModalOpen(false);
             setBillingPlan(null);
@@ -837,6 +849,9 @@ export default function CosGynDashboard() {
           onSuccess={(res) => {
             setIsBillingModalOpen(false);
             setBillingPlan(null);
+            queryClient.invalidateQueries({ queryKey: ['cosgyn', 'plans'] });
+            queryClient.invalidateQueries({ queryKey: ['cosgyn', 'sessions'] });
+            queryClient.invalidateQueries({ queryKey: ['billing', 'invoices'] });
             setActionSuccess(`Official Invoice #${res.invoice_number} created successfully! Total: ₹${res.total_amount}`);
             setTimeout(() => setActionSuccess(null), 6000);
           }}

@@ -209,6 +209,38 @@ export default function IUIDonorModal({
               </button>
             </div>
 
+            {viewMode === 'preview' && (
+              <div className="flex items-center gap-2">
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setIncludeHeader(true)}
+                    className={`px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer ${
+                      includeHeader ? 'bg-teal-700 text-white font-bold' : 'text-slate-600'
+                    }`}
+                  >
+                    With Header
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeHeader(false)}
+                    className={`px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer ${
+                      !includeHeader ? 'bg-amber-600 text-white font-bold' : 'text-slate-600'
+                    }`}
+                  >
+                    Pre-printed Pad
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print (A4)
+                </button>
+              </div>
+            )}
+
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
               <X className="w-5 h-5" />
             </button>
@@ -602,35 +634,6 @@ export default function IUIDonorModal({
             /* PRINT PREVIEW VIEW                                       */
             /* ======================================================== */
             <div className="space-y-6 printable-document print:p-0 print:m-0 text-slate-900 text-xs" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
-              <div className="flex items-center justify-between print:hidden pb-3 border-b border-slate-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-600">Letterhead pad spacing:</span>
-                  <div className="flex bg-slate-100 p-0.5 rounded border text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setIncludeHeader(true)}
-                      className={`px-2 py-0.5 rounded ${includeHeader ? 'bg-teal-700 text-white font-bold' : 'text-slate-600'}`}
-                    >
-                      With Header
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIncludeHeader(false)}
-                      className={`px-2 py-0.5 rounded ${!includeHeader ? 'bg-amber-600 text-white font-bold' : 'text-slate-600'}`}
-                    >
-                      Pre-printed Pad
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-md shadow-sm flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print Report (A4)
-                </button>
-              </div>
-
               <PrintableReportHeader
                 title="IUI WITH DONOR SEMEN (IUI-D) — CLINICAL & LABORATORY RECORD"
                 subtitle="Assisted Conception Unit · ART Bank Gamete Allocation"

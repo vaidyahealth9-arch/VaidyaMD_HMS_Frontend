@@ -31,7 +31,6 @@ export default function TakeawayCalendarModal({
   days,
   defaultShowLogo = true,
 }: TakeawayCalendarModalProps) {
-  const [includeLogo, setIncludeLogo] = useState(defaultShowLogo);
   const { currentBranch, user } = useAuth() || {};
 
   const effectiveBoldColor =
@@ -50,40 +49,39 @@ export default function TakeawayCalendarModal({
 
   const effectiveModality = cycle?.treatment_type || 'Controlled Ovarian Stimulation';
 
-  // 1. Build weekday-aligned calendar cells (Monday = index 0, Sunday = index 6)
+  // 1. Build calendar cells starting from Day 1's actual weekday (zero leading waste)
   const sortedDays = [...(days || [])].sort((a, b) => (a.day_number || 0) - (b.day_number || 0));
 
-  let startDowIndex = 0; // default Monday
+  const weekdaysFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const weekdaysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  let startDow = 0; // 0 = Sunday, 1 = Monday, etc.
   if (sortedDays.length > 0) {
     const firstDay = sortedDays[0];
     if (firstDay.date) {
       try {
         const d = new Date(firstDay.date);
-        startDowIndex = (d.getDay() + 6) % 7;
+        startDow = d.getDay();
       } catch {
-        startDowIndex = 0;
+        startDow = 1;
       }
     } else if (firstDay.day_of_week) {
-      const dowMap: Record<string, number> = {
-        mon: 0,
-        tue: 1,
-        wed: 2,
-        thu: 3,
-        fri: 4,
-        sat: 5,
-        sun: 6,
-      };
-      const key = firstDay.day_of_week.slice(0, 3).toLowerCase();
-      if (dowMap[key] !== undefined) startDowIndex = dowMap[key];
+      const idx = weekdaysShort.findIndex(
+        (w) => w.toLowerCase() === firstDay.day_of_week.slice(0, 3).toLowerCase()
+      );
+      if (idx >= 0) startDow = idx;
     }
   }
 
-  const cells: CalendarCell[] = [];
-  // Add leading padding for days before Day 1 in starting week
-  for (let p = 0; p < startDowIndex; p++) {
-    cells.push({ isPadding: true });
+  // 7 rotated column headers starting from Day 1's actual weekday
+  const columnHeaders: string[] = [];
+  for (let c = 0; c < 7; c++) {
+    const dayIndex = (startDow + c) % 7;
+    columnHeaders.push(weekdaysFull[dayIndex]);
   }
-  // Add active plan days
+
+  const cells: CalendarCell[] = [];
+  // Directly add active plan days starting at Column 0 with ZERO leading padding
   sortedDays.forEach((d) => {
     cells.push({ day: d });
   });
@@ -99,14 +97,14 @@ export default function TakeawayCalendarModal({
   }
 
   // Group rows into pages:
-  // If 3 weeks or fewer (standard 14–18 day cycle): fit on 1 single page (Page 1 of 1)!
-  // If > 3 weeks (e.g. 28–35 day long downregulation cycle): chunk 2 or 3 weeks per page.
+  // Up to 4 rows (28 days): FIT ON 1 SINGLE LANDSCAPE PAGE!
+  // > 4 rows (> 28 days, e.g. 35 days): chunk 3 rows per page
   const pages: CalendarCell[][][] = [];
-  if (calendarRows.length <= 3) {
+  if (calendarRows.length <= 4) {
     pages.push(calendarRows);
   } else {
-    for (let i = 0; i < calendarRows.length; i += 2) {
-      pages.push(calendarRows.slice(i, i + 2));
+    for (let i = 0; i < calendarRows.length; i += 3) {
+      pages.push(calendarRows.slice(i, i + 3));
     }
   }
 
@@ -125,7 +123,21 @@ export default function TakeawayCalendarModal({
 
   const cycleId = cycle?.cycle_id || 'ICSI-00037';
   const attempts = String(cycle?.attempt_number || 1);
-  const stimStart = cycle?.start_date || sortedDays[0]?.display_date || sortedDays[0]?.date || 'Day 1';
+
+  // Stimulation start day is Baseline Scan Day
+  const baselineScanDate =
+    cycle?.sentinel_dates?.baseline_scan ||
+    cycle?.sentinel_dates?.baseline_scan_date ||
+    sortedDays.find((d) => d.milestone?.toLowerCase().includes('baseline'))?.date;
+
+  const stimStart =
+    baselineScanDate ||
+    cycle?.sentinel_dates?.stim_start ||
+    cycle?.start_date ||
+    sortedDays[0]?.display_date ||
+    sortedDays[0]?.date ||
+    'Day 1';
+
   const doctorName = cycle?.consultant_name || cycle?.doctor_name || 'Dr. Treating Gynecologist';
   const printDate = new Date().toLocaleDateString('en-IN', {
     day: '2-digit',
@@ -165,20 +177,18 @@ export default function TakeawayCalendarModal({
         <div className="w-full flex flex-col items-center">
           {/* Global Landscape Preview & Print Stylesheet */}
           <style jsx global>{`
-            /* Screen Preview: True Landscape Paper Card (297mm wide x 210mm high) */
+            /* Screen Preview: True Landscape Paper Card (297mm wide x 210mm min-height) */
             .a4-print-sheet.a4-landscape-page {
-              width: 297mm !important;
+              width: 100% !important;
               max-width: 297mm !important;
               min-height: 210mm !important;
-              height: 210mm !important;
-              max-height: 210mm !important;
-              aspect-ratio: 297 / 210 !important;
+              height: auto !important;
               margin: 0 auto 2rem auto !important;
               box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
               display: flex !important;
               flex-direction: column !important;
               justify-content: space-between !important;
-              overflow: hidden !important;
+              overflow: visible !important;
               background: #ffffff !important;
               box-sizing: border-box !important;
             }
@@ -243,50 +253,31 @@ export default function TakeawayCalendarModal({
             }
           `}</style>
 
-          {/* Screen Only: Logo / Plain Print Switcher Toolbar */}
-          <div className="flex items-center justify-between w-full max-w-[297mm] mx-auto mb-4 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-800 print:hidden">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-slate-300">Letterhead Mode:</span>
-              <button
-                type="button"
-                onClick={() => setIncludeLogo(true)}
-                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  includeLogo ? 'bg-primary text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Official Logo Print
-              </button>
-              <button
-                type="button"
-                onClick={() => setIncludeLogo(false)}
-                className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  !includeLogo ? 'bg-primary text-white shadow-xs' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Plain Schedule (No Logo)
-              </button>
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium">
-              Landscape Patient Schedule · Monday–Sunday Calendar View (A4 Landscape)
-            </span>
-          </div>
-
           {pages.map((weeksForPage, pageIdx) => {
             const rowsOnThisPage = weeksForPage.length;
+            const isCompact = rowsOnThisPage >= 4;
             const cellHeightClass =
-              rowsOnThisPage >= 3
+              rowsOnThisPage >= 4
                 ? 'min-h-[72px] h-[72px]'
+                : rowsOnThisPage === 3
+                ? 'min-h-[105px] h-[105px]'
                 : rowsOnThisPage === 2
-                ? 'min-h-[96px] h-[96px]'
-                : 'min-h-[110px] h-[110px]';
+                ? 'min-h-[145px] h-[145px]'
+                : 'min-h-[180px] h-[180px]';
 
             const cellInnerMinHeight =
-              rowsOnThisPage >= 3 ? 'min-h-[66px]' : rowsOnThisPage === 2 ? 'min-h-[88px]' : 'min-h-[100px]';
+              rowsOnThisPage >= 4
+                ? 'min-h-[64px]'
+                : rowsOnThisPage === 3
+                ? 'min-h-[96px]'
+                : rowsOnThisPage === 2
+                ? 'min-h-[135px]'
+                : 'min-h-[170px]';
 
             return (
               <A4Sheet
                 key={`takeaway-page-${pageIdx}`}
-                className="a4-landscape-page mb-8 print:mb-0 w-full max-w-[297mm] min-h-[210mm] bg-white text-slate-900 shadow-sm border border-slate-200 overflow-hidden"
+                className="a4-landscape-page mb-8 print:mb-0 w-full max-w-[297mm] min-h-[210mm] bg-white text-slate-900 shadow-sm border border-slate-200"
                 header={
                   <div className="w-full">
                     {/* ── Top Bold Accent Stripe (Full Bleed touching paper top edge) ── */}
@@ -303,7 +294,7 @@ export default function TakeawayCalendarModal({
                     {/* Header Content with proper margin */}
                     <div className="px-6 sm:px-8 print:px-8 pt-2 pb-0.5">
                       {/* Optional Hospital Branding Header Strip */}
-                      {includeLogo && !hideHeader && (
+                      {!hideHeader && (
                         <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-300">
                           <div className="flex items-center gap-3">
                             {effectiveLogoUrl ? (
@@ -412,8 +403,8 @@ export default function TakeawayCalendarModal({
                   />
                 }
               >
-                {/* Monday to Sunday 7-Column Calendar Grid Tables — Top-aligned directly beneath header */}
-                <div className="w-full px-6 sm:px-8 print:px-8 space-y-2 mt-1.5 mb-auto">
+                {/* 7-Column Calendar Grid Tables — starting on Day 1's weekday */}
+                <div className={`w-full px-6 sm:px-8 print:px-8 ${rowsOnThisPage >= 4 ? 'space-y-1' : 'space-y-2.5'} my-auto flex-1 flex flex-col justify-between py-1`}>
                   {weeksForPage.map((week, wIdx) => (
                     <table
                       key={`week-${wIdx}`}
@@ -422,37 +413,25 @@ export default function TakeawayCalendarModal({
                     >
                       <thead>
                         <tr className="bg-slate-100 text-black border-b border-black">
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Monday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Tuesday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Wednesday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Thursday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Friday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Saturday
-                          </th>
-                          <th className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900">
-                            Sunday
-                          </th>
+                          {columnHeaders.map((colName, cIdx) => (
+                            <th
+                              key={cIdx}
+                              className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900 text-[8.5px] print:text-[8px] uppercase tracking-wide"
+                            >
+                              {colName}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
                           {week.map((cell, cIdx) => {
+                            const isLeftEdge = cIdx === 0;
                             if (cell.isPadding || !cell.day) {
                               return (
                                 <td
                                   key={`pad-${cIdx}`}
-                                  className={`border border-black bg-slate-50/40 p-1 align-top box-border ${cellHeightClass}`}
+                                  className={`border border-black bg-slate-50/40 p-1.5 align-top box-border ${cellHeightClass}`}
                                 >
                                   {/* Blank padding cell */}
                                 </td>
@@ -475,7 +454,9 @@ export default function TakeawayCalendarModal({
                             return (
                               <td
                                 key={`day-${day.day_number}-${cIdx}`}
-                                className={`border border-black p-1 align-top text-black box-border ${cellHeightClass} ${
+                                className={`border border-black align-top text-black box-border ${cellHeightClass} ${
+                                  isCompact ? 'p-0.5' : isLeftEdge ? 'pl-2 pr-1 py-1' : 'p-1'
+                                } ${
                                   isTrigger
                                     ? 'bg-amber-50/40'
                                     : isOpu
@@ -485,10 +466,12 @@ export default function TakeawayCalendarModal({
                               >
                                 <div className={`flex flex-col justify-between h-full pb-0.5 ${cellInnerMinHeight}`}>
                                   <div>
-                                    {/* Cell Header: Date (Day - X) */}
-                                    <div className="font-extrabold text-[8px] border-b border-black pb-0.5 mb-1 text-slate-900 flex items-center justify-between">
-                                      <span>{formatDateLabel(day)}</span>
-                                      <span>(Day - {day.stim_day_number || day.day_number})</span>
+                                    {/* Cell Header: Date (Day X · Stim Y) */}
+                                    <div className="font-extrabold text-[8.5px] border-b border-black pb-0.5 mb-1 text-slate-900 flex items-center justify-between whitespace-nowrap overflow-visible">
+                                      <span className="font-bold tracking-tight">{formatDateLabel(day)}</span>
+                                      <span className="font-bold text-slate-700 ml-1">
+                                        Day {day.day_number}{day.stim_day_number ? ` · S${day.stim_day_number}` : ''}
+                                      </span>
                                     </div>
 
                                     {/* 1. Blood / Lab Investigations (E2, LH, P4) */}

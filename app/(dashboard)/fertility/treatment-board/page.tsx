@@ -17,7 +17,7 @@ import {
   FlaskConical,
   X,
 } from 'lucide-react';
-import { treatmentCyclesApi, getApiBase } from '@/lib/api';
+import { treatmentCyclesApi, protocolsApi, getApiBase } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import StartCyclePatientModal from '@/components/fertility/StartCyclePatientModal';
 import { PlanDetailsSubTabContent } from '@/components/fertility/plan-details';
@@ -30,6 +30,8 @@ import TreatmentBoardTable from '@/components/fertility/TreatmentBoardTable';
 export default function TreatmentBoardPage() {
   const { user } = useAuth();
   const [cycles, setCycles] = useState<any[]>([]);
+  const [cycleTypes, setCycleTypes] = useState<any[]>([]);
+  const [protocols, setProtocols] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -43,6 +45,23 @@ export default function TreatmentBoardPage() {
   const [activeOpuCycle, setActiveOpuCycle] = useState<any | null>(null);
   const [activeEmbryologyCycle, setActiveEmbryologyCycle] = useState<any | null>(null);
   const [isExportingRegistry, setIsExportingRegistry] = useState(false);
+
+  const loadFilterOptions = async () => {
+    try {
+      const [typesRes, protosRes] = await Promise.allSettled([
+        treatmentCyclesApi.listTypes({ include_inactive: false }),
+        protocolsApi.list({ include_inactive: false }),
+      ]);
+      if (typesRes.status === 'fulfilled' && Array.isArray(typesRes.value)) {
+        setCycleTypes(typesRes.value);
+      }
+      if (protosRes.status === 'fulfilled' && Array.isArray(protosRes.value)) {
+        setProtocols(protosRes.value);
+      }
+    } catch (err) {
+      console.error('Failed to load cycle types / protocols from DB', err);
+    }
+  };
 
   const loadCycles = async () => {
     setIsLoading(true);
@@ -58,6 +77,7 @@ export default function TreatmentBoardPage() {
 
   useEffect(() => {
     loadCycles();
+    loadFilterOptions();
   }, []);
 
   const handleExportNationalArtRegistry = async (format: 'csv' | 'json' = 'csv') => {
@@ -105,9 +125,39 @@ export default function TreatmentBoardPage() {
     (c) => c.status === 'running' && (c.sentinel_dates?.opu_date || c.sentinel_dates?.transfer_date)
   ).length;
 
+  // Distinct cycle types present in active cohort that may not be in master cycle types table
+  const distinctCohortTypes = React.useMemo(() => {
+    const known = new Set(cycleTypes.map((t) => (t.name || '').trim().toLowerCase()));
+    const extras: string[] = [];
+    for (const c of cycles) {
+      const t = (c.treatment_type || '').trim();
+      if (t && !known.has(t.toLowerCase()) && !extras.includes(t)) {
+        extras.push(t);
+      }
+    }
+    return extras;
+  }, [cycleTypes, cycles]);
+
   // Filter Pipeline
   const filteredCycles = cycles.filter((c) => {
-    if (typeFilter !== 'ALL' && c.treatment_type !== typeFilter) return false;
+    if (typeFilter !== 'ALL') {
+      if (typeFilter.startsWith('TYPE:')) {
+        const val = typeFilter.slice(5).toLowerCase();
+        if ((c.treatment_type || '').toLowerCase() !== val) return false;
+      } else if (typeFilter.startsWith('PROTO:')) {
+        const val = typeFilter.slice(6);
+        const matchProtoId = String(c.protocol_template_id || '') === val;
+        const matchProtoName = (c.protocol_name || '').toLowerCase() === val.toLowerCase();
+        if (!matchProtoId && !matchProtoName) return false;
+      } else {
+        const lower = typeFilter.toLowerCase();
+        const matchType = (c.treatment_type || '').toLowerCase() === lower;
+        const matchProto =
+          String(c.protocol_template_id || '') === typeFilter ||
+          (c.protocol_name || '').toLowerCase() === lower;
+        if (!matchType && !matchProto) return false;
+      }
+    }
 
     if (stageFilter === 'STIMULATION') {
       if (!c.sentinel_dates?.stim_start || c.sentinel_dates?.opu_date) return false;
@@ -262,22 +312,43 @@ export default function TreatmentBoardPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
-          {/* Treatment Type Filter */}
+          {/* Treatment Type & Protocol Filter (Fetched from DB) */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="vmd-input text-xs py-2 px-3 font-semibold text-slate-700 bg-slate-50"
+            className="vmd-input text-xs py-2 px-3 font-semibold text-slate-700 bg-slate-50 max-w-[240px]"
           >
             <option value="ALL">All Protocols &amp; Types</option>
-            <option value="ICSI">ICSI (Intracytoplasmic)</option>
-            <option value="IVF">Standard IVF</option>
-            <option value="FET">Frozen Embryo Transfer (FET)</option>
-            <option value="ICSI_FET">ICSI + Freeze-All</option>
-            <option value="IUI">Intrauterine Insemination (IUI)</option>
-            <option value="IUI_D">IUI with Donor Semen (IUI-D)</option>
-            <option value="DONOR_OOCYTE">Donor Oocyte ICSI</option>
-            <option value="SURGICAL_SPERM">TESA / PESA ICSI</option>
-            <option value="PGT_A">PGT-A Screening Cycle</option>
+
+            {cycleTypes.length > 0 && (
+              <optgroup label="Treatment Types (Master DB)">
+                {cycleTypes.map((t) => (
+                  <option key={t.id || t.name} value={`TYPE:${t.name}`}>
+                    {t.name} {t.category ? `(${t.category})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {distinctCohortTypes.length > 0 && (
+              <optgroup label="Active Cycle Types in Cohort">
+                {distinctCohortTypes.map((t) => (
+                  <option key={t} value={`TYPE:${t}`}>
+                    {t}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {protocols.length > 0 && (
+              <optgroup label="Stimulation Protocols (Master DB)">
+                {protocols.map((p) => (
+                  <option key={p.id} value={`PROTO:${p.id}`}>
+                    {p.name} {p.category ? `(${p.category})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
 
           {/* Clinical Stage Filter */}

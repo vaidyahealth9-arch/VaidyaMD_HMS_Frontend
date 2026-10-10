@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Clock,
@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Pill,
   Printer,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -20,6 +21,7 @@ interface ConsultationRecordModalProps {
   onClose: () => void;
   onLoadForEdit: (record: any) => void;
   onPrintRx: (record: any) => void;
+  onDelete?: (record: any) => void;
 }
 
 export default function ConsultationRecordModal({
@@ -27,7 +29,9 @@ export default function ConsultationRecordModal({
   onClose,
   onLoadForEdit,
   onPrintRx,
+  onDelete,
 }: ConsultationRecordModalProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (!record) return null;
 
   return (
@@ -306,6 +310,41 @@ export default function ConsultationRecordModal({
               <Printer className="w-4 h-4 text-[rgb(var(--clr-primary))]" />
               <span>Print Prescription (Rx)</span>
             </Button>
+            {onDelete && (
+              confirmDelete ? (
+                <div className="flex items-center gap-1.5 bg-red-50 p-1 rounded-md border border-red-200">
+                  <span className="text-[11px] font-bold text-red-700">Delete permanently?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDelete(record);
+                      onClose();
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white rounded font-bold px-2 py-0.5 text-[11px] cursor-pointer"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="text-slate-600 hover:bg-slate-200 rounded px-2 py-0.5 text-[11px] cursor-pointer"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmDelete(true)}
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 rounded-md font-bold px-3 flex items-center gap-1.5 cursor-pointer"
+                  title="Delete this consultation note"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  <span>Delete Note</span>
+                </Button>
+              )
+            )}
           </div>
           <Button
             type="button"

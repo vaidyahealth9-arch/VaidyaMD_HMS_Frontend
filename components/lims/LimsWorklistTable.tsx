@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Search, Barcode, Eye } from 'lucide-react';
+import { Search, Barcode, Eye, Receipt } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Badge } from '@/shared/ui/badge';
+import { useBillingModal } from '@/contexts/BillingContext';
 
 interface LimsWorklistTableProps {
   worklist: any[];
@@ -45,6 +46,7 @@ export default function LimsWorklistTable({
   onOpenBarcodeModal,
   onOpenReview,
 }: LimsWorklistTableProps) {
+  const { openBilling } = useBillingModal();
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -142,7 +144,39 @@ export default function LimsWorklistTable({
                       </Badge>
                     </td>
                     <td className="p-3.5 text-slate-500">{formatDateTime(item.created_at)}</td>
-                    <td className="p-3.5 text-right">
+                    <td className="p-3.5 text-right flex items-center justify-end gap-1.5">
+                      {item.invoice_id ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                          <Receipt className="w-3 h-3" /> Billed
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            openBilling({
+                              patientId: item.patient_id,
+                              lockedPatient: true,
+                              sourceModule: 'lims',
+                              sourceReferenceId: item.id,
+                              defaultReason: `LIMS Diagnostic: ${item.test_name}`,
+                              defaultItems: [
+                                {
+                                  description: `Laboratory Test: ${item.test_name}`,
+                                  quantity: 1,
+                                  unit_price: 600,
+                                  total: 600,
+                                  service_code: 'LAB-TEST',
+                                },
+                              ],
+                            })
+                          }
+                          className="h-7 text-xs font-bold rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>Bill</span>
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant={isPending ? 'default' : 'outline'}

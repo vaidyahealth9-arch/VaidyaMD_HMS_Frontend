@@ -19,6 +19,14 @@ export interface LineItem {
   is_package_covered?: boolean;
 }
 
+export interface SplitPaymentTender {
+  payment_method: PaymentMode;
+  upi_pay_mode?: string;
+  amount: number;
+  reference?: string;
+  notes?: string;
+}
+
 export interface Invoice {
   id: string;
   invoice_number: string;
@@ -26,11 +34,19 @@ export interface Invoice {
   patient_name?: string;
   patient_vid?: string;
   appointment_source: string;
+  source_module?: string;
+  source_reference_id?: string;
   reason_for_attendance?: string;
+  subtotal?: number;
+  discount?: number;
+  tax?: number;
   total_amount: number;
   paid_amount: number;
+  wallet_amount_used?: number;
   pending_due: number;
   status: InvoiceStatus;
+  payment_method?: string;
+  upi_pay_mode?: string;
   discount_type?: DiscountType;
   discount_value?: number;
   items?: LineItem[];
@@ -104,9 +120,11 @@ export interface DuesInfo {
 
 export interface RecordPaymentPayload {
   amount: number;
-  payment_mode: PaymentMode;
+  payment_mode?: PaymentMode;
+  payment_method?: string;
   upi_pay_mode?: string;
   reference_number?: string;
+  split_payments?: SplitPaymentTender[];
   notes?: string;
   discount?: number;
 }
@@ -118,11 +136,15 @@ export interface CreateInvoicePayload {
   items: LineItem[];
   discount_type?: DiscountType;
   discount_value?: number;
+  discount_reason?: string;
   payment_status?: 'paid' | 'pending';
   payment_mode?: PaymentMode;
+  payment_method?: string;
   upi_pay_mode?: string;
   paid_amount?: number;
   wallet_deduction?: number;
+  wallet_amount_used?: number;
+  split_payments?: SplitPaymentTender[];
   patient_package_id?: string;
   notes?: string;
 }

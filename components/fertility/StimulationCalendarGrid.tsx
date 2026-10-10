@@ -203,6 +203,8 @@ export default function StimulationCalendarGrid({
   const [viewMode, setViewMode] = useState<'calendar' | 'matrix'>('calendar');
 
   const [totalDays, setTotalDays] = useState(14);
+  const [isCustomDaysLimited, setIsCustomDaysLimited] = useState(false);
+  const [customDaysLimit, setCustomDaysLimit] = useState(14);
   const [drugList, setDrugList] = useState<string[]>([
     'Rec-FSH (Gonal-F / Puregon)',
     'HMG (Menopur)',
@@ -256,7 +258,9 @@ export default function StimulationCalendarGrid({
 
   useEffect(() => {
     const baseDate = startDate ? new Date(startDate) : new Date();
-    const count = Math.max(14, initialDays?.length || 14);
+    // Default to content from initialDays, or 14 if starting empty
+    const naturalCount = initialDays && initialDays.length > 0 ? initialDays.length : 14;
+    const count = isCustomDaysLimited ? customDaysLimit : naturalCount;
     setTotalDays(count);
 
     const isFet = Boolean(
@@ -274,7 +278,7 @@ export default function StimulationCalendarGrid({
     if (sentinelDates) {
       if (sentinelDates.lmp_day1) sentinelMilestoneMap.set(sentinelDates.lmp_day1, 'Day 1 (LMP)');
       if (sentinelDates.baseline_scan) sentinelMilestoneMap.set(sentinelDates.baseline_scan, 'Baseline Scan 🔍');
-      if (sentinelDates.stim_start) sentinelMilestoneMap.set(sentinelDates.stim_start, isFet ? 'HRT Prep Start' : 'Stimulation Start');
+      if (sentinelDates.stim_start) sentinelMilestoneMap.set(sentinelDates.stim_start, isFet ? 'HRT Prep Start' : 'Stimulation Start · Baseline Scan 🔍');
       if (sentinelDates.d12_scan) sentinelMilestoneMap.set(sentinelDates.d12_scan, 'D12 Endometrial Scan 🔍');
       if (sentinelDates.p0_date) sentinelMilestoneMap.set(sentinelDates.p0_date, 'P0 (Progesterone Start)');
       if (sentinelDates.trigger) sentinelMilestoneMap.set(sentinelDates.trigger, 'Trigger Injection ⚡');
@@ -311,7 +315,7 @@ export default function StimulationCalendarGrid({
           else if (i === 10) milestone = 'Endometrial TVS Check 🔍';
           else if (i === 13) milestone = 'P0 (Progesterone Window)';
           else if (i === 18) milestone = 'Embryo Transfer 👶';
-          else if (i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
+          else if (i === 28 || i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
         } else if (isIui) {
           if (i === 1) milestone = 'Cycle Day 1 (LMP)';
           else if (i === 2) milestone = 'Ovulation Induction Start';
@@ -319,14 +323,18 @@ export default function StimulationCalendarGrid({
           else if (i === 11) milestone = 'Trigger Evaluation';
           else if (i === 12) milestone = 'hCG Trigger ⚡';
           else if (i === 14) milestone = 'IUI Insemination 💉';
-          else if (i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
+          else if (i === 28 || i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
         } else {
-          // IVF / ICSI
-          if (i === 1) milestone = 'Stim Day 1';
+          // IVF / ICSI / ART
+          if (i === 1) milestone = 'Stim Day 1 · Baseline Scan 🔍';
           else if (i === 6) milestone = 'Antagonist Start';
-          else if (i === 10) milestone = 'Trigger Imminent';
-          else if (i === 12) milestone = 'hCG Trigger ⚡';
-          else if (i === 14) milestone = 'OPU Retrieval 🧫';
+          else if (i === 10) milestone = 'Trigger Evaluation / Scan 🔍';
+          else if (i === 12) milestone = 'hCG / Agonist Trigger ⚡';
+          else if (i === 14) milestone = 'OPU Ovum Pick-Up Retrieval 🧫';
+          else if (i === 15) milestone = 'Fertilization Check (D1) 🔬';
+          else if (i === 17) milestone = 'D3 Cleavage Embryo Check / Transfer Window 👶';
+          else if (i === 19) milestone = 'D5 Blastocyst Transfer Window 👶';
+          else if (i === 28 || i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
         }
       }
 
@@ -388,28 +396,45 @@ export default function StimulationCalendarGrid({
 
     setDrugList(Array.from(new Set([...drugList, ...protoDrugs])));
 
-    const maxDayNeeded = Math.max(
-      totalDays,
+    // Determine day count strictly from the protocol's rules & timeline events
+    const protoSpan = Math.max(
       ...rules.map((r: any) => Number(r.day_end_offset || 0)),
-      ...timelineEvents.map((e: any) => Number(e.day_offset || 0))
+      ...timelineEvents.map((e: any) => Number(e.day_offset || 0)),
+      14 // baseline stimulation span
     );
-    if (maxDayNeeded > totalDays) {
-      setTotalDays(maxDayNeeded);
-    }
+
+    const targetDays = isCustomDaysLimited
+      ? customDaysLimit
+      : mode === 'merge'
+      ? Math.max(days.length, protoSpan)
+      : protoSpan;
+
+    setTotalDays(targetDays);
+    setCustomDaysLimit(targetDays);
 
     setDays((prev) => {
       let currentDays = [...prev];
-      if (maxDayNeeded > currentDays.length) {
+      if (mode === 'overwrite' && targetDays < currentDays.length) {
+        currentDays = currentDays.slice(0, targetDays);
+      } else if (targetDays > currentDays.length) {
         const baseDate = startDate ? new Date(startDate) : new Date();
         const existingCount = currentDays.length;
-        for (let i = existingCount; i < maxDayNeeded; i++) {
+        for (let i = existingCount; i < targetDays; i++) {
           const d = new Date(baseDate);
           d.setDate(d.getDate() + i);
+          const dayNum = i + 1;
+          let milestone = '';
+          if (dayNum === 15) milestone = 'Fertilization Check (D1) 🔬';
+          else if (dayNum === 17) milestone = 'D3 Cleavage Embryo Check / Transfer Window 👶';
+          else if (dayNum === 19) milestone = 'D5 Blastocyst Transfer Window 👶';
+          else if (dayNum === 28 || dayNum === targetDays) milestone = 'Beta-hCG Pregnancy Test 🩸';
+
           currentDays.push({
-            day_number: i + 1,
+            day_number: dayNum,
             date: d.toISOString().split('T')[0],
             display_date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
             day_of_week: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+            milestone: milestone,
             medications: [],
           });
         }
@@ -537,6 +562,44 @@ export default function StimulationCalendarGrid({
     setDrugList([...drugList, trimmed]);
     setNewDrugName('');
     setShowAddDrug(false);
+  };
+
+  const handleSetScheduleDuration = (newCount: number) => {
+    if (newCount === totalDays || newCount < 7) return;
+    setTotalDays(newCount);
+    setDays((prev) => {
+      let currentDays = [...prev];
+      if (newCount > currentDays.length) {
+        const baseDate = startDate ? new Date(startDate) : new Date();
+        const existingCount = currentDays.length;
+        for (let i = existingCount; i < newCount; i++) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + i);
+          const dayNum = i + 1;
+          let milestone = '';
+          if (dayNum === 15) milestone = 'Fertilization Check (D1) 🔬';
+          else if (dayNum === 17) milestone = 'D3 Cleavage Embryo Check / Transfer Window 👶';
+          else if (dayNum === 19) milestone = 'D5 Blastocyst Transfer Window 👶';
+          else if (dayNum === newCount || dayNum === 28) milestone = 'Beta-hCG Pregnancy Test 🩸';
+
+          currentDays.push({
+            day_number: dayNum,
+            date: d.toISOString().split('T')[0],
+            display_date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+            day_of_week: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+            milestone: milestone,
+            medications: [],
+          });
+        }
+      } else if (newCount < currentDays.length) {
+        currentDays = currentDays.slice(0, newCount);
+      }
+      return currentDays;
+    });
+  };
+
+  const handleAddDays = (numToAdd: number = 7) => {
+    handleSetScheduleDuration(totalDays + numToAdd);
   };
 
   const handleSaveCalendar = async () => {
@@ -752,6 +815,78 @@ export default function StimulationCalendarGrid({
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* Checkbox: Limit to days / Manual duration limit */}
+              {!readonly && (
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1 shadow-2xs text-xs">
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isCustomDaysLimited}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsCustomDaysLimited(checked);
+                        if (!checked) {
+                          // Unchecked: revert to natural protocol content length
+                          const naturalCount = initialDays && initialDays.length > 0 ? initialDays.length : 14;
+                          handleSetScheduleDuration(naturalCount);
+                        }
+                      }}
+                      className="rounded border-slate-300 text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+                      Limit days:
+                    </span>
+                  </label>
+
+                  {isCustomDaysLimited ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={totalDays}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setCustomDaysLimit(val);
+                          handleSetScheduleDuration(val);
+                        }}
+                        className="text-[11px] text-slate-800 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 font-bold focus:ring-0 cursor-pointer"
+                      >
+                        <option value={10}>10 Days</option>
+                        <option value={14}>14 Days (Stim Only)</option>
+                        <option value={18}>18 Days</option>
+                        <option value={21}>21 Days (Stim + ET)</option>
+                        <option value={28}>28 Days (Full Cycle)</option>
+                        <option value={35}>35 Days (Extended)</option>
+                        {![10, 14, 18, 21, 28, 35].includes(totalDays) && (
+                          <option value={totalDays}>{totalDays} Days (Custom)</option>
+                        )}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDays(7)}
+                        className="px-1.5 py-0.5 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded transition-colors"
+                        title="Extend schedule by 7 more days"
+                      >
+                        +7d
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700">
+                      <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-800 font-mono">
+                        {totalDays} Days
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(Protocol content)</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDays(7)}
+                        className="px-1.5 py-0.5 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded transition-colors"
+                        title="Extend schedule by 7 more days"
+                      >
+                        +7d
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

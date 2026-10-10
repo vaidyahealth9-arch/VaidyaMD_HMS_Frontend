@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ipdApi, patientsApi, authApi } from '@/lib/api';
+import { toast } from '@/contexts/ToastContext';
 import {
   BedDouble,
   Users,
@@ -22,9 +23,11 @@ import {
   AdmissionsTab,
   AdmissionSheet,
 } from '@/components/ipd';
+import { useBillingModal } from '@/contexts/BillingContext';
 
 export default function IPDPage() {
   const queryClient = useQueryClient();
+  const { openBilling } = useBillingModal();
   const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>('bedboard');
   const [selectedWardId, setSelectedWardId] = useState<string>('all');
 
@@ -95,17 +98,6 @@ export default function IPDPage() {
     },
   });
 
-  const dischargeMutation = useMutation({
-    mutationFn: (admissionId: string) => ipdApi.dischargePatient(admissionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
-      queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
-      queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
-    },
-    onError: (err: any) => {
-      alert(err.message || 'Failed to discharge patient');
-    },
-  });
 
   const bedStatusMutation = useMutation({
     mutationFn: ({ bedId, status }: { bedId: string; status: string }) =>
@@ -142,6 +134,98 @@ export default function IPDPage() {
   const vacantCount = beds.filter((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available').length;
   const cleaningCount = beds.filter((b: any) => b.status === 'Cleaning').length;
   const occupancyRate = totalBeds > 0 ? Math.round((occupiedCount / totalBeds) * 100) : 0;
+
+  // Unified Billing Integration: Final Discharge Settlement
+  const handleDischargeWithUnifiedBilling = async (admissionId: string) => {
+    try {
+      const summary = await ipdApi.getDischargeSummary(admissionId);
+      if (!summary) {
+        toast.error('Discharge Error', 'Could not retrieve IPD discharge summary.');
+        return;
+      }
+
+      const defaultItems = (summary.suggested_items || []).map((it: any) => ({
+        description: it.description || `IPD Room Charges (${summary.bed_number || 'Bed'})`,
+        quantity: it.quantity || 1,
+        unit_price: it.unit_price || 0,
+        total: it.total || (it.quantity || 1) * (it.unit_price || 0),
+        service_code: it.service_code || 'IPD-ROOM',
+        category: 'IPD',
+      }));
+
+      openBilling({
+        patientId: summary.patient_id,
+        lockedPatient: true,
+        sourceModule: 'ipd',
+        sourceReferenceId: admissionId,
+        defaultReason: `IPD Inpatient Discharge Settlement: ${summary.ward_name || 'Ward'} (Bed ${summary.bed_number || ''}, ${summary.duration_days || 1} day${(summary.duration_days || 1) > 1 ? 's' : ''})`,
+        defaultItems: defaultItems.length > 0 ? defaultItems : [
+          {
+            description: `IPD Room Charges (Bed ${summary.bed_number || 'Standard'})`,
+            quantity: summary.duration_days || 1,
+            unit_price: summary.daily_rate || 0,
+            total: (summary.duration_days || 1) * (summary.daily_rate || 0),
+            service_code: 'IPD-ROOM',
+            category: 'IPD',
+          },
+        ],
+        onSuccess: async (invoice) => {
+          try {
+            await ipdApi.dischargePatient(admissionId, {
+              invoice_id: invoice.id,
+              notes: `Discharged via Unified Billing with Final Invoice #${invoice.invoice_number}`,
+            });
+            queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
+            queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
+            queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+            toast.success(
+              'Discharged & Billed Successfully',
+              `Patient ${summary.patient_name || ''} discharged. Final invoice #${invoice.invoice_number} generated.`
+            );
+          } catch (err: any) {
+            console.error('Failed to mark admission discharged after billing', err);
+            toast.error('Discharge Status Error', err.message || 'Invoice generated, but discharge status update failed.');
+          }
+        },
+      });
+    } catch (err: any) {
+      toast.error('Discharge Tariff Error', err?.message || 'Could not load IPD discharge tariff.');
+    }
+  };
+
+  // Unified Billing Integration: Interim mid-stay billing without discharge
+  const handleInterimBilling = async (admissionId: string) => {
+    try {
+      const summary = await ipdApi.getDischargeSummary(admissionId);
+      if (!summary) return;
+
+      const defaultItems = (summary.suggested_items || []).map((it: any) => ({
+        description: `Interim: ${it.description || `IPD Room Charges (${summary.bed_number || 'Bed'})`}`,
+        quantity: it.quantity || 1,
+        unit_price: it.unit_price || 0,
+        total: it.total || (it.quantity || 1) * (it.unit_price || 0),
+        service_code: it.service_code || 'IPD-ROOM',
+        category: 'IPD',
+      }));
+
+      openBilling({
+        patientId: summary.patient_id,
+        lockedPatient: true,
+        sourceModule: 'ipd',
+        sourceReferenceId: admissionId,
+        defaultReason: `IPD Interim Inpatient Bill: ${summary.ward_name || 'Ward'} (Bed ${summary.bed_number || ''})`,
+        defaultItems,
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
+          queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+          toast.success('Interim Bill Generated', 'Interim invoice created successfully.');
+        },
+      });
+    } catch (err: any) {
+      toast.error('Billing Tariff Error', err?.message || 'Could not load IPD billing tariff.');
+    }
+  };
 
   return (
     <PageLayout className="space-y-6">
@@ -238,7 +322,8 @@ export default function IPDPage() {
             selectedWardId={selectedWardId}
             setSelectedWardId={setSelectedWardId}
             onAdmit={handleOpenAdmit}
-            onDischarge={(admissionId) => dischargeMutation.mutate(admissionId)}
+            onDischarge={handleDischargeWithUnifiedBilling}
+            onInterimBill={handleInterimBilling}
             onCleanBed={(bedId) => bedStatusMutation.mutate({ bedId, status: 'Vacant' })}
           />
         )}
@@ -254,7 +339,8 @@ export default function IPDPage() {
         {activeTab === 'admissions' && (
           <AdmissionsTab
             admissions={admissions}
-            onDischarge={(admissionId) => dischargeMutation.mutate(admissionId)}
+            onDischarge={handleDischargeWithUnifiedBilling}
+            onInterimBill={handleInterimBilling}
           />
         )}
       </div>

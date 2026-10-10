@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { pharmacyApi } from '@/lib/api';
+import { useBillingModal } from '@/contexts/BillingContext';
+import { pharmacyApi, walletApi } from '@/lib/api';
 import {
   Search,
   ShoppingCart,
@@ -12,6 +13,8 @@ import {
   Plus,
   CheckCircle2,
   AlertTriangle,
+  Wallet,
+  Receipt,
   X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
@@ -42,6 +45,7 @@ export default function PosTab({
   onDispenseSuccess,
 }: PosTabProps) {
   const { user, can } = useAuth();
+  const { openBilling } = useBillingModal();
   const queryClient = useQueryClient();
 
   const [posSearch, setPosSearch] = useState('');
@@ -54,6 +58,17 @@ export default function PosTab({
   const [posAmountPaid, setPosAmountPaid] = useState<number | ''>('');
   const [posPaymentMode, setPosPaymentMode] = useState<string>('Cash');
   const [posPaymentRef, setPosPaymentRef] = useState<string>('');
+  const [posWalletDeduct, setPosWalletDeduct] = useState<number>(0);
+
+  const selectedPatMatch = patients.find((p: any) => p.id === posPatientId || `${p.name} (${p.mrn || p.vid})` === posPatientId);
+  const effectivePatientId = selectedPatMatch ? selectedPatMatch.id : posPatientId;
+
+  const { data: walletData } = useQuery({
+    queryKey: ['patient-wallet', effectivePatientId],
+    queryFn: () => walletApi.get(effectivePatientId),
+    enabled: !!effectivePatientId,
+  });
+  const walletBalance = Number(walletData?.balance || 0);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -66,11 +81,11 @@ export default function PosTab({
   }, []);
 
   const cartTotal = posCart.reduce((acc, curr) => acc + curr.quantity * curr.unit_price, 0);
+  const netPayable = Math.max(0, cartTotal - posDiscount);
+  const remainingAfterWallet = Math.max(0, netPayable - posWalletDeduct);
 
   const dispenseMutation = useMutation({
     mutationFn: () => {
-      const match = patients.find((p: any) => p.id === posPatientId || `${p.name} (${p.mrn || p.vid})` === posPatientId);
-      const effectivePatientId = match ? match.id : posPatientId;
       if (!effectivePatientId) {
         throw new Error('Please select a registered patient before dispensing.');
       }
@@ -80,7 +95,8 @@ export default function PosTab({
         doctor_id: user?.id,
         notes: 'Dispensed via Point of Sale counter',
         discount: posDiscount,
-        amount_paid: posAmountPaid === '' ? Math.max(0, cartTotal - posDiscount) : Number(posAmountPaid),
+        wallet_amount_used: posWalletDeduct,
+        amount_paid: posAmountPaid === '' ? remainingAfterWallet : Number(posAmountPaid),
         payment_method: posPaymentMode,
         payment_ref: posPaymentRef ? posPaymentRef.trim() : undefined,
       });
@@ -89,8 +105,12 @@ export default function PosTab({
       queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
       queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
+      if (effectivePatientId) {
+        queryClient.invalidateQueries({ queryKey: ['patient-wallet', effectivePatientId] });
+      }
       setPosCart([]);
       setPosDiscount(0);
+      setPosWalletDeduct(0);
       setPosAmountPaid('');
       setPosPaymentMode('Cash');
       setPosPaymentRef('');
@@ -100,6 +120,49 @@ export default function PosTab({
       import('@/contexts/ToastContext').then(({ toast }) => toast.error('Dispensing failed', err.message));
     },
   });
+
+  const handleOpenUnifiedBilling = () => {
+    if (!effectivePatientId) {
+      import('@/contexts/ToastContext').then(({ toast }) =>
+        toast.error('Patient Required', 'Please select a registered patient before opening checkout.')
+      );
+      return;
+    }
+    if (posCart.length === 0) {
+      import('@/contexts/ToastContext').then(({ toast }) =>
+        toast.error('Empty Cart', 'Please add medications to the cart before opening checkout.')
+      );
+      return;
+    }
+    openBilling({
+      patientId: effectivePatientId,
+      lockedPatient: true,
+      sourceModule: 'pharmacy',
+      defaultReason: 'Point of Sale Pharmacy Dispense',
+      defaultItems: posCart.map((i) => ({
+        description: `${i.item_name}${i.batch_number ? ` (Batch: ${i.batch_number})` : ''}`,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total: i.quantity * i.unit_price,
+        service_code: i.item_code,
+        category: 'Pharmacy',
+      })),
+      defaultDiscount: posDiscount,
+      onSuccess: (invoice) => {
+        queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+        queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
+        if (effectivePatientId) {
+          queryClient.invalidateQueries({ queryKey: ['patient-wallet', effectivePatientId] });
+        }
+        setPosCart([]);
+        setPosDiscount(0);
+        setPosWalletDeduct(0);
+        setPosAmountPaid('');
+        onDispenseSuccess(invoice);
+      },
+    });
+  };
 
   const handleAddToCart = (batch: any) => {
     if (batch.is_active === false) return;
@@ -380,16 +443,66 @@ export default function PosTab({
                     </div>
                     <div className="flex justify-between text-sm font-bold border-t border-slate-100 pt-2">
                       <span className="text-slate-900">Total Billed:</span>
-                      <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(Math.max(0, cartTotal - posDiscount))}</span>
+                      <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(netPayable)}</span>
                     </div>
+
+                    {/* Patient Advance Wallet Auto-Deduction Prompt */}
+                    {walletBalance > 0 && (
+                      <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-md text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-blue-900 font-semibold">
+                            <Wallet className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Advance Balance:</span>
+                          </div>
+                          <span className="font-bold text-blue-900">{formatCurrency(walletBalance)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-blue-100">
+                          <span className="text-[11px] text-blue-700">Deduct from Wallet:</span>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              min="0"
+                              max={Math.min(walletBalance, netPayable)}
+                              value={posWalletDeduct || ''}
+                              onChange={(e) => setPosWalletDeduct(Math.min(walletBalance, Math.max(0, Number(e.target.value))))}
+                              placeholder="0"
+                              className="h-6 w-20 text-xs text-right bg-white border-blue-300"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPosWalletDeduct(posWalletDeduct > 0 ? 0 : Math.min(walletBalance, netPayable))}
+                              className="h-6 px-2 text-[10px] font-bold border-blue-300 text-blue-700 hover:bg-blue-100"
+                            >
+                              {posWalletDeduct > 0 ? 'Clear' : 'Use Wallet'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {posWalletDeduct > 0 && (
+                      <div className="space-y-1 pt-1 border-t border-slate-100">
+                        <div className="flex justify-between items-center text-xs text-blue-700 font-medium">
+                          <span>Wallet Deduction:</span>
+                          <span>- {formatCurrency(posWalletDeduct)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-bold text-slate-800">
+                          <span>Remaining Balance Due:</span>
+                          <span className="text-emerald-700">{formatCurrency(remainingAfterWallet)}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-xs bg-emerald-50 p-2 rounded-md border border-emerald-100">
-                      <span className="text-emerald-800 font-bold">Amount Paid (₹):</span>
+                      <span className="text-emerald-800 font-bold">Counter Paid (₹):</span>
                       <Input
                         type="number"
                         min="0"
                         value={posAmountPaid}
                         onChange={(e) => setPosAmountPaid(e.target.value === '' ? '' : Number(e.target.value))}
-                        placeholder={(Math.max(0, cartTotal - posDiscount)).toString()}
+                        placeholder={remainingAfterWallet.toString()}
                         className="h-7 text-xs w-24 text-right bg-white border-emerald-200"
                       />
                     </div>
@@ -428,13 +541,26 @@ export default function PosTab({
                     </div>
                   </div>
                   {can('action:dispense_pharmacy') ? (
-                    <Button
-                      onClick={() => dispenseMutation.mutate()}
-                      disabled={dispenseMutation.isPending || !posPatientId || posCart.length === 0}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-md shadow-md text-xs mt-2"
-                    >
-                      {dispenseMutation.isPending ? 'Dispensing & Deducting Stock...' : '1-Click Dispense & Bill'}
-                    </Button>
+                    <div className="space-y-2 mt-2">
+                      <Button
+                        type="button"
+                        onClick={handleOpenUnifiedBilling}
+                        disabled={!posPatientId || posCart.length === 0}
+                        className="w-full gap-2 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-bold h-10 rounded-md shadow-md text-xs"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        <span>Unified Billing Sheet (Split / Wallet / GST)</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => dispenseMutation.mutate()}
+                        disabled={dispenseMutation.isPending || !posPatientId || posCart.length === 0}
+                        variant="outline"
+                        className="w-full border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold h-9 rounded-md text-xs"
+                      >
+                        {dispenseMutation.isPending ? 'Dispensing & Deducting Stock...' : '1-Click Quick Dispense (Counter Cash)'}
+                      </Button>
+                    </div>
                   ) : (
                     <div className="w-full p-2.5 mt-2 bg-slate-100 border border-slate-200 rounded-md text-slate-500 text-xs font-bold text-center">
                       Not Authorized to Dispense Medication

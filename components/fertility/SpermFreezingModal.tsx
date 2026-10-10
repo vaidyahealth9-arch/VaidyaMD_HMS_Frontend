@@ -634,7 +634,6 @@ export default function SpermFreezingModal({
                 title="SEMEN CRYOPRESERVATION & BIOBANK CERTIFICATE"
                 subtitle="VaidyaMD BioBank • In Compliance with ART (Regulation) Act 2021 Form 15"
                 hideHospitalHeader={usePrePrintedPad}
-                onTogglePrePrintedPad={() => setUsePrePrintedPad(!usePrePrintedPad)}
                 patient={{
                   name: patient?.name,
                   vid: patient?.vid,

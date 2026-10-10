@@ -71,7 +71,24 @@ export default function CounselingDirectoryTable({
                   </p>
                 </td>
                 <td className="p-3.5">
-                  <p className="font-bold text-slate-900">{note.patient_name || 'Patient'}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-bold text-slate-900">{note.patient_name || 'Patient'}</p>
+                    {note.patient_gender && (
+                      note.patient_gender.toLowerCase() === 'female' ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          ♀ Female
+                        </span>
+                      ) : note.patient_gender.toLowerCase() === 'male' ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                          ♂ Male
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-medium px-1.5 py-0.2 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                          {note.patient_gender}
+                        </span>
+                      )
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
                     <span className="font-mono font-bold text-primary">{note.patient_vid || '—'}</span>
                     {note.patient_age && <span>· {note.patient_age}y</span>}

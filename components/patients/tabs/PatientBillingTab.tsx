@@ -4,14 +4,15 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Package, PackageCheck, Plus, Check, X } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { patientPackagesApi } from '@/lib/api';
+import { patientPackagesApi, billingApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import FertilityWalletCard from '@/components/fertility/FertilityWalletCard';
+import { useBillingModal } from '@/contexts/BillingContext';
 import {
   StatusBadge,
   RecordPaymentModal,
   ReceiptModal,
   NewInvoiceSheet,
+  PatientWalletCard,
 } from '@/components/billing';
 import type { Invoice } from '@/features/billing/types';
 import { toast } from '@/contexts/ToastContext';
@@ -58,6 +59,61 @@ export default function PatientBillingTab({
     }
   }, [propPackages, patientId]);
 
+  const { openBilling } = useBillingModal();
+  const [availablePackages, setAvailablePackages] = useState<any[]>([]);
+  const [showPackagePicker, setShowPackagePicker] = useState(false);
+  const [loadingPackagesList, setLoadingPackagesList] = useState(false);
+
+  const handleOpenPackagePicker = async () => {
+    setLoadingPackagesList(true);
+    try {
+      const pkgs = await billingApi.listPackages();
+      setAvailablePackages(Array.isArray(pkgs) ? pkgs : []);
+      setShowPackagePicker(true);
+    } catch {
+      toast.error('Failed to load packages', 'Could not fetch active treatment packages');
+    } finally {
+      setLoadingPackagesList(false);
+    }
+  };
+
+  const handleSelectPackageToBill = (pkg: any) => {
+    setShowPackagePicker(false);
+    const pkgItems = Array.isArray(pkg.items) ? pkg.items : [];
+    const packagePrice = parseFloat(pkg.base_price ?? pkg.price ?? 0) || 0;
+    const mappedItems = pkgItems.length > 0
+      ? pkgItems.map((it: any) => {
+          const uPrice = Number(it.price ?? it.cost ?? 0);
+          const uQty = Number(it.quantity || 1);
+          return {
+            description: it.name || it.description || 'Service',
+            quantity: uQty,
+            unit_price: uPrice,
+            total: uPrice * uQty,
+            service_code: it.code || it.service_code || '',
+          };
+        })
+      : [{ description: pkg.name, quantity: 1, unit_price: packagePrice, total: packagePrice }];
+
+    const sumTariff = mappedItems.reduce((acc: number, it: any) => acc + (it.total || 0), 0);
+    const bundleDiscount = Math.max(0, sumTariff - packagePrice);
+
+    openBilling({
+      patientId,
+      lockedPatient: true,
+      sourceModule: 'package',
+      packageId: pkg.id,
+      defaultReason: `Treatment Package: ${pkg.name}`,
+      defaultItems: mappedItems,
+      defaultDiscount: bundleDiscount,
+      defaultDiscountType: 'amount',
+      onSuccess: () => {
+        loadPackages();
+        handleRefresh();
+      },
+    });
+  };
+
   // Shared billing modals state
   const [paymentModalInv, setPaymentModalInv] = useState<Invoice | null>(null);
   const [receiptModalInv, setReceiptModalInv] = useState<Invoice | null>(null);
@@ -98,7 +154,7 @@ export default function PatientBillingTab({
   return (
     <div className="space-y-6 w-full">
       {/* Advance Wallet & Balance Card */}
-      <FertilityWalletCard
+      <PatientWalletCard
         patientId={patientId}
         patientName={patient?.name}
         patientVid={patient?.vid}
@@ -119,13 +175,15 @@ export default function PatientBillingTab({
               Track bundled clinical procedures, remaining scan/lab quotas, and log service redemptions
             </p>
           </div>
-          <Link
-            href="/billing?tab=packages"
-            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+          <button
+            type="button"
+            onClick={handleOpenPackagePicker}
+            disabled={loadingPackagesList}
+            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/15 text-primary font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            Bill New Package
-          </Link>
+            {loadingPackagesList ? 'Loading Bundles...' : 'Bill New Package'}
+          </button>
         </div>
 
         {patientPackages.length === 0 ? (
@@ -135,12 +193,13 @@ export default function PatientBillingTab({
             <p className="text-[11px] text-slate-400 mt-0.5">
               When a bundled package (e.g. IVF-ICSI, IUI, Surrogacy) is billed, its service quotas will appear here for 1-click redemption.
             </p>
-            <Link
-              href="/billing?tab=packages"
-              className="inline-block mt-3 text-xs text-primary font-bold hover:underline"
+            <button
+              type="button"
+              onClick={handleOpenPackagePicker}
+              className="inline-block mt-3 text-xs text-primary font-bold hover:underline cursor-pointer"
             >
-              View Available Treatment Bundles →
-            </Link>
+              View Available Treatment Bundles &amp; Bill Package →
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -482,6 +541,84 @@ export default function PatientBillingTab({
         defaultPatientId={patientId}
         lockedPatient={true}
       />
+
+      {/* Treatment Package Picker Modal */}
+      {showPackagePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Select Treatment Package to Bill</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Package quotas will be allocated to {patient?.name || 'this patient'} upon invoice generation
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPackagePicker(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-3 flex-1">
+              {availablePackages.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No treatment packages configured in the hospital catalog.
+                </div>
+              ) : (
+                availablePackages.map((pkg) => {
+                  const pkgItems = Array.isArray(pkg.items) ? pkg.items : [];
+                  const packagePrice = parseFloat(pkg.base_price ?? pkg.price ?? 0) || 0;
+                  return (
+                    <div
+                      key={pkg.id}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-sm">{pkg.name}</h4>
+                          <span className="text-[10px] font-bold uppercase text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            {pkg.plugin_id || 'Clinical'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-1">{pkg.description}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Includes {pkgItems.length} service components · Quotas tracked automatically
+                        </p>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-base font-extrabold text-primary font-mono">
+                          {formatCurrency(packagePrice)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectPackageToBill(pkg)}
+                          className="mt-1.5 px-3 py-1.5 bg-primary hover:bg-primary-mid text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer"
+                        >
+                          Select &amp; Bill
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPackagePicker(false)}
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

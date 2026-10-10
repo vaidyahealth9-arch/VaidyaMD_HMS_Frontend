@@ -35,6 +35,7 @@ import {
   Baby,
   Activity,
   Layers,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -399,6 +400,19 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     return [];
   };
 
+  const formatFollowUpSchedule = (raw?: string) => {
+    if (!raw) return 'As advised';
+    const val = raw.trim();
+    const lower = val.toLowerCase();
+    if (lower === '1_week' || lower === '1 week') return 'Review in 1 week';
+    if (lower === '2_weeks' || lower === '2 weeks') return 'Review in 2 weeks';
+    if (lower === '1_month' || lower === '1 month') return 'Review in 1 month';
+    if (lower.startsWith('review in') || lower.startsWith('review after') || lower.startsWith('sos')) {
+      return val;
+    }
+    return `Review in ${val}`;
+  };
+
   // Open Prescription Print Preview directly from current form state
   const handleOpenPrintPreview = (customMeds?: any[]) => {
     const rawMeds = customMeds || getValues('medications') || [];
@@ -444,14 +458,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       investigations: formVals.investigations_to_be_advised || formVals.investigations_ordered || formVals.previous_investigations,
       medications: meds,
       advice: formVals.treatment_notes || formVals.plan,
-      nextFollowUp:
-        formVals.follow_up === '1_week'
-          ? 'Review in 1 week'
-          : formVals.follow_up === '2_weeks'
-          ? 'Review in 2 weeks'
-          : formVals.follow_up === '1_month'
-          ? 'Review in 1 month'
-          : 'As advised',
+      nextFollowUp: formatFollowUpSchedule(formVals.follow_up),
     });
   };
 
@@ -520,6 +527,84 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
     }
 
     toast.info('Consultation Loaded', `Loaded consultation (${rec.created_at?.split('T')[0] || 'history'}) in in-place update mode`);
+  };
+
+  // Clear / Discard Form handler
+  const handleClearForm = () => {
+    if (window.confirm('Discard current edits and start a fresh consultation? Any unsaved changes will be lost.')) {
+      reset({
+        chief_complaints: '',
+        history_of_illness: '',
+        previous_history: '',
+        present_history: '',
+        examination: '',
+        provisional_diagnosis: '',
+        investigations_to_be_advised: '',
+        treatment_notes: '',
+        plan: '',
+        future_consultation_notes: '',
+        follow_up: '1_week',
+        nurse_notes: '',
+        cvs_findings: '',
+        cns_findings: '',
+        rs_findings: '',
+        medications: [],
+        clinical_proforma: null,
+      });
+      setActiveConsultationRecordId(null);
+      setSaveSuccessMessage(null);
+      toast.info('Form Cleared', 'Consultation workbench has been reset to a fresh note.');
+    }
+  };
+
+  // Delete Consultation Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      return opdApi.deleteConsultation(recordId);
+    },
+    onSuccess: (_, deletedRecordId) => {
+      queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', selectedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ['clinical-records'] });
+
+      // If the currently edited or viewed record was deleted, reset workbench state
+      if (activeConsultationRecordId === deletedRecordId) {
+        setActiveConsultationRecordId(null);
+        reset({
+          chief_complaints: '',
+          history_of_illness: '',
+          previous_history: '',
+          present_history: '',
+          examination: '',
+          provisional_diagnosis: '',
+          investigations_to_be_advised: '',
+          treatment_notes: '',
+          plan: '',
+          future_consultation_notes: '',
+          follow_up: '1_week',
+          nurse_notes: '',
+          cvs_findings: '',
+          cns_findings: '',
+          rs_findings: '',
+          medications: [],
+          clinical_proforma: null,
+        });
+      }
+      if (viewingRecord?.id === deletedRecordId) {
+        setViewingRecord(null);
+      }
+      toast.success('Consultation Deleted', 'The consultation note was successfully deleted.');
+    },
+    onError: (err: any) => {
+      console.error('Failed to delete consultation note', err);
+      toast.error('Delete Failed', err?.message || 'Could not delete consultation note');
+    },
+  });
+
+  const handleDeleteConsultation = (rec: any) => {
+    const recordId = rec?.id || rec;
+    if (!recordId) return;
+    deleteMutation.mutate(recordId);
   };
 
   // Save Consultation Mutation (Doctor)
@@ -852,14 +937,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
       investigations: rec.data?.investigations_to_be_advised || rec.data?.investigations_ordered || rec.data?.previous_investigations,
       medications: meds,
       advice: rec.data?.treatment_notes || rec.data?.plan,
-      nextFollowUp:
-        rec.data?.follow_up === '1_week'
-          ? 'Review in 1 week'
-          : rec.data?.follow_up === '2_weeks'
-          ? 'Review in 2 weeks'
-          : rec.data?.follow_up === '1_month'
-          ? 'Review in 1 month'
-          : 'As advised',
+      nextFollowUp: formatFollowUpSchedule(rec.data?.follow_up),
     });
   };
 
@@ -897,6 +975,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
           onSelectRecord={(rec) => setViewingRecord(rec)}
           onLoadConsultationForEdit={(rec) => handleLoadConsultationForEdit(rec)}
           onPrintPrevious={(rec) => handlePrintPrevious(rec)}
+          onDeleteConsultation={(rec) => handleDeleteConsultation(rec)}
           onSelectCounselingNote={(note) => setViewingCounselingNote(note)}
         />
 
@@ -1051,6 +1130,24 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
 
               {/* Bottom Form Actions */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClearForm}
+                    className="text-slate-600 border-slate-200 hover:bg-slate-100 font-medium px-4 h-10 rounded-md shadow-2xs gap-1.5"
+                    title="Clear form or exit editing of existing note"
+                  >
+                    <RotateCcw className="w-4 h-4 text-slate-500" />
+                    <span>{activeConsultationRecordId ? 'Discard / New Note' : 'Clear Form'}</span>
+                  </Button>
+                  {activeConsultationRecordId && (
+                    <span className="text-xs bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-md font-semibold">
+                      Editing Saved Record
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-3">
                   <Button
                     type="button"
@@ -1068,7 +1165,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
                     className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
                   >
                     <Save className="w-4 h-4" />
-                    <span>{saveMutation.isPending ? 'Saving to EMR...' : 'Save Consultation Record'}</span>
+                    <span>{saveMutation.isPending ? 'Saving to EMR...' : activeConsultationRecordId ? 'Update Consultation' : 'Save Consultation Record'}</span>
                   </Button>
                 </div>
               </div>
@@ -1090,6 +1187,7 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
         onClose={() => setViewingRecord(null)}
         onLoadForEdit={(rec) => handleLoadConsultationForEdit(rec)}
         onPrintRx={(rec) => handlePrintPrevious(rec)}
+        onDelete={(rec) => handleDeleteConsultation(rec)}
       />
 
       {/* Printable Prescription Modal */}

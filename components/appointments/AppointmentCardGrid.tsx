@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Clock,
@@ -17,10 +17,16 @@ import {
   Info,
   Check,
   Sparkles,
+  Receipt,
+  CreditCard,
 } from 'lucide-react';
-import { StatusBadge } from '@/components/billing';
+import { StatusBadge, ReceiptModal, RecordPaymentModal } from '@/components/billing';
 import { statusColors } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBillingModal } from '@/contexts/BillingContext';
+import { billingApi } from '@/lib/api';
+import { toast } from '@/contexts/ToastContext';
+import { DEFAULT_VISIT_TYPES } from './modals/BookAppointmentModal';
 
 interface AppointmentCardGridProps {
   appointments: any[];
@@ -31,6 +37,7 @@ interface AppointmentCardGridProps {
   onStartConsultation: (apt: any) => void;
   onReschedule: (apt: any) => void;
   onTriage: (apt: any) => void;
+  onRefresh?: () => void;
 }
 
 const parseUtc = (dStr: string) => {
@@ -48,8 +55,37 @@ export default function AppointmentCardGrid({
   onStartConsultation: handleStartConsultation,
   onReschedule,
   onTriage,
+  onRefresh,
 }: AppointmentCardGridProps) {
   const { can } = useAuth();
+  const { openBilling } = useBillingModal();
+  const [selectedReceiptInv, setSelectedReceiptInv] = useState<any | null>(null);
+  const [selectedPaymentInv, setSelectedPaymentInv] = useState<any | null>(null);
+  const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
+
+  const handleOpenReceipt = async (invId: string) => {
+    try {
+      setIsLoadingInvoice(true);
+      const inv = await billingApi.getInvoice(invId);
+      setSelectedReceiptInv(inv);
+    } catch (err: any) {
+      toast.error('Could not load invoice receipt', err.message);
+    } finally {
+      setIsLoadingInvoice(false);
+    }
+  };
+
+  const handleOpenPayment = async (invId: string) => {
+    try {
+      setIsLoadingInvoice(true);
+      const inv = await billingApi.getInvoice(invId);
+      setSelectedPaymentInv(inv);
+    } catch (err: any) {
+      toast.error('Could not load invoice for payment', err.message);
+    } finally {
+      setIsLoadingInvoice(false);
+    }
+  };
   const getWaitTime = (apt: any) => {
     if (apt.status !== 'waiting') return null;
     const dateStr = apt.updated_at || apt.created_at || apt.scheduled_at;
@@ -281,6 +317,94 @@ export default function AppointmentCardGrid({
                     </button>
                   )}
 
+                  {/* Billing Action: Intelligent handling for Billed (paid), Due (pending/partial), and Unbilled */}
+                  {(() => {
+                    const invId = apt.invoice_id || apt.metadata_?.invoice_id || apt.metadata?.invoice_id;
+                    const invStatus = (apt.invoice_status || apt.metadata_?.invoice_status || '').toLowerCase();
+                    const pendingDue = Number(
+                      apt.invoice_pending_due !== undefined && apt.invoice_pending_due !== null
+                        ? apt.invoice_pending_due
+                        : (apt.metadata_?.invoice_pending_due ?? 0)
+                    );
+
+                    if (invId) {
+                      const isPaid = invStatus === 'paid' || (pendingDue <= 0 && invStatus !== 'pending');
+                      if (isPaid) {
+                        return (
+                          <button
+                            onClick={() => handleOpenReceipt(invId)}
+                            className="text-xs font-bold px-2.5 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors flex items-center gap-1 shadow-xs"
+                            title={`Invoice #${apt.invoice_number || ''} is settled. Click to view receipt.`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Billed</span>
+                          </button>
+                        );
+                      }
+
+                      // Pending or partially paid
+                      const dueDisplay = pendingDue > 0 ? pendingDue : (Number(apt.consultation_fee) || 500);
+                      return (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenPayment(invId)}
+                            className="text-xs font-bold px-2.5 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors flex items-center gap-1"
+                            title={`Pending balance: ₹${dueDisplay}. Click to record payment.`}
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Due: ₹{dueDisplay}</span>
+                          </button>
+                          <button
+                            onClick={() => handleOpenReceipt(invId)}
+                            className="p-2 bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md transition-colors"
+                            title="View / Print Bill"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    // Not billed yet -> Open Universal Billing Modal
+                    return (
+                      <button
+                        onClick={() => {
+                          const visitTypeKey = (apt.visit_type || 'consultation').replace(/^visit_/, '');
+                          const matchingVt = DEFAULT_VISIT_TYPES.find(
+                            (v) => v.id === visitTypeKey || v.record_type === apt.visit_type
+                          );
+                          const visitTypeTitle = matchingVt?.label || apt.visit_type?.replace(/_/g, ' ') || 'Consultation';
+                          const fee = Number(apt.consultation_fee || apt.metadata?.consultation_fee || apt.metadata_?.consultation_fee || matchingVt?.defaultFee || 500);
+
+                          openBilling({
+                            patientId: apt.patient_id,
+                            lockedPatient: true,
+                            sourceModule: 'opd',
+                            sourceReferenceId: apt.id,
+                            defaultReason: `OPD: ${visitTypeTitle} - ${apt.doctor_name || 'Doctor'}`,
+                            defaultItems: [
+                              {
+                                description: `${visitTypeTitle} - ${apt.department?.toUpperCase() || 'OPD'} (${apt.doctor_name || 'Physician'})`,
+                                quantity: 1,
+                                unit_price: fee,
+                                total: fee,
+                                service_code: 'OPD-CONSULT',
+                              },
+                            ],
+                            onSuccess: () => {
+                              if (onRefresh) onRefresh();
+                            },
+                          });
+                        }}
+                        className="text-xs font-bold px-2.5 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                        title="Generate consultation invoice or collect fee"
+                      >
+                        <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Bill</span>
+                      </button>
+                    );
+                  })()}
+
                   {/* EMR Button - Not for Cosmetic Gynecology */}
                   {!isCosGyn && (
                     <Link
@@ -317,6 +441,23 @@ export default function AppointmentCardGrid({
           </p>
         </div>
       )}
+
+      <ReceiptModal
+        invoice={selectedReceiptInv}
+        isOpen={!!selectedReceiptInv}
+        onClose={() => setSelectedReceiptInv(null)}
+      />
+
+      <RecordPaymentModal
+        invoice={selectedPaymentInv}
+        isOpen={!!selectedPaymentInv}
+        onClose={() => setSelectedPaymentInv(null)}
+        onSuccess={() => {
+          setSelectedPaymentInv(null);
+          if (onRefresh) onRefresh();
+        }}
+        context="opd"
+      />
     </>
   );
 }

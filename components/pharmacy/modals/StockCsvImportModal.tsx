@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '@/lib/api';
+import { adminApi, pharmacyApi } from '@/lib/api';
 import {
   FileSpreadsheet,
   UploadCloud,
@@ -59,31 +59,39 @@ export default function StockCsvImportModal({
 
   const handleDownloadStockTemplate = async (mode: 'blank' | 'export' = 'blank') => {
     try {
-      await adminApi.downloadCsv('pharmacy_stock', mode, `pharmacy_stock_${mode}.csv`);
+      if (mode === 'blank') {
+        await pharmacyApi.downloadStockTemplateCsv(`pharmacy_stock_template.csv`);
+      } else {
+        await adminApi.downloadCsv('pharmacy_stock', mode, `pharmacy_stock_${mode}.csv`);
+      }
     } catch {
-      // Client-side fallback template download
-      const headers = [
-        'item_code', 'item_name', 'generic_name', 'category', 'batch_number', 'manufacturer',
-        'expiry_date', 'purchase_rate', 'mrp', 'selling_price', 'quantity_received', 'quantity_available',
-        'rack_location', 'hsn_code', 'vendor_name'
-      ];
-      const sampleRows = [
-        ['SODU02', 'DUPHASTON TAB 10MG', 'Dydrogesterone 10mg', 'Luteal Support', 'MAW26022', "Abbott Women's Health", '2029-06-01', '687.10', '901.82', '880.00', '12', '12', 'D210', '30043919', 'Matrika Pharmacy Vendor'],
-        ['SEEV01', 'EVATONE 2 MG TAB', 'Estradiol Valerate 2mg', 'Hormones / Endometrial Prep', 'PLEV2603', 'Serum Institute', '2028-01-01', '122.55', '160.85', '155.00', '30', '30', 'A003', '30043919', 'Matrika Pharmacy Vendor'],
-        ['MIDO02', 'DOLO 650 TAB', 'Paracetamol 650mg', 'Analgesics / Antipyretics', 'DOBS4440', 'Micro Labs', '2030-03-01', '24.59', '32.28', '32.00', '12', '12', 'A059', '30049061', 'Matrika Pharmacy Vendor'],
-        ['UNCO05', 'COQ CAP 100MG', 'Coenzyme Q10 100mg', 'Fertility Antioxidants', 'COQ26002GJ', 'Universal Nutriscience', '2028-11-01', '452.57', '594.00', '570.00', '9', '9', 'B072', '30045090', 'Matrika Pharmacy Vendor'],
-        ['COHB03', 'HBCOM SACHETS (1X2GM)', 'Iron + Folic Acid + Vitamin B12', 'Supplements / Hematology', 'BS260140', 'Comed Chemicals', '2028-05-01', '15.60', '20.48', '20.48', '48', '48', 'A003', '30045010', 'Matrika Pharmacy Vendor']
-      ];
-      const csvText = [headers.join(','), ...sampleRows.map((r: any) => r.join(','))].join('\n');
-      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pharmacy_stock_${mode}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      try {
+        await adminApi.downloadCsv('pharmacy_stock', mode, `pharmacy_stock_${mode}.csv`);
+      } catch {
+        // Client-side fallback template download
+        const headers = [
+          'item_code', 'item_name', 'generic_name', 'category', 'batch_number', 'manufacturer',
+          'expiry_date', 'purchase_rate', 'mrp', 'selling_price', 'quantity_received', 'quantity_available',
+          'rack_location', 'hsn_code', 'vendor_name'
+        ];
+        const sampleRows = [
+          ['SODU02', 'DUPHASTON TAB 10MG', 'Dydrogesterone 10mg', 'Luteal Support', 'MAW26022', "Abbott Women's Health", '2029-06-01', '687.10', '901.82', '880.00', '12', '12', 'D210', '30043919', 'Matrika Pharmacy Vendor'],
+          ['SEEV01', 'EVATONE 2 MG TAB', 'Estradiol Valerate 2mg', 'Hormones / Endometrial Prep', 'PLEV2603', 'Serum Institute', '2028-01-01', '122.55', '160.85', '155.00', '30', '30', 'A003', '30043919', 'Matrika Pharmacy Vendor'],
+          ['MIDO02', 'DOLO 650 TAB', 'Paracetamol 650mg', 'Analgesics / Antipyretics', 'DOBS4440', 'Micro Labs', '2030-03-01', '24.59', '32.28', '32.00', '12', '12', 'A059', '30049061', 'Matrika Pharmacy Vendor'],
+          ['UNCO05', 'COQ CAP 100MG', 'Coenzyme Q10 100mg', 'Fertility Antioxidants', 'COQ26002GJ', 'Universal Nutriscience', '2028-11-01', '452.57', '594.00', '570.00', '9', '9', 'B072', '30045090', 'Matrika Pharmacy Vendor'],
+          ['COHB03', 'HBCOM SACHETS (1X2GM)', 'Iron + Folic Acid + Vitamin B12', 'Supplements / Hematology', 'BS260140', 'Comed Chemicals', '2028-05-01', '15.60', '20.48', '20.48', '48', '48', 'A003', '30045010', 'Matrika Pharmacy Vendor']
+        ];
+        const csvText = [headers.join(','), ...sampleRows.map((r: any) => r.join(','))].join('\n');
+        const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pharmacy_stock_${mode}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
     }
   };
 
@@ -98,7 +106,12 @@ export default function StockCsvImportModal({
     setEditingStockRowIndex(null);
 
     try {
-      const res = await adminApi.previewCsv('pharmacy_stock', file, mode);
+      let res: any;
+      try {
+        res = await pharmacyApi.previewStockCsv(file, mode);
+      } catch {
+        res = await adminApi.previewCsv('pharmacy_stock', file, mode);
+      }
       setStockCsvPreviewData(res);
       setStockCsvPreviewRows(res.stats?.preview_rows || []);
     } catch (err: any) {
@@ -182,7 +195,12 @@ export default function StockCsvImportModal({
         fileToUpload = new Blob([csvLines.join('\n')], { type: 'text/csv' });
       }
 
-      const res = await adminApi.importCsv('pharmacy_stock', fileToUpload, stockConflictMode);
+      let res: any;
+      try {
+        res = await pharmacyApi.importStockCsv(fileToUpload, stockConflictMode);
+      } catch {
+        res = await adminApi.importCsv('pharmacy_stock', fileToUpload, stockConflictMode);
+      }
       setStockImportResult(res);
       queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
       queryClient.invalidateQueries({ queryKey: ['pharmacy-grns'] });

@@ -5,6 +5,7 @@ import {
   Plus,
   LogOut,
   CheckCircle2,
+  Receipt,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
@@ -18,6 +19,7 @@ interface BedboardTabProps {
   setSelectedWardId: (id: string) => void;
   onAdmit: (bed: any) => void;
   onDischarge: (admissionId: string) => void;
+  onInterimBill?: (admissionId: string) => void;
   onCleanBed: (bedId: string) => void;
 }
 
@@ -28,6 +30,7 @@ export default function BedboardTab({
   setSelectedWardId,
   onAdmit,
   onDischarge,
+  onInterimBill,
   onCleanBed,
 }: BedboardTabProps) {
   return (
@@ -105,6 +108,18 @@ export default function BedboardTab({
                         </div>
 
                         <div className="flex gap-1.5 pt-1">
+                          {onInterimBill && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onInterimBill(bed.current_admission.admission_id)}
+                              className="h-8 rounded-lg text-xs font-semibold px-2.5 border-slate-300 text-slate-700 hover:bg-slate-50"
+                              title="Generate interim bill without discharging"
+                            >
+                              <Receipt className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                              <span>Bill</span>
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="destructive"

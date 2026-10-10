@@ -197,7 +197,19 @@ export default function NewCounselingSessionModal({
                       <Badge variant="outline" className="text-[10px] bg-white text-emerald-800 border-emerald-300 font-mono">
                         {activeSelectedPatient.vid || activeSelectedPatient.mrn}
                       </Badge>
-                      <span className="text-[11px] text-emerald-700 capitalize">· {activeSelectedPatient.gender} ({activeSelectedPatient.age}y)</span>
+                      {(activeSelectedPatient.gender || '').toLowerCase() === 'female' ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          ♀ Female ({activeSelectedPatient.age}y)
+                        </span>
+                      ) : (activeSelectedPatient.gender || '').toLowerCase() === 'male' ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                          ♂ Male ({activeSelectedPatient.age}y)
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-emerald-700 capitalize">
+                          · {activeSelectedPatient.gender} ({activeSelectedPatient.age}y)
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-emerald-800/80 mt-0.5">
                       Phone: {activeSelectedPatient.phone || '—'} {activeSelectedPatient.blood_group ? `· Blood Group: ${activeSelectedPatient.blood_group}` : ''}
@@ -227,7 +239,7 @@ export default function NewCounselingSessionModal({
                       setIsPatientDropdownOpen(true);
                     }}
                     onFocus={() => setIsPatientDropdownOpen(true)}
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary shadow-sm"
                   />
                 </div>
 
@@ -238,28 +250,59 @@ export default function NewCounselingSessionModal({
                         No matching registered patients found.
                       </div>
                     ) : (
-                      filteredPatients.map((p: any) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedPatientId(p.id);
-                            setIsPatientDropdownOpen(false);
-                            setPatientSearch('');
-                          }}
-                          className="w-full px-3.5 py-2.5 text-left hover:bg-pink-50/60 flex items-center justify-between transition-colors"
-                        >
-                          <div>
-                            <p className="font-bold text-slate-900 text-xs">{p.name}</p>
-                            <p className="text-[11px] text-slate-500">
-                              {p.gender} · Age: {p.age || '—'} · Phone: {p.phone || '—'}
-                            </p>
-                          </div>
-                          <span className="font-mono text-[11px] font-bold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
-                            {p.vid || p.mrn}
-                          </span>
-                        </button>
-                      ))
+                      filteredPatients.map((p: any) => {
+                        const genderLower = (p.gender || '').toLowerCase();
+                        const isFemale = genderLower === 'female';
+                        const isMale = genderLower === 'male';
+
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPatientId(p.id);
+                              setIsPatientDropdownOpen(false);
+                              setPatientSearch('');
+                            }}
+                            className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between transition-colors ${
+                              isFemale
+                                ? 'hover:bg-rose-50/70'
+                                : isMale
+                                ? 'hover:bg-sky-50/70'
+                                : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-bold text-slate-900 text-xs">{p.name}</p>
+                                {isFemale ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                    ♀ Female
+                                  </span>
+                                ) : isMale ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                                    ♂ Male
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Age: {p.age || '—'}y · Phone: {p.phone || '—'}
+                              </p>
+                            </div>
+                            <span
+                              className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded border ${
+                                isFemale
+                                  ? 'text-rose-700 bg-rose-50 border-rose-200'
+                                  : isMale
+                                  ? 'text-sky-700 bg-sky-50 border-sky-200'
+                                  : 'text-slate-700 bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              {p.vid || p.mrn}
+                            </span>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 )}
