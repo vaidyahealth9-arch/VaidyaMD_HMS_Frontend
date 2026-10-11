@@ -12,6 +12,7 @@ import {
   calculateFollicleStats,
   formatDoseDisplay,
   generateDaysFromProtocol,
+  getProtocolActualDays,
 } from './utils';
 import { treatmentCyclesApi, protocolsApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
@@ -94,7 +95,8 @@ export default function PlanDetailsSubTabContent({
                 activeCycle?.sentinel_dates?.stim_start ||
                 activeCycle?.sentinel_dates?.lmp_day1 ||
                 new Date().toISOString().split('T')[0];
-              const gen = generateDaysFromProtocol(matched, startRef, 14);
+              const actualDays = getProtocolActualDays(matched, activeCycle?.sentinel_dates, activeCycle?.treatment_type);
+              const gen = generateDaysFromProtocol(matched, startRef, actualDays, activeCycle?.sentinel_dates, activeCycle?.treatment_type);
               if (gen && gen.length > 0) {
                 updateDays(gen, { protocolId: matched.id, protocolName: matched.name });
               }

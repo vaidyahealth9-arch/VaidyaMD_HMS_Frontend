@@ -45,44 +45,47 @@ export default function HrtFetProtocolSheet({
     currentBranch?.gstin ? `GSTIN: ${currentBranch.gstin}` : '',
   ].filter(Boolean).join(' • ') || 'Centre for Reproductive Medicine & Advanced IVF';
 
+  // Support unwrapping if previously saved with nested sentinel_dates
+  const unwrappedSentinel = (sentinelDates?.sentinel_dates ? { ...sentinelDates.sentinel_dates, ...sentinelDates } : sentinelDates) || {};
+
   // Setup Parameters (Sheet 2: Setup)
   const [bleedDate, setBleedDate] = useState<string>(
-    sentinelDates?.lmp_day1 || startDate || new Date().toISOString().split('T')[0]
+    unwrappedSentinel?.lmp_day1 || startDate || new Date().toISOString().split('T')[0]
   );
   const [plannedEstrogenDays, setPlannedEstrogenDays] = useState<number>(
-    sentinelDates?.planned_estrogen_days ? Number(sentinelDates.planned_estrogen_days) : 13
+    unwrappedSentinel?.planned_estrogen_days ? Number(unwrappedSentinel.planned_estrogen_days) : 13
   );
   const [embryoStage, setEmbryoStage] = useState<'Day 3' | 'Day 5'>(
-    sentinelDates?.embryo_stage === 'Day 3' ? 'Day 3' : 'Day 5'
+    unwrappedSentinel?.embryo_stage === 'Day 3' ? 'Day 3' : 'Day 5'
   );
   const [p0Time, setP0Time] = useState<string>(
-    sentinelDates?.p0_time || '08:00 AM'
+    unwrappedSentinel?.p0_time || '08:00 AM'
   );
   const [e2Dose, setE2Dose] = useState<string>(
-    sentinelDates?.e2_dose || '2 mg'
+    unwrappedSentinel?.e2_dose || '2 mg'
   );
   const [e2Route, setE2Route] = useState<string>(
-    sentinelDates?.e2_route || 'Oral'
+    unwrappedSentinel?.e2_route || 'Oral'
   );
   const [e2Freq, setE2Freq] = useState<string>(
-    sentinelDates?.e2_freq || 'TDS'
+    unwrappedSentinel?.e2_freq || 'TDS'
   );
   const [p4Dose, setP4Dose] = useState<string>(
-    sentinelDates?.p4_dose || ''
+    unwrappedSentinel?.p4_dose || ''
   );
   const [p4Route, setP4Route] = useState<string>(
-    sentinelDates?.p4_route || ''
+    unwrappedSentinel?.p4_route || ''
   );
   const [p4Freq, setP4Freq] = useState<string>(
-    sentinelDates?.p4_freq || ''
+    unwrappedSentinel?.p4_freq || ''
   );
 
   // Endometrial Assessment Setup
   const [liningThickness, setLiningThickness] = useState<string>(
-    sentinelDates?.lining_thickness || ''
+    unwrappedSentinel?.lining_thickness || ''
   );
   const [liningPattern, setLiningPattern] = useState<string>(
-    sentinelDates?.lining_pattern || ''
+    unwrappedSentinel?.lining_pattern || ''
   );
 
   // UI States
@@ -439,22 +442,25 @@ export default function HrtFetProtocolSheet({
         });
         await treatmentCyclesApi.updateMedicationCalendar(cycleId, rowsWithMilestones);
         await treatmentCyclesApi.updateSentinelDates(cycleId, {
-          sentinel_dates: {
-            ...(sentinelDates || {}),
-            lmp_day1: bleedDate,
-            planned_estrogen_days: plannedEstrogenDays,
-            embryo_stage: embryoStage,
-            p0_date: calculatedDates?.p0Date,
-            p0_time: p0Time,
-            et: calculatedDates?.transferDate,
-            beta_hcg_date: calculatedDates?.betaHcgDate,
-            lining_thickness: liningThickness,
-            lining_pattern: liningPattern,
-            e2_dose: e2Dose,
-            p4_dose: p4Dose,
-            protocol_category: 'fet',
-            is_hrt_fet: true,
-          },
+          ...(sentinelDates?.sentinel_dates || {}),
+          ...(sentinelDates || {}),
+          lmp_day1: bleedDate,
+          planned_estrogen_days: plannedEstrogenDays,
+          embryo_stage: embryoStage,
+          p0_date: calculatedDates?.p0Date,
+          p0_time: p0Time,
+          et: calculatedDates?.transferDate,
+          beta_hcg_date: calculatedDates?.betaHcgDate,
+          lining_thickness: liningThickness,
+          lining_pattern: liningPattern,
+          e2_dose: e2Dose,
+          e2_route: e2Route,
+          e2_freq: e2Freq,
+          p4_dose: p4Dose,
+          p4_route: p4Route,
+          p4_freq: p4Freq,
+          protocol_category: 'fet',
+          is_hrt_fet: true,
         });
       }
       onCalendarSaved?.(rows);
@@ -552,9 +558,9 @@ export default function HrtFetProtocolSheet({
 
           <button
             type="button"
-            onClick={() => handlePrintCalendar(rows, hospitalName, branchSubtitle)}
+            onClick={() => setShowCalendarPrint(true)}
             className="px-3 py-1.5 rounded-lg bg-amber-400/80 text-slate-900 hover:bg-amber-400 border border-amber-300/40 text-xs font-bold flex items-center gap-1.5 transition-all"
-            title="Open Weekly Calendar in a clean print window"
+            title="Open Weekly Calendar print preview modal"
           >
             <CalendarDays className="w-3.5 h-3.5" />
             <span>Calendar Print</span>

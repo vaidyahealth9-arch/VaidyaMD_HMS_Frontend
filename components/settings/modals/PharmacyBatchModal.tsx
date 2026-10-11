@@ -123,7 +123,21 @@ export default function PharmacyBatchModal({
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Available Quantity (Units) *</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Pack Size (Tablets/Sheet) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={batchForm.pack_size ?? 10}
+                    onChange={(e) => setBatchForm({ ...batchForm, pack_size: Math.max(1, Number(e.target.value)) })}
+                    placeholder="10 or 15 (1 for bottle/inj)"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Tablets in 1 sheet (1 for single units)</p>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Available Quantity (Loose Units) *</label>
                   <input
                     type="number"
                     min="0"
@@ -132,6 +146,12 @@ export default function PharmacyBatchModal({
                     onChange={(e) => setBatchForm({ ...batchForm, quantity_available: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-primary focus:ring-1 focus:ring-primary focus:border-primary"
                   />
+                  {batchForm.pack_size > 1 && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      = {Math.floor(batchForm.quantity_available / batchForm.pack_size)} sheets
+                      {batchForm.quantity_available % batchForm.pack_size > 0 ? ` + ${batchForm.quantity_available % batchForm.pack_size} tabs` : ''}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -180,6 +200,11 @@ export default function PharmacyBatchModal({
                     onChange={(e) => setBatchForm({ ...batchForm, selling_price: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary"
                   />
+                  {batchForm.pack_size > 1 && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      = ₹{((batchForm.selling_price || batchForm.mrp || 0) / batchForm.pack_size).toFixed(2)} per tablet
+                    </p>
+                  )}
                 </div>
 
                 <div>

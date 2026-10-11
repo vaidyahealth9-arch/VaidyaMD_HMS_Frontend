@@ -23,12 +23,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   HeartHandshake,
+  PhoneCall,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 
 const navItems = [
   { id: 'dashboard',        href: '/dashboard',                 icon: LayoutDashboard, label: 'Dashboard',          roles: ['admin','doctor','nurse','receptionist','accounts','embryologist','andrologist','pharma','pharmacist','counsellor'] },
-  { id: 'counseling',       href: '/counseling',                icon: HeartHandshake,  label: 'Counselor Desk',     roles: ['admin','counsellor','doctor','nurse'] },
+  // Temporarily hidden from navigation menu during pre-release testing. Uncomment when ready to expose to users:
+  // { id: 'crm',              href: '/crm',                       icon: PhoneCall,       label: 'CRM & Dialer',       roles: ['admin','counsellor','receptionist','doctor','accounts'], badge: 'New' },
   { id: 'patients',         href: '/patients',                  icon: Users,           label: 'Patients & EMR',     roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
   { id: 'appointments',     href: '/appointments',              icon: Calendar,        label: 'Appointments',       roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
   { id: 'cosgyn',           href: '/cosgyn',                    icon: Sparkles,        label: 'Cosmetic Gynae',     roles: ['admin','doctor','nurse','receptionist','accounts'] },

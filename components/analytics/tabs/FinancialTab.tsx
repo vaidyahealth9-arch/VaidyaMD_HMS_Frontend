@@ -25,26 +25,28 @@ interface FinancialTabProps {
   monthlyData: any[];
   deptPieData: any[];
   doctorBreakdown: any[];
+  trajectoryTitle?: string;
 }
 
 export default function FinancialTab({
   monthlyData,
   deptPieData,
   doctorBreakdown,
+  trajectoryTitle,
 }: FinancialTabProps) {
   return (
     <div className="space-y-6 pt-3">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Trend Area Chart */}
+        {/* Dynamic Trajectory Area Chart */}
         <Card className="lg:col-span-2 border-slate-200 shadow-sm">
           <CardHeader className="pb-2 border-b border-slate-100">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-slate-800">
-                  Monthly Revenue Trajectory (Past 6 Months)
+                  {trajectoryTitle || 'Revenue Trajectory'}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Chronological billing trajectory aggregated directly from cashier invoices
+                  Chronological billing trajectory aggregated directly from cashier invoices for the selected timeframe
                 </CardDescription>
               </div>
               <Badge variant="outline" className="text-[10px] font-semibold">
@@ -55,7 +57,7 @@ export default function FinancialTab({
           <CardContent className="p-4 h-72">
             {monthlyData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                No monthly records available for selected timeframe.
+                No billing records found for the selected timeframe.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -67,7 +69,7 @@ export default function FinancialTab({
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} />
                   <YAxis
                     stroke="#94a3b8"
                     fontSize={11}
@@ -75,7 +77,7 @@ export default function FinancialTab({
                   />
                   <Tooltip
                     formatter={(value: any) => [formatCurrency(Number(value)), 'Revenue']}
-                    labelFormatter={(lbl, p) => `${lbl} ${p?.[0]?.payload?.year || ''}`}
+                    labelFormatter={(lbl, p) => `${lbl || p?.[0]?.payload?.month || ''}`}
                   />
                   <Area
                     type="monotone"
@@ -180,19 +182,24 @@ export default function FinancialTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {doctorBreakdown.map((doc: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3.5 font-bold text-slate-900">Dr. {doc.doctor_name}</td>
-                    <td className="p-3.5 text-slate-600 font-mono">{doc.invoices_count}</td>
-                    <td className="p-3.5 text-slate-900 font-bold">{formatCurrency(doc.total_billed)}</td>
-                    <td className="p-3.5 text-emerald-700 font-bold">
-                      {formatCurrency(doc.total_collected)}
-                    </td>
-                    <td className="p-3.5 text-right text-slate-600 font-mono">
-                      {formatCurrency(doc.avg_per_patient)}
-                    </td>
-                  </tr>
-                ))}
+                {doctorBreakdown.map((doc: any, idx: number) => {
+                  const rawName = (doc.doctor_name || doc.name || 'Unknown Clinician').trim();
+                  const displayName = rawName.toLowerCase().startsWith('dr.') ? rawName : `Dr. ${rawName}`;
+                  const avgVal = Number(doc.avg_per_patient) || 0;
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3.5 font-bold text-slate-900">{displayName}</td>
+                      <td className="p-3.5 text-slate-600 font-mono">{doc.invoices_count || 0}</td>
+                      <td className="p-3.5 text-slate-900 font-bold">{formatCurrency(doc.total_billed || 0)}</td>
+                      <td className="p-3.5 text-emerald-700 font-bold">
+                        {formatCurrency(doc.total_collected || 0)}
+                      </td>
+                      <td className="p-3.5 text-right text-slate-600 font-mono">
+                        {formatCurrency(avgVal)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

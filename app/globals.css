@@ -612,11 +612,11 @@
   height: auto;
 }
 
-/* Screen Preview for A5 Sheet (148mm x 210mm Portrait) */
+/* Screen Preview for A5 Sheet (210mm x 148mm Landscape) */
 .a5-print-sheet {
   width: 100%;
-  max-width: 148mm;
-  min-height: 210mm;
+  max-width: 210mm;
+  min-height: 148mm;
   background: white;
   margin: 0 auto;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
@@ -670,7 +670,7 @@
   }
 
   @page a5-page {
-    size: A5 portrait;
+    size: A5 landscape !important;
     margin: 0 !important;
   }
 
@@ -686,69 +686,94 @@
   /* Physical Print: Exact A4 Sheet Page Break */
   .a4-print-sheet {
     width: 210mm !important;
-    min-height: 296mm !important;
-    height: auto !important;
-    max-height: none !important;
+    min-height: 295.5mm !important;
+    height: 295.5mm !important;
+    max-height: 295.5mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
-    page-break-after: always !important;
-    break-after: page !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
     position: relative !important;
     background: white !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     box-sizing: border-box !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .a4-print-sheet:not(:last-child):not(:last-of-type) {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
   /* Physical Print: Landscape A4 Sheet */
   .a4-print-sheet.a4-landscape-page {
     width: 297mm !important;
-    min-height: 209mm !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
+    min-height: 208mm !important;
+    height: 208.5mm !important;
+    max-height: 208.5mm !important;
+    overflow: hidden !important;
   }
 
-  /* Physical Print: Exact A5 Sheet Page Break */
+  /* Physical Print: Exact A5 Sheet Page Break (Landscape: 210mm wide x 147mm high) */
   .a5-print-sheet {
-    width: 148mm !important;
-    min-height: 209mm !important;
-    height: auto !important;
-    max-height: none !important;
+    width: 210mm !important;
+    height: 147mm !important;
+    max-height: 147mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
-    page-break-after: always !important;
-    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
     position: relative !important;
     background: white !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     box-sizing: border-box !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-  }
-
-  .a5-print-sheet {
     page: a5-page;
   }
 
-  /* Suppress trailing empty page on last sheet */
+  .a5-print-sheet img {
+    max-height: 12mm !important;
+  }
+
+  .a5-print-sheet .printable-header-container {
+    margin-bottom: 0 !important;
+  }
+
+  .a5-print-sheet .printable-footer-container {
+    margin-top: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .a5-print-sheet .printable-footer-container .h-8 {
+    height: 8px !important;
+  }
+
+  /* Strictly suppress trailing empty page on last and only sheets */
   .a4-print-sheet:last-child,
-  .a5-print-sheet:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
+  .a4-print-sheet:last-of-type,
+  .a4-print-sheet:only-child,
+  .a4-print-sheet:only-of-type,
+  .a5-print-sheet:last-child,
+  .a5-print-sheet:last-of-type,
+  .a5-print-sheet:only-child,
+  .a5-print-sheet:only-of-type {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   /* Sheet content sits strictly in middle, flows top-down */

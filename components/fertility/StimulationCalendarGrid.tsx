@@ -44,6 +44,7 @@ import PrintableModal from '@/components/common/PrintableModal';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import PrintableReportFooter from '@/components/common/PrintableReportFooter';
 import A4Sheet from '@/components/common/A4Sheet';
+import { getProtocolActualDays } from './plan-details/utils';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -257,9 +258,17 @@ export default function StimulationCalendarGrid({
   const [days, setDays] = useState<DayData[]>([]);
 
   useEffect(() => {
-    const baseDate = startDate ? new Date(startDate) : new Date();
-    // Default to content from initialDays, or 14 if starting empty
-    const naturalCount = initialDays && initialDays.length > 0 ? initialDays.length : 14;
+    const cleanDate = (v?: any) => (typeof v === 'string' ? v.split('T')[0] : '');
+    const refStart =
+      cleanDate(sentinelDates?.lmp_date || sentinelDates?.lmp_day1) ||
+      cleanDate(startDate) ||
+      cleanDate(sentinelDates?.stim_start_date || sentinelDates?.stim_start) ||
+      cleanDate(sentinelDates?.baseline_scan_date || sentinelDates?.baseline_scan);
+    const baseDate = refStart ? new Date(refStart) : new Date();
+
+    const currentProto = dbProtocols.find((p: any) => p.id === selectedProtocolId);
+    const protoActualDays = getProtocolActualDays(currentProto, sentinelDates, treatmentType);
+    const naturalCount = initialDays && initialDays.length > 0 ? Math.max(initialDays.length, protoActualDays) : protoActualDays;
     const count = isCustomDaysLimited ? customDaysLimit : naturalCount;
     setTotalDays(count);
 
@@ -273,27 +282,40 @@ export default function StimulationCalendarGrid({
       treatmentType?.toUpperCase().includes('OI')
     );
 
-    // Build Sentinel Milestone Map
+    // Build Normalized Sentinel Milestone Map
+    const sTrigger = cleanDate(sentinelDates?.trigger_datetime || sentinelDates?.trigger);
+    const sOpu = cleanDate(sentinelDates?.opu_datetime || sentinelDates?.opu);
+    const sEt = cleanDate(sentinelDates?.et_datetime || sentinelDates?.et || sentinelDates?.transfer_date);
+    const sBaseline = cleanDate(sentinelDates?.baseline_scan_date || sentinelDates?.baseline_scan);
+    const sStim = cleanDate(sentinelDates?.stim_start_date || sentinelDates?.stim_start);
+    const sLmp = cleanDate(sentinelDates?.lmp_date || sentinelDates?.lmp_day1);
+    const sP0 = cleanDate(sentinelDates?.lps_start_date || sentinelDates?.p0_date);
+    const sBeta = cleanDate(sentinelDates?.beta_hcg_date);
+
     const sentinelMilestoneMap = new Map<string, string>();
     if (sentinelDates) {
-      if (sentinelDates.lmp_day1) sentinelMilestoneMap.set(sentinelDates.lmp_day1, 'Day 1 (LMP)');
-      if (sentinelDates.baseline_scan) sentinelMilestoneMap.set(sentinelDates.baseline_scan, 'Baseline Scan 🔍');
-      if (sentinelDates.stim_start) sentinelMilestoneMap.set(sentinelDates.stim_start, isFet ? 'HRT Prep Start' : 'Stimulation Start · Baseline Scan 🔍');
-      if (sentinelDates.d12_scan) sentinelMilestoneMap.set(sentinelDates.d12_scan, 'D12 Endometrial Scan 🔍');
-      if (sentinelDates.p0_date) sentinelMilestoneMap.set(sentinelDates.p0_date, 'P0 (Progesterone Start)');
-      if (sentinelDates.trigger) sentinelMilestoneMap.set(sentinelDates.trigger, 'Trigger Injection ⚡');
+      if (sLmp) sentinelMilestoneMap.set(sLmp, 'Day 1 (LMP)');
+      if (sBaseline && sStim && sBaseline === sStim) {
+        sentinelMilestoneMap.set(sBaseline, isFet ? 'HRT Prep Start · Baseline Scan 🔍' : 'Stimulation Start · Baseline Scan 🔍');
+      } else {
+        if (sBaseline) sentinelMilestoneMap.set(sBaseline, 'Baseline Scan 🔍');
+        if (sStim) sentinelMilestoneMap.set(sStim, isFet ? 'HRT Prep Start' : 'Stimulation Start ⚡');
+      }
+      if (sentinelDates.d12_scan) sentinelMilestoneMap.set(cleanDate(sentinelDates.d12_scan), 'D12 Endometrial Scan 🔍');
+      if (sP0) sentinelMilestoneMap.set(sP0, 'P0 (Progesterone Start)');
+      if (sTrigger) sentinelMilestoneMap.set(sTrigger, 'Trigger Injection ⚡');
 
       if (isIui) {
-        if (sentinelDates.insemination) sentinelMilestoneMap.set(sentinelDates.insemination, 'IUI Insemination 💉');
-        else if (sentinelDates.opu) sentinelMilestoneMap.set(sentinelDates.opu, 'IUI Insemination 💉');
+        if (sentinelDates.insemination) sentinelMilestoneMap.set(cleanDate(sentinelDates.insemination), 'IUI Insemination 💉');
+        else if (sOpu) sentinelMilestoneMap.set(sOpu, 'IUI Insemination 💉');
       } else if (isFet) {
-        if (sentinelDates.et || sentinelDates.transfer_date) sentinelMilestoneMap.set(sentinelDates.et || sentinelDates.transfer_date, 'Frozen Embryo Transfer 👶');
+        if (sEt) sentinelMilestoneMap.set(sEt, 'Frozen Embryo Transfer 👶');
       } else {
-        if (sentinelDates.opu) sentinelMilestoneMap.set(sentinelDates.opu, 'OPU (Egg Retrieval) 🧫');
-        if (sentinelDates.et) sentinelMilestoneMap.set(sentinelDates.et, 'Embryo Transfer 👶');
+        if (sOpu) sentinelMilestoneMap.set(sOpu, 'OPU (Egg Retrieval) 🧫');
+        if (sEt) sentinelMilestoneMap.set(sEt, 'Embryo Transfer 👶');
       }
 
-      if (sentinelDates.beta_hcg_date) sentinelMilestoneMap.set(sentinelDates.beta_hcg_date, 'Beta-hCG Pregnancy Test 🩸');
+      if (sBeta) sentinelMilestoneMap.set(sBeta, 'Beta-hCG Pregnancy Test 🩸');
     }
 
     const generated: DayData[] = [];
@@ -305,9 +327,27 @@ export default function StimulationCalendarGrid({
 
       const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
       const displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const isoDate = existing?.date || d.toISOString().split('T')[0];
+      const isoDate = d.toISOString().split('T')[0];
 
-      let milestone: string | undefined = existing?.milestone || existing?.phase || sentinelMilestoneMap.get(isoDate);
+      const sentinelMilestone = sentinelMilestoneMap.get(isoDate);
+      let milestone: string | undefined = sentinelMilestone;
+
+      if (!milestone && existing?.milestone) {
+        const emLower = existing.milestone.toLowerCase();
+        const isMoved =
+          (emLower.includes('trigger') && sTrigger && isoDate !== sTrigger) ||
+          (emLower.includes('opu') && sOpu && isoDate !== sOpu) ||
+          (emLower.includes('egg retrieval') && sOpu && isoDate !== sOpu) ||
+          (emLower.includes('transfer') && sEt && isoDate !== sEt) ||
+          (emLower.includes('beta-hcg') && sBeta && isoDate !== sBeta);
+        if (!isMoved) {
+          milestone = existing.milestone;
+        }
+      }
+
+      if (!milestone) {
+        milestone = existing?.phase;
+      }
 
       if (!milestone) {
         if (isFet) {
@@ -326,7 +366,9 @@ export default function StimulationCalendarGrid({
           else if (i === 28 || i === count) milestone = 'Beta-hCG Pregnancy Test 🩸';
         } else {
           // IVF / ICSI / ART
-          if (i === 1) milestone = 'Stim Day 1 · Baseline Scan 🔍';
+          if (i === 1) milestone = 'Cycle Day 1 (LMP)';
+          else if (i === 2) milestone = 'Baseline TVS Scan 🔍';
+          else if (i === 3) milestone = 'Stim Day 1 (Stimulation Start) ⚡';
           else if (i === 6) milestone = 'Antagonist Start';
           else if (i === 10) milestone = 'Trigger Evaluation / Scan 🔍';
           else if (i === 12) milestone = 'hCG / Agonist Trigger ⚡';
@@ -640,9 +682,42 @@ export default function StimulationCalendarGrid({
     return weeks;
   }, [days]);
 
-  // Pages for 7-Day Calendar Grid Print (2 weeks per A4 sheet)
+  // Pages for 7-Day Calendar Grid Print (dynamically fits up to 4 weeks per A4 sheet when content is light)
   const weekPages = useMemo(() => {
-    return chunkArray(calendarWeeks, 2);
+    if (!calendarWeeks.length) return [];
+    const pages: DayData[][][] = [];
+    let currentPage: DayData[][] = [];
+    let currentPageWeight = 0;
+    // Page 1 has Follicular Summary Bar, max capacity is ~4.0 units; subsequent pages ~5.0. Max 4 weeks per page.
+    let maxWeightForCurrentPage = 4.0;
+
+    calendarWeeks.forEach((week) => {
+      // Calculate content density weight for this week
+      let maxDayMeds = 0;
+      let hasScans = false;
+      week.forEach((d) => {
+        if (d.medications && d.medications.length > maxDayMeds) maxDayMeds = d.medications.length;
+        if (d.right_follicles || d.left_follicles || d.endometrium_mm || d.e2_pgml) hasScans = true;
+      });
+      let weekWeight = 1.0;
+      if (maxDayMeds >= 3) weekWeight += 0.5;
+      if (hasScans) weekWeight += 0.3;
+
+      if (currentPage.length > 0 && (currentPageWeight + weekWeight > maxWeightForCurrentPage || currentPage.length >= 4)) {
+        pages.push(currentPage);
+        currentPage = [week];
+        currentPageWeight = weekWeight;
+        maxWeightForCurrentPage = 5.0;
+      } else {
+        currentPage.push(week);
+        currentPageWeight += weekWeight;
+      }
+    });
+
+    if (currentPage.length > 0) {
+      pages.push(currentPage);
+    }
+    return pages;
   }, [calendarWeeks]);
 
   // Pages for Spreadsheet Matrix Print (15 days per A4 sheet)
@@ -830,7 +905,9 @@ export default function StimulationCalendarGrid({
                         setIsCustomDaysLimited(checked);
                         if (!checked) {
                           // Unchecked: revert to natural protocol content length
-                          const naturalCount = initialDays && initialDays.length > 0 ? initialDays.length : 14;
+                          const currentProto = dbProtocols.find((p: any) => p.id === selectedProtocolId);
+                          const protoActualDays = getProtocolActualDays(currentProto, sentinelDates, treatmentType);
+                          const naturalCount = initialDays && initialDays.length > 0 ? Math.max(initialDays.length, protoActualDays) : protoActualDays;
                           handleSetScheduleDuration(naturalCount);
                         }
                       }}

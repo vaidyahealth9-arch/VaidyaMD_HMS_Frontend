@@ -106,7 +106,56 @@ export default function InsertEditPlanModal({
   }, [isOpen]);
 
   const syncProtocolDefaults = (proto: ProtocolTemplateItem) => {
-    if (!proto || !proto.rules) return;
+    if (!proto) return;
+
+    // Calculate protocol duration dynamically
+    let protoDays: number | undefined;
+    const anyProto = proto as any;
+    if (typeof anyProto.duration_days === 'number' && anyProto.duration_days > 0) {
+      protoDays = anyProto.duration_days;
+    } else if (typeof anyProto.total_days === 'number' && anyProto.total_days > 0) {
+      protoDays = anyProto.total_days;
+    } else if (typeof anyProto.duration === 'number' && anyProto.duration > 0) {
+      protoDays = anyProto.duration;
+    } else if (typeof anyProto.days === 'number' && anyProto.days > 0) {
+      protoDays = anyProto.days;
+    }
+
+    // Parse duration from protocol name (e.g. "21 Day HRT FET Protocol" -> 21, "10-Day Antagonist" -> 10)
+    if (!protoDays && proto.name) {
+      const match = proto.name.match(/(\d+)\s*[- ]?Day/i);
+      if (match && match[1]) {
+        const parsed = parseInt(match[1], 10);
+        if (parsed > 0) protoDays = parsed;
+      }
+    }
+
+    // Check max offset from rules
+    if (proto.rules && proto.rules.length > 0) {
+      const maxRuleEnd = Math.max(
+        ...proto.rules.map((r) => Math.max(r.day_end_offset || 0, r.day_start_offset || 0))
+      );
+      if (maxRuleEnd > 0 && (!protoDays || maxRuleEnd > protoDays)) {
+        protoDays = maxRuleEnd;
+      }
+    }
+
+    // Check max offset from timeline events
+    if (proto.timeline_events && proto.timeline_events.length > 0) {
+      const maxEventDay = Math.max(
+        ...proto.timeline_events.map((e) => Math.max(e.day_offset || 0, e.day_number || 0, e.day || 0))
+      );
+      if (maxEventDay > 0 && (!protoDays || maxEventDay > protoDays)) {
+        protoDays = maxEventDay;
+      }
+    }
+
+    if (protoDays && protoDays > 0) {
+      setStimDuration(protoDays);
+    }
+
+    if (!proto.rules || proto.rules.length === 0) return;
+
     // Find primary stimulation rule
     const primaryRule = proto.rules.find((r) =>
       r.day_start_offset <= 3 && !r.drug_name.toLowerCase().includes('cetrot') && !r.drug_name.toLowerCase().includes('trigger')
@@ -507,8 +556,8 @@ export default function InsertEditPlanModal({
               </label>
               <input
                 type="number"
-                min={10}
-                max={28}
+                min={1}
+                max={60}
                 value={stimDuration}
                 onChange={(e) => setStimDuration(Number(e.target.value))}
                 className="vmd-input text-xs w-full py-2 font-bold"

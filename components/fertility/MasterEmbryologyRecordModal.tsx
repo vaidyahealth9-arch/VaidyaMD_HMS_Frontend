@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dna,
   Printer,
@@ -19,6 +19,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableReportFooter from '@/components/common/PrintableReportFooter';
+import A4Sheet from '@/components/common/A4Sheet';
 import { embryologyApi, andrologyApi } from '@/lib/api';
 
 export interface MasterEmbryologyRecordModalProps {
@@ -91,6 +93,61 @@ export default function MasterEmbryologyRecordModal({
 
   // Embryo Images
   const [images, setImages] = useState<ImageUploadRow[]>([]);
+
+  // Hydrate existing saved embryology record on mount
+  useEffect(() => {
+    if (!patient?.id) return;
+    const cycleId = cycle?.id;
+    andrologyApi.list({ patient_id: patient.id, record_type: 'master_embryology_record' })
+      .then((records: any[]) => {
+        if (!Array.isArray(records) || records.length === 0) return;
+        const match = cycleId ? records.find((r) => r.data?.cycle_id === cycleId) || records[0] : records[0];
+        if (match && match.data) {
+          const d = match.data;
+          if (d.consultant_doctor) setConsultantDoctor(d.consultant_doctor);
+          if (d.embryologist_1) setEmbryologist1(d.embryologist_1);
+          if (d.embryologist_2) setEmbryologist2(d.embryologist_2);
+          if (d.gynaecologist_1) setGynaecologist1(d.gynaecologist_1);
+          if (d.gynaecologist_2) setGynaecologist2(d.gynaecologist_2);
+          if (d.reason_for_art) setReasonForArt(d.reason_for_art);
+          if (d.female_factor) setFemaleFactor(d.female_factor);
+          if (d.male_factor) setMaleFactor(d.male_factor);
+          if (d.stimulation_protocol) setStimulationProtocol(d.stimulation_protocol);
+          if (d.date_of_stimulation) setDateOfStimulation(d.date_of_stimulation);
+          if (d.e2_on_hcg) setE2OnHcg(d.e2_on_hcg);
+          if (d.egg_collection_date) setEggCollectionDate(d.egg_collection_date);
+          if (d.egg_collection_time) setEggCollectionTime(d.egg_collection_time);
+          if (d.no_of_oocytes !== undefined) setNoOfOocytes(String(d.no_of_oocytes));
+          if (d.oocyte_quality) setOocyteQuality(d.oocyte_quality);
+          if (d.sperm_parameters) setSpermParameters(d.sperm_parameters);
+          if (d.oocytes_injected !== undefined) setOocytesInjected(String(d.oocytes_injected));
+          if (d.oocytes_fertilized !== undefined) setOocytesFertilized(String(d.oocytes_fertilized));
+          if (d.date_day_transfer) setDateDayTransfer(d.date_day_transfer);
+          if (d.embryos_transferred !== undefined) setEmbryosTransferred(String(d.embryos_transferred));
+          if (d.quality_embryos_transferred) setQualityEmbryosTransferred(d.quality_embryos_transferred);
+          if (d.transfer_comments) setTransferComments(d.transfer_comments);
+          if (d.embryos_frozen !== undefined) setEmbryosFrozen(String(d.embryos_frozen));
+          if (d.embryos_discarded !== undefined) setEmbryosDiscarded(String(d.embryos_discarded));
+          if (d.freezing_done_on) setFreezingDoneOn(d.freezing_done_on);
+          if (d.no_of_cryoleafs !== undefined) setNoOfCryoleafs(String(d.no_of_cryoleafs));
+          if (d.vitrification_expiry) setVitrificationExpiry(d.vitrification_expiry);
+          if (d.laser_hatching) setLaserHatching(d.laser_hatching);
+          if (d.procedure_done) setProcedureDone(d.procedure_done);
+          if (d.renewal_before) setRenewalBefore(d.renewal_before);
+          if (d.disclaimer) setDisclaimer(d.disclaimer);
+          if (Array.isArray(d.images) && d.images.length > 0) {
+            setImages(d.images.map((img: any, idx: number) => ({
+              id: String(idx + 1),
+              previewUrl: img.previewUrl || '',
+              description: img.description || `Embryo Micrograph #${idx + 1}`,
+            })));
+          }
+          // Default to preview mode for existing records to prevent accidental edits
+          setViewMode('preview');
+        }
+      })
+      .catch((err) => console.error('Failed to load embryology record', err));
+  }, [patient?.id, cycle?.id]);
 
   const addImageRow = () => {
     setImages([
@@ -166,11 +223,11 @@ export default function MasterEmbryologyRecordModal({
 
       await andrologyApi.create(payload);
       setSaveSuccess(true);
+      setViewMode('preview');
       onSaved?.();
       setTimeout(() => {
         setSaveSuccess(false);
-        onClose();
-      }, 1000);
+      }, 3000);
     } catch (err: any) {
       alert(err.message || 'Failed to save master embryology record');
     } finally {
@@ -230,7 +287,7 @@ export default function MasterEmbryologyRecordModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar print:overflow-visible print:p-0 print:m-0 print:h-auto print:max-h-none">
           {viewMode === 'form' ? (
             <div className="space-y-6">
               {/* Clinical Staff Registry */}
@@ -576,74 +633,130 @@ export default function MasterEmbryologyRecordModal({
               </div>
             </div>
           ) : (
-            /* Print Preview */
-            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-0 print:m-0 print:border-none print:shadow-none">
-              <PrintableReportHeader
-                title="Embryology Laboratory Master Record"
-                subtitle="VaidyaMD Embryology Suite · Complete Treatment Cycle Documentation"
-                badge="EMBRYOLOGY RECORD"
-                patient={{
-                  name: patient?.name || 'Female Patient',
-                  vid: patient?.vid,
-                }}
-                partner={partner?.name ? { name: partner.name } : undefined}
-                doctor={{
-                  name: consultantDoctor,
-                }}
-                metaFields={[
-                  { label: 'Treatment Cycle ID', value: cycle?.cycle_id || '—' },
-                  { label: 'Egg Collection Date', value: `${eggCollectionDate} ${eggCollectionTime}` },
-                ]}
-              />
+            /* Authentic A4 Printable Report Preview */
+            <div className="py-6 overflow-y-auto max-h-full flex justify-center bg-slate-100/60 print:bg-white print:p-0 print:m-0">
+              <A4Sheet
+                className="shadow-xl"
+                header={
+                  <PrintableReportHeader
+                    title="Embryology Laboratory Master Record & ART Log"
+                    subtitle="Department of Embryology, Insemination & Cryopreservation · ART Act Accredited"
+                    badge="EMBRYOLOGY RECORD"
+                    patient={{
+                      name: patient?.name || 'Female Patient',
+                      vid: patient?.vid,
+                    }}
+                    partner={partner?.name ? { name: partner.name } : undefined}
+                    doctor={{
+                      name: consultantDoctor,
+                    }}
+                    metaFields={[
+                      { label: 'Treatment Cycle ID', value: cycle?.cycle_id || '—' },
+                      { label: 'Egg Collection Date', value: `${eggCollectionDate} ${eggCollectionTime}`.trim() || '—' },
+                    ]}
+                  />
+                }
+                footer={
+                  <PrintableReportFooter
+                    signatoryName={embryologist1 || 'Primary Embryologist'}
+                    signatoryTitle="Primary Clinical Embryologist"
+                    signatorySubtitle="IVF / ICSI Laboratory Specialist"
+                    showSignatory={true}
+                    witnessName={embryologist2}
+                    witnessTitle="Senior Witness Embryologist"
+                    showWitness={true}
+                    disclaimer="This document represents the laboratory embryology operative record, insemination summary, and cryostorage log."
+                    pageNumber={1}
+                    totalPages={1}
+                  />
+                }
+              >
+                <div className="p-6 sm:p-8 space-y-5 text-slate-900 text-xs">
+                  {/* Clinical Demographics Table */}
+                  <table className="w-full border-collapse border border-slate-300 text-xs leading-snug">
+                    <tbody>
+                      <tr className="bg-slate-50 font-semibold">
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 text-slate-600">Female Patient:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 font-bold text-slate-900">{patient?.name} ({patient?.vid})</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 text-slate-600">Male Partner:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 font-bold text-slate-900">{partner?.name || 'Partner'}</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Cycle ID / Modality:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium">{cycle?.cycle_id || '—'} · {stimulationProtocol || 'IVF/ICSI'}</td>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Treating Clinician:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-bold">{consultantDoctor || gynaecologist1 || '—'}</td>
+                      </tr>
+                      <tr className="bg-slate-50 font-semibold">
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Insemination / OPU:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium">{eggCollectionDate} {eggCollectionTime}</td>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Indication / Factors:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium">{reasonForArt || femaleFactor || maleFactor || 'Primary Subfertility'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
-                <div className="p-2.5 bg-slate-50 font-bold">Female Patient: <span className="font-normal">{patient?.name}</span></div>
-                <div className="p-2.5 bg-slate-50 font-bold">VID: <span className="font-normal font-mono">{patient?.vid}</span></div>
-                <div className="p-2.5">Male Partner: <span className="font-semibold">{partner?.name || 'Partner'}</span></div>
-                <div className="p-2.5">Cycle ID: <span className="font-semibold">{cycle?.cycle_id}</span></div>
-                <div className="p-2.5">Consultant: <span className="font-semibold">{consultantDoctor}</span></div>
-                <div className="p-2.5">Egg Collection: <span className="font-semibold">{eggCollectionDate} {eggCollectionTime}</span></div>
-              </div>
+                  {/* Gamete & Embryo Development Yield Grid */}
+                  <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="p-1.5 bg-white rounded border border-primary/10">
+                      <span className="text-slate-600 block text-[10px] font-bold uppercase tracking-wider">Oocytes Retrieved</span>
+                      <strong className="text-2xl text-pink-700 font-black">{noOfOocytes || '0'}</strong>
+                    </div>
+                    <div className="p-1.5 bg-white rounded border border-primary/10">
+                      <span className="text-slate-600 block text-[10px] font-bold uppercase tracking-wider">Oocytes Injected (ICSI)</span>
+                      <strong className="text-2xl text-primary font-black">{oocytesInjected || '0'}</strong>
+                    </div>
+                    <div className="p-1.5 bg-white rounded border border-primary/10">
+                      <span className="text-slate-600 block text-[10px] font-bold uppercase tracking-wider">Fertilized (2PN)</span>
+                      <strong className="text-2xl text-emerald-700 font-black">{oocytesFertilized || '0'}</strong>
+                    </div>
+                    <div className="p-1.5 bg-white rounded border border-primary/10">
+                      <span className="text-slate-600 block text-[10px] font-bold uppercase tracking-wider">Transferred</span>
+                      <strong className="text-2xl text-purple-700 font-black">{embryosTransferred || '0'}</strong>
+                    </div>
+                  </div>
 
-              <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 grid grid-cols-4 gap-2 text-center text-xs">
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Oocytes Retrieved</span>
-                  <strong className="text-xl text-pink-700">{noOfOocytes}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Oocytes Injected</span>
-                  <strong className="text-xl text-primary">{oocytesInjected}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Fertilized (2PN)</span>
-                  <strong className="text-xl text-emerald-700">{oocytesFertilized}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Embryos Transferred</span>
-                  <strong className="text-xl text-purple-700">{embryosTransferred}</strong>
-                </div>
-              </div>
+                  {/* Transfer & Cryo Details */}
+                  <div className="border border-slate-200 rounded-lg p-3.5 bg-white space-y-2 text-xs">
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[11px] border-b pb-1">
+                      Embryo Quality &amp; Cryopreservation Record
+                    </h4>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-700">
+                      <div><strong className="text-slate-900">Transfer Protocol &amp; Stage:</strong> {dateDayTransfer || 'Day 5 Blastocyst Transfer'}</div>
+                      <div><strong className="text-slate-900">Embryo Quality / Grades:</strong> {qualityEmbryosTransferred || 'Grade 4AA, 4AB'}</div>
+                      <div><strong className="text-slate-900">Cryopreserved Embryos:</strong> {embryosFrozen || '0'} in {noOfCryoleafs || '0'} cryoleaf(s)</div>
+                      <div><strong className="text-slate-900">Vitrification Expiry:</strong> {vitrificationExpiry || '—'}</div>
+                      <div><strong className="text-slate-900">Assisted Hatching (AHA):</strong> {laserHatching || 'Not indicated'}</div>
+                      <div><strong className="text-slate-900">Sperm Parameters:</strong> {spermParameters || 'Normozoospermic'}</div>
+                    </div>
+                    {transferComments && (
+                      <div className="pt-1.5 border-t border-slate-100 text-slate-600">
+                        <strong className="text-slate-800">Embryologist Remarks:</strong> {transferComments}
+                      </div>
+                    )}
+                  </div>
 
-              <div className="text-xs space-y-2 border-t pt-3">
-                <p><strong>Transfer Protocol:</strong> {dateDayTransfer}</p>
-                <p><strong>Embryo Quality:</strong> {qualityEmbryosTransferred}</p>
-                <p><strong>Vitrified Embryos:</strong> {embryosFrozen} in {noOfCryoleafs} cryoleaf(s) (Expires: {vitrificationExpiry})</p>
-                <p><strong>Laser Hatching:</strong> {laserHatching}</p>
-                <p><strong>Observations:</strong> {transferComments}</p>
-              </div>
-
-              <div className="pt-8 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs">
-                <div>
-                  <div className="border-b border-slate-400 w-48 mb-1" />
-                  <p className="font-bold text-slate-800">{embryologist1}</p>
-                  <p className="text-slate-500">Primary Embryologist</p>
+                  {/* Micrograph Images if available */}
+                  {Array.isArray(images) && images.filter((img) => Boolean(img.previewUrl)).length > 0 && (
+                    <div className="border border-slate-200 rounded-lg p-3.5 bg-slate-50 space-y-2">
+                      <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[11px]">
+                        Embryo Micrograph Log
+                      </h4>
+                      <div className="grid grid-cols-3 gap-3">
+                        {images
+                          .filter((img) => Boolean(img.previewUrl))
+                          .map((img) => (
+                            <div key={img.id} className="bg-white p-1.5 rounded border border-slate-300 text-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img.previewUrl} alt={img.description} className="h-28 w-full object-contain mx-auto rounded" />
+                              <span className="text-[10px] text-slate-600 block mt-1 font-semibold">{img.description}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right flex flex-col items-end">
-                  <div className="border-b border-slate-400 w-48 mb-1" />
-                  <p className="font-bold text-slate-800">{embryologist2}</p>
-                  <p className="text-slate-500">Witness Signatory</p>
-                </div>
-              </div>
+              </A4Sheet>
             </div>
           )}
         </div>

@@ -89,10 +89,12 @@ export const fertilityApi = {
 };
 
 export const andrologyApi = {
-  list: (params?: { patient_id?: string }) =>
+  list: (params?: { patient_id?: string; record_type?: string; cycle_id?: string }) =>
     request<any[]>(`/plugins/fertility/andrology/${toQueryString(params)}`),
   create: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/andrology/', { method: 'POST', body: JSON.stringify(data) }),
+  update: (recordId: string, data: Record<string, unknown>) =>
+    request<any>(`/plugins/fertility/andrology/${recordId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   saveSurgicalRetrieval: (data: Record<string, unknown>) =>
     request<any>('/plugins/fertility/andrology/', {
       method: 'POST',

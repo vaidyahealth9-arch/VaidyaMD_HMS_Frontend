@@ -2,6 +2,7 @@ export { default as StockCsvImportModal } from './modals/StockCsvImportModal';
 export { default as DispenseSuccessModal } from './modals/DispenseSuccessModal';
 export { default as NewIndentModal } from './modals/NewIndentModal';
 export { default as NewPoModal } from './modals/NewPoModal';
+export { default as ReceiveStockModal } from './modals/ReceiveStockModal';
 
 export { default as InventoryTab } from './tabs/InventoryTab';
 export { default as PosTab } from './tabs/PosTab';

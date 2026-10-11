@@ -14,9 +14,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
+  UploadCloud,
 } from 'lucide-react';
 import PharmacyVendorModal from '../modals/PharmacyVendorModal';
 import PharmacyBatchModal from '../modals/PharmacyBatchModal';
+import StockCsvImportModal from '@/components/pharmacy/modals/StockCsvImportModal';
 
 interface PharmacySettingsTabProps {
   pharmacyVendors: any[];
@@ -35,6 +37,7 @@ export default function PharmacySettingsTab({
 }: PharmacySettingsTabProps) {
   const queryClient = useQueryClient();
   const [pharmaSubTab, setPharmaSubTab] = useState<'vendors' | 'inventory'>('vendors');
+  const [showStockCsvModal, setShowStockCsvModal] = useState(false);
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
   const [vendorForm, setVendorForm] = useState({
@@ -54,6 +57,7 @@ export default function PharmacySettingsTab({
     category: 'Fertility / Hormones',
     batch_number: '',
     expiry_date: '',
+    pack_size: 10,
     quantity_available: 50,
     quantity_received: 50,
     purchase_rate: 0,
@@ -190,32 +194,44 @@ export default function PharmacySettingsTab({
                 Add Vendor
               </button>
             ) : (
-              <button
-                onClick={() => {
-                  setEditingBatch(null);
-                  setBatchForm({
-                    item_code: '',
-                    item_name: '',
-                    generic_name: '',
-                    category: 'Fertility / Hormones',
-                    batch_number: '',
-                    expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                    quantity_available: 50,
-                    quantity_received: 50,
-                    purchase_rate: 0,
-                    mrp: 0,
-                    selling_price: 0,
-                    rack_location: 'A003',
-                    branch_id: '',
-                    is_active: true,
-                  });
-                  setShowBatchModal(true);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Drug Batch
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowStockCsvModal(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-xs cursor-pointer"
+                  title="Upload CSV to import batches with Admin Overwrite / Upsert permissions"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Import Stock CSV (Admin Override)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingBatch(null);
+                    setBatchForm({
+                      item_code: '',
+                      item_name: '',
+                      generic_name: '',
+                      category: 'Fertility / Hormones',
+                      batch_number: '',
+                      expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      pack_size: 10,
+                      quantity_available: 50,
+                      quantity_received: 50,
+                      purchase_rate: 0,
+                      mrp: 0,
+                      selling_price: 0,
+                      rack_location: 'A003',
+                      branch_id: '',
+                      is_active: true,
+                    });
+                    setShowBatchModal(true);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary-mid text-white font-semibold text-xs rounded-lg shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Drug Batch
+                </button>
+              </div>
             )}
           </div>
 
@@ -428,6 +444,7 @@ export default function PharmacySettingsTab({
                                     category: b.category || 'General Pharmacy',
                                     batch_number: b.batch_number || '',
                                     expiry_date: b.expiry_date ? String(b.expiry_date).split('T')[0] : '',
+                                    pack_size: b.pack_size ?? 10,
                                     quantity_available: b.quantity_available ?? 0,
                                     quantity_received: b.quantity_received ?? b.quantity_available ?? 0,
                                     purchase_rate: b.purchase_rate ?? 0,
@@ -489,6 +506,14 @@ export default function PharmacySettingsTab({
         setBatchForm={setBatchForm}
         hospitalBranches={hospitalBranches}
         onSubmit={handleSaveBatch}
+      />
+      <StockCsvImportModal
+        isOpen={showStockCsvModal}
+        onClose={() => setShowStockCsvModal(false)}
+        allowOverride={true}
+        onSuccess={() => {
+          pharmacyApi.listBatches().then((b: any) => setPharmacyBatches(Array.isArray(b) ? b : []));
+        }}
       />
     </>
   );

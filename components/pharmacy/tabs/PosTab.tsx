@@ -31,6 +31,8 @@ interface PosTabProps {
     item_name: string;
     quantity: number;
     unit_price: number;
+    pack_size?: number;
+    sheet_price?: number;
     batch_number?: string;
   }>;
   setPosCart: React.Dispatch<React.SetStateAction<any[]>>;
@@ -167,6 +169,10 @@ export default function PosTab({
   const handleAddToCart = (batch: any) => {
     if (batch.is_active === false) return;
     if (batch.quantity_available <= 0) return;
+    const packSize = Math.max(1, batch.pack_size || 1);
+    const sheetPrice = Number(batch.selling_price || batch.mrp || 0);
+    const unitPrice = Math.round((sheetPrice / packSize) * 100) / 100;
+
     setPosCart((prev) => {
       const existing = prev.find((i) => i.item_code === batch.item_code);
       if (existing) {
@@ -180,7 +186,9 @@ export default function PosTab({
           item_code: batch.item_code,
           item_name: batch.item_name,
           quantity: 1,
-          unit_price: batch.selling_price || batch.mrp,
+          pack_size: packSize,
+          sheet_price: sheetPrice,
+          unit_price: unitPrice,
           batch_number: batch.batch_number,
         },
       ];
@@ -355,25 +363,42 @@ export default function PosTab({
                       b.batch_number?.toLowerCase().includes(posSearch.toLowerCase()) ||
                       b.item_code?.toLowerCase().includes(posSearch.toLowerCase())
                     )
-                    .slice(0, 20)
-                    .map((b: any) => (
-                      <div
-                        key={b.id}
-                        onClick={() => handleAddToCart(b)}
-                        className="p-3 rounded-md border border-slate-200 hover:border-[rgb(var(--clr-primary)/0.4)] bg-white hover:bg-[rgb(var(--clr-primary)/0.04)] cursor-pointer transition-all flex items-center justify-between"
-                      >
-                        <div className="min-w-0 pr-2">
-                          <p className="font-bold text-xs text-slate-900 truncate">{b.item_name}</p>
-                          <p className="text-[10px] text-slate-500">
-                            Batch: {b.batch_number} · Exp: {formatDate(b.expiry_date)}
-                          </p>
+                    .slice(0, 24)
+                    .map((b: any) => {
+                      const pSz = Math.max(1, b.pack_size || 1);
+                      const sheetPrice = Number(b.selling_price || b.mrp || 0);
+                      const unitPrice = Math.round((sheetPrice / pSz) * 100) / 100;
+                      const sheets = Math.floor((b.quantity_available || 0) / pSz);
+
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => handleAddToCart(b)}
+                          className="p-3 rounded-md border border-slate-200 hover:border-[rgb(var(--clr-primary)/0.4)] bg-white hover:bg-[rgb(var(--clr-primary)/0.04)] cursor-pointer transition-all flex items-center justify-between"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="font-bold text-xs text-slate-900 truncate">{b.item_name}</p>
+                            <p className="text-[10px] text-slate-500">
+                              Batch: {b.batch_number} · Exp: {formatDate(b.expiry_date)}
+                            </p>
+                            {pSz > 1 && (
+                              <p className="text-[10px] text-slate-400">
+                                1 sheet = {pSz} tabs
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs font-bold text-[rgb(var(--clr-primary))]">
+                              {formatCurrency(unitPrice)} <span className="text-[10px] font-normal text-slate-500">/{pSz > 1 ? 'tab' : 'unit'}</span>
+                            </p>
+                            <span className="text-[10px] font-semibold text-emerald-600">
+                              {b.quantity_available} {pSz > 1 ? 'tabs' : 'in stock'}
+                              {pSz > 1 && ` (${sheets} sh)`}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-bold text-[rgb(var(--clr-primary))]">{formatCurrency(b.selling_price || b.mrp)}</p>
-                          <span className="text-[10px] font-semibold text-emerald-600">{b.quantity_available} in stock</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   {batches.filter((b: any) =>
                     !posSearch ||
                     b.item_name?.toLowerCase().includes(posSearch.toLowerCase()) ||
@@ -405,24 +430,89 @@ export default function PosTab({
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto pr-1">
-                      {posCart.map((item, idx) => (
-                        <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
-                          <div className="min-w-0 pr-2">
-                            <p className="font-bold text-slate-900 truncate">{item.item_name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">FEFO Batch: {item.batch_number}</p>
+                      {posCart.map((item, idx) => {
+                        const pSz = Math.max(1, item.pack_size || 1);
+                        const sheetsCount = Math.floor(item.quantity / pSz);
+                        const looseCount = item.quantity % pSz;
+
+                        return (
+                          <div key={idx} className="py-2.5 flex flex-col gap-1.5 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-slate-900 truncate">{item.item_name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">FEFO Batch: {item.batch_number}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="font-bold text-slate-900">{formatCurrency(item.quantity * item.unit_price)}</span>
+                                <p className="text-[10px] text-slate-400">
+                                  {formatCurrency(item.unit_price)} / {pSz > 1 ? 'tab' : 'unit'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Quantity Controls & Quick Sheet Helper */}
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100/80">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-slate-500 font-medium">Qty:</span>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, Number(e.target.value));
+                                    setPosCart(posCart.map((it, i) => i === idx ? { ...it, quantity: val } : it));
+                                  }}
+                                  className="h-6 w-14 text-xs text-center font-bold px-1"
+                                />
+                                <span className="text-[10px] text-slate-500">{pSz > 1 ? 'tabs' : 'units'}</span>
+
+                                {pSz > 1 && (
+                                  <div className="flex items-center gap-1 ml-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPosCart(posCart.map((it, i) => i === idx ? { ...it, quantity: it.quantity + pSz } : it));
+                                      }}
+                                      className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                                      title={`Add 1 Sheet (${pSz} tablets)`}
+                                    >
+                                      +1 Sheet
+                                    </button>
+                                    {item.quantity > pSz && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPosCart(posCart.map((it, i) => i === idx ? { ...it, quantity: Math.max(1, it.quantity - pSz) } : it));
+                                        }}
+                                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                                        title={`Subtract 1 Sheet (${pSz} tablets)`}
+                                      >
+                                        -1 Sheet
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {pSz > 1 && (
+                                  <span className="text-[10px] text-slate-400">
+                                    ({sheetsCount} sh{looseCount > 0 ? ` + ${looseCount} tabs` : ''})
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setPosCart(posCart.filter((_, i) => i !== idx))}
+                                  className="text-red-400 hover:text-red-600 p-1"
+                                  title="Remove from cart"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-700">x{item.quantity}</span>
-                            <span className="font-bold text-slate-900">{formatCurrency(item.quantity * item.unit_price)}</span>
-                            <button
-                              onClick={() => setPosCart(posCart.filter((_, i) => i !== idx))}
-                              className="text-red-400 hover:text-red-600 p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 

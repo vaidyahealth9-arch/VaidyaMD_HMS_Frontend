@@ -18,6 +18,13 @@ import {
   Download,
   Activity,
   RefreshCw,
+  Printer,
+  Calendar,
+  Filter,
+  Stethoscope,
+  Microscope,
+  Bed,
+  Pill,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
@@ -27,6 +34,10 @@ import {
   LeakageTab,
   NoShowsTab,
   ClinicalTab,
+  DoctorProductivityTab,
+  ClinicalLabTab,
+  OperationsIpdTab,
+  PharmacyLabTab,
 } from '@/components/analytics';
 
 const TIMEFRAME_OPTIONS = [
@@ -36,24 +47,47 @@ const TIMEFRAME_OPTIONS = [
   { label: 'This Month', value: 'this_month' },
   { label: 'This Year', value: 'this_year' },
   { label: 'All Time', value: 'all' },
+  { label: 'Custom Range', value: 'custom' },
+];
+
+const DEPARTMENT_OPTIONS = [
+  { label: 'All Departments', value: '' },
+  { label: 'OPD Consultations', value: 'OPD' },
+  { label: 'IVF & Fertility ART', value: 'IVF' },
+  { label: 'IPD Ward & Surgery', value: 'IPD' },
+  { label: 'Pharmacy Dispensary', value: 'Pharmacy' },
+  { label: 'LIMS Diagnostic Lab', value: 'LIMS' },
 ];
 
 export default function AnalyticsPage() {
   const queryClient = useQueryClient();
   const [timeframe, setTimeframe] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'financial' | 'leakage' | 'noshows' | 'clinical'>('financial');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [department, setDepartment] = useState<string>('');
+
+  type TabType = 'financial' | 'leakage' | 'doctors' | 'lab' | 'ipd' | 'pharmacy' | 'noshows' | 'clinical';
+  const [activeTab, setActiveTab] = useState<TabType>('financial');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
 
-  // 1. Fetch Revenue Breakdown (with timeframe)
+  // Common query params
+  const queryParams = {
+    timeframe: timeframe !== 'custom' ? timeframe : undefined,
+    start_date: timeframe === 'custom' && startDate ? startDate : undefined,
+    end_date: timeframe === 'custom' && endDate ? endDate : undefined,
+    department: department || undefined,
+  };
+
+  // 1. Fetch Revenue Breakdown
   const {
     data: revenueData,
     isLoading: revLoading,
     isRefetching: revRefetching,
     refetch: refetchRevenue,
   } = useQuery({
-    queryKey: ['analytics-revenue-breakdown', timeframe],
-    queryFn: () => analyticsApi.getRevenueBreakdown(timeframe),
+    queryKey: ['analytics-revenue-breakdown', timeframe, startDate, endDate, department],
+    queryFn: () => analyticsApi.getRevenueBreakdown(queryParams),
   });
 
   // 2. Fetch Revenue Leakage
@@ -74,7 +108,7 @@ export default function AnalyticsPage() {
     queryFn: () => analyticsApi.getNoShows(),
   });
 
-  // 4. Fetch Clinical ART Outcomes
+  // 4. Fetch Clinical ART Outcomes (Legacy)
   const {
     data: clinicalData,
     refetch: refetchClinical,
@@ -83,7 +117,47 @@ export default function AnalyticsPage() {
     queryFn: () => analyticsApi.getClinicalOutcomes().catch(() => null),
   });
 
-  // 5. Fetch Geographic Distribution
+  // 5. Fetch Doctor Productivity
+  const {
+    data: doctorData,
+    isLoading: docLoading,
+    refetch: refetchDoctors,
+  } = useQuery({
+    queryKey: ['analytics-doctor-productivity', timeframe, startDate, endDate, department],
+    queryFn: () => analyticsApi.getDoctorProductivity(queryParams).catch(() => null),
+  });
+
+  // 6. Fetch Clinical Lab KPIs
+  const {
+    data: labData,
+    isLoading: labLoading,
+    refetch: refetchLab,
+  } = useQuery({
+    queryKey: ['analytics-clinical-lab', timeframe, startDate, endDate],
+    queryFn: () => analyticsApi.getClinicalLab(queryParams).catch(() => null),
+  });
+
+  // 7. Fetch Operations & IPD
+  const {
+    data: ipdData,
+    isLoading: ipdLoading,
+    refetch: refetchIpd,
+  } = useQuery({
+    queryKey: ['analytics-operations-ipd', timeframe, startDate, endDate],
+    queryFn: () => analyticsApi.getOperationsIpd(queryParams).catch(() => null),
+  });
+
+  // 8. Fetch Pharmacy & Lab Telemetry
+  const {
+    data: pharmaLabData,
+    isLoading: pharmaLoading,
+    refetch: refetchPharma,
+  } = useQuery({
+    queryKey: ['analytics-pharmacy-lab', timeframe, startDate, endDate],
+    queryFn: () => analyticsApi.getPharmacyLab(queryParams).catch(() => null),
+  });
+
+  // 9. Fetch Geographic Distribution
   const { data: cityData = [] } = useQuery({
     queryKey: ['analytics-patients-city'],
     queryFn: () => analyticsApi.getPatientsByCity().catch(() => []),
@@ -107,7 +181,7 @@ export default function AnalyticsPage() {
     },
   });
 
-  // Send WhatsApp Reminder Mutation with live WhatsApp Web dispatch
+  // Send WhatsApp Reminder Mutation
   const handleSendReminder = async (item: any) => {
     const appointmentId = typeof item === 'string' ? item : item?.id;
     if (!appointmentId) return;
@@ -142,6 +216,10 @@ export default function AnalyticsPage() {
     refetchLeakage();
     refetchNoShows();
     refetchClinical();
+    refetchDoctors();
+    refetchLab();
+    refetchIpd();
+    refetchPharma();
   };
 
   const exportCSV = () => {
@@ -154,10 +232,19 @@ export default function AnalyticsPage() {
       ['Leakage', 'Unbilled Orders Count', leakageData?.summary?.unbilled_orders_count || 0],
       ['Leakage', 'Est. Lost Revenue', leakageData?.summary?.total_leakage_detected || 0],
       ['Retention', 'Missed Appointments Count', noShows.length || 0],
-      ['Clinical', 'Total Treatment Cycles', clinicalData?.cycle_summary?.total_cycles || 0],
-      ['Clinical', 'Completed Cycles', clinicalData?.cycle_summary?.completed || 0],
-      ['Clinical', 'Completion Rate %', clinicalData?.cycle_summary?.completion_rate_pct || 0],
+      ['Clinical Lab', 'Fertilization Rate %', labData?.lab_quality_indicators?.fertilization_rate_pct || 0],
+      ['Clinical Lab', 'Blastocyst Rate %', labData?.lab_quality_indicators?.blastocyst_formation_rate_pct || 0],
+      ['Operations', 'Bed Occupancy Rate %', ipdData?.summary?.bed_occupancy_rate_pct || 0],
+      ['Pharmacy', 'Medications Dispensed', pharmaLabData?.pharmacy?.total_items_dispensed || 0],
+      ['Diagnostics', 'Tests Processed', pharmaLabData?.laboratory?.total_diagnostic_tests_run || 0],
     ];
+
+    if (doctorData?.doctors) {
+      doctorData.doctors.forEach((d: any) => {
+        rows.push(['Doctor Productivity', d.doctor_name, `Consults: ${d.completed_consultations}, Billed: ${d.revenue_billed}`]);
+      });
+    }
+
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -166,6 +253,10 @@ export default function AnalyticsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   // Safe data accessors
@@ -180,17 +271,17 @@ export default function AnalyticsPage() {
     active_patients_count: 0,
   };
 
-  const monthlyData = revenueData?.monthly_trajectory || [];
-  const deptData = revenueData?.by_department || {};
-  const deptPieData = Object.entries(deptData).map(([name, val]: any) => ({
-    name,
-    value: Number(val),
+  const monthlyData = revenueData?.monthly_trend || [];
+  const deptData = revenueData?.by_department || [];
+  const deptPieData = deptData.map((d: any) => ({
+    name: d.department,
+    value: Number(d.revenue || 0),
   }));
 
-  const doctorBreakdown = revenueData?.by_doctor || [];
+  const doctorBreakdown = revenueData?.by_clinician || [];
   const leakageItems = leakageData?.detected_leakages || [];
   const leakageSummary = leakageData?.summary || { total_leakage_detected: 0, unbilled_orders_count: 0 };
-  const cycleSummary = clinicalData?.cycle_summary || {
+  const cycleSummary = clinicalData?.cycle_summary || clinicalData?.summary || {
     total_cycles: 0,
     running: 0,
     completed: 0,
@@ -204,32 +295,15 @@ export default function AnalyticsPage() {
       {/* Header & Controls */}
       <PageHeader
         title="Hospital Performance & Clinical Analytics"
-        subtitle="Live hospital financial metrics, AI revenue leakage auditing, patient retention queues, and ART clinical outcomes"
+        subtitle="Live hospital financial metrics, clinician benchmarks, ART laboratory outcomes, bed occupancy, and AI revenue auditing"
         icon={TrendingUp}
         titleBadge={
           <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded">
-            Live Data
+            Live Database Feeds
           </span>
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {/* Timeframe selector */}
-            <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-              {TIMEFRAME_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setTimeframe(opt.value)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                    timeframe === opt.value
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
             <Button
               variant="outline"
               size="sm"
@@ -239,6 +313,17 @@ export default function AnalyticsPage() {
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="h-8 text-xs font-semibold gap-1.5 border-slate-200"
+              title="Print Summary Report"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Print Report</span>
             </Button>
 
             <Button
@@ -255,6 +340,66 @@ export default function AnalyticsPage() {
           </div>
         }
       />
+
+      {/* Universal Filter Suite Bar */}
+      <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Timeframe Presets */}
+          <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 overflow-x-auto">
+            {TIMEFRAME_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setTimeframe(opt.value)}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+                  timeframe === opt.value
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Date Range Inputs */}
+          {timeframe === 'custom' && (
+            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-500 ml-1" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs font-medium text-slate-700"
+                title="Start Date"
+              />
+              <span className="text-slate-400">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs font-medium text-slate-700"
+                title="End Date"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Department Filter Dropdown */}
+        <div className="flex items-center gap-2">
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <select
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {DEPARTMENT_OPTIONS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Success Notification */}
       {actionSuccess && (
@@ -302,19 +447,19 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Outstanding Dues & Revenue Leakage */}
-        <Card className="border-red-200 bg-gradient-to-br from-red-50/40 to-white shadow-sm">
+        {/* Prevented / Detected Revenue Leakage */}
+        <Card className="border-amber-200 bg-gradient-to-br from-amber-50/40 to-white shadow-sm">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Unbilled Leakage / Dues</p>
-              <h3 className="text-2xl font-bold text-red-700 mt-0.5">
-                {formatCurrency(leakageSummary.total_leakage_detected || kpis.pending_collections)}
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Unbilled AI Leakage</p>
+              <h3 className="text-2xl font-bold text-amber-700 mt-0.5">
+                {formatCurrency(leakageSummary.total_leakage_detected)}
               </h3>
-              <p className="text-[11px] text-red-600 font-semibold mt-0.5">
-                {leakageSummary.unbilled_orders_count} unbilled items detected
+              <p className="text-[11px] text-amber-600 font-medium mt-0.5">
+                {leakageSummary.unbilled_orders_count} unbilled procedures found
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
               <AlertTriangle className="w-5 h-5" />
             </div>
           </CardContent>
@@ -339,15 +484,19 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Main Tabs */}
+      {/* Main Tabs Navigation */}
       <TabBar
         activeTab={activeTab}
-        onChange={(v) => setActiveTab(v as any)}
+        onChange={(v) => setActiveTab(v as TabType)}
         tabs={[
           { id: 'financial', label: 'Financial & Streams', icon: BarChart3 },
-          { id: 'leakage', label: 'Leakage Action Center', icon: AlertTriangle, badge: leakageItems.length || undefined },
-          { id: 'noshows', label: 'No-Show & Recall Queue', icon: UserX, badge: noShows.length || undefined },
-          { id: 'clinical', label: 'Clinical & ART Outcomes', icon: Activity },
+          { id: 'doctors', label: 'Doctor Productivity', icon: Stethoscope },
+          { id: 'lab', label: 'IVF & Lab Outcomes', icon: Microscope },
+          { id: 'ipd', label: 'IPD & Bed Census', icon: Bed },
+          { id: 'pharmacy', label: 'Pharmacy & LIMS', icon: Pill },
+          { id: 'leakage', label: 'AI Leakage Center', icon: AlertTriangle, badge: leakageItems.length || undefined },
+          { id: 'noshows', label: 'Patient Retention Queue', icon: UserX, badge: noShows.length || undefined },
+          { id: 'clinical', label: 'Cycles Registry', icon: Activity },
         ]}
       />
 
@@ -357,10 +506,43 @@ export default function AnalyticsPage() {
           monthlyData={monthlyData}
           deptPieData={deptPieData}
           doctorBreakdown={doctorBreakdown}
+          trajectoryTitle={revenueData?.trajectory_title}
         />
       )}
 
-      {/* TAB 2: REVENUE LEAKAGE ACTION CENTER */}
+      {/* TAB 2: DOCTOR PRODUCTIVITY BENCHMARKS */}
+      {activeTab === 'doctors' && (
+        <DoctorProductivityTab
+          data={doctorData}
+          isLoading={docLoading}
+        />
+      )}
+
+      {/* TAB 3: IVF & EMBRYOLOGY LAB OUTCOMES */}
+      {activeTab === 'lab' && (
+        <ClinicalLabTab
+          data={labData}
+          isLoading={labLoading}
+        />
+      )}
+
+      {/* TAB 4: IPD OPERATIONS & BED CENSUS */}
+      {activeTab === 'ipd' && (
+        <OperationsIpdTab
+          data={ipdData}
+          isLoading={ipdLoading}
+        />
+      )}
+
+      {/* TAB 5: PHARMACY & LIMS TELEMETRY */}
+      {activeTab === 'pharmacy' && (
+        <PharmacyLabTab
+          data={pharmaLabData}
+          isLoading={pharmaLoading}
+        />
+      )}
+
+      {/* TAB 6: REVENUE LEAKAGE ACTION CENTER */}
       {activeTab === 'leakage' && (
         <LeakageTab
           leakageSummary={leakageSummary}
@@ -370,7 +552,7 @@ export default function AnalyticsPage() {
         />
       )}
 
-      {/* TAB 3: NO-SHOW & RECALL QUEUE */}
+      {/* TAB 7: NO-SHOW & RECALL QUEUE */}
       {activeTab === 'noshows' && (
         <NoShowsTab
           noShows={noShows}
@@ -379,7 +561,7 @@ export default function AnalyticsPage() {
         />
       )}
 
-      {/* TAB 4: CLINICAL & ART OUTCOMES */}
+      {/* TAB 8: CYCLES REGISTRY */}
       {activeTab === 'clinical' && (
         <ClinicalTab
           cycleSummary={cycleSummary}

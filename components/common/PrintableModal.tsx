@@ -18,6 +18,8 @@ export interface PrintableModalProps {
   headerProps?: PrintableReportHeaderProps;
   footerProps?: PrintableReportFooterProps;
   showPrePrintedToggle?: boolean;
+  pageSize?: 'a4' | 'a5';
+  printLabel?: string;
 }
 
 export default function PrintableModal({
@@ -32,6 +34,8 @@ export default function PrintableModal({
   headerProps,
   footerProps,
   showPrePrintedToggle = true,
+  pageSize = 'a4',
+  printLabel,
 }: PrintableModalProps) {
   const [includeHeader, setIncludeHeader] = useState(defaultIncludeHeader);
 
@@ -68,7 +72,7 @@ export default function PrintableModal({
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold tracking-tight">{title}</h3>
             <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-              A4 Sheet Preview
+              {pageSize === 'a5' ? 'A5 Sheet Preview' : 'A4 Sheet Preview'}
             </span>
           </div>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
@@ -111,7 +115,7 @@ export default function PrintableModal({
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md bg-[rgb(var(--clr-primary))] hover:brightness-110 active:scale-95 text-white cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print (A4)</span>
+            <span>{printLabel || (pageSize === 'a5' ? 'Print (A5)' : 'Print (A4)')}</span>
           </button>
 
           {/* Close Button */}
