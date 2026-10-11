@@ -64,6 +64,8 @@ export default function PharmacyPage() {
     item_name: string;
     quantity: number;
     unit_price: number;
+    pack_size?: number;
+    sheet_price?: number;
     batch_number?: string;
   }>>([]);
 
@@ -128,6 +130,10 @@ export default function PharmacyPage() {
   const handleAddToCart = (batch: any) => {
     if (batch.is_active === false) return;
     if (batch.quantity_available <= 0) return;
+    const packSize = Math.max(1, batch.pack_size || 1);
+    const sheetPrice = Number(batch.selling_price || batch.mrp || 0);
+    const unitPrice = Math.round((sheetPrice / packSize) * 100) / 100;
+
     setPosCart((prev) => {
       const existing = prev.find((i) => i.item_code === batch.item_code);
       if (existing) {
@@ -141,7 +147,9 @@ export default function PharmacyPage() {
           item_code: batch.item_code,
           item_name: batch.item_name,
           quantity: 1,
-          unit_price: batch.selling_price || batch.mrp,
+          pack_size: packSize,
+          sheet_price: sheetPrice,
+          unit_price: unitPrice,
           batch_number: batch.batch_number,
         },
       ];

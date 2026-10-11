@@ -25,17 +25,21 @@ interface StockCsvImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (message: string) => void;
+  allowOverride?: boolean;
 }
 
 export default function StockCsvImportModal({
   isOpen,
   onClose,
   onSuccess,
+  allowOverride = false,
 }: StockCsvImportModalProps) {
   const queryClient = useQueryClient();
 
   const [stockCsvFile, setStockCsvFile] = useState<File | null>(null);
-  const [stockConflictMode, setStockConflictMode] = useState<'overwrite' | 'skip'>('overwrite');
+  const [stockConflictMode, setStockConflictMode] = useState<'overwrite' | 'skip'>(
+    allowOverride ? 'overwrite' : 'skip'
+  );
   const [isStockImporting, setIsStockImporting] = useState(false);
   const [stockImportResult, setStockImportResult] = useState<any | null>(null);
   const [stockImportError, setStockImportError] = useState<string | null>(null);
@@ -161,6 +165,7 @@ export default function StockCsvImportModal({
   };
 
   const handleStockConflictModeChange = async (newMode: 'overwrite' | 'skip') => {
+    if (!allowOverride && newMode === 'overwrite') return;
     setStockConflictMode(newMode);
     if (stockCsvFile) {
       handleStockFileSelect(stockCsvFile, newMode);
@@ -291,47 +296,59 @@ export default function StockCsvImportModal({
               {/* Step 2: Conflict Policy Selector */}
               <div>
                 <label className="block text-slate-700 font-semibold mb-1.5">2. Existing Batch Conflict Resolution Policy:</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className={`flex items-center gap-2.5 p-3 border rounded-xl cursor-pointer transition-colors ${
-                      stockConflictMode === 'overwrite'
-                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-950 font-bold'
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="stock_conflict"
-                      checked={stockConflictMode === 'overwrite'}
-                      onChange={() => handleStockConflictModeChange('overwrite')}
-                      className="text-amber-600 focus:ring-amber-500"
-                    />
-                    <div>
-                      <span className="font-bold block text-xs">⚡ Overwrite (Upsert)</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Updates existing batches with CSV quantity, MRP &amp; expiry</span>
-                    </div>
-                  </label>
+                {allowOverride ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className={`flex items-center gap-2.5 p-3 border rounded-xl cursor-pointer transition-colors ${
+                        stockConflictMode === 'overwrite'
+                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-950 font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="stock_conflict"
+                        checked={stockConflictMode === 'overwrite'}
+                        onChange={() => handleStockConflictModeChange('overwrite')}
+                        className="text-amber-600 focus:ring-amber-500"
+                      />
+                      <div>
+                        <span className="font-bold block text-xs">⚡ Overwrite (Upsert)</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Updates existing batches with CSV quantity, MRP &amp; expiry</span>
+                      </div>
+                    </label>
 
-                  <label
-                    className={`flex items-center gap-2.5 p-3 border rounded-xl cursor-pointer transition-colors ${
-                      stockConflictMode === 'skip'
-                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-950 font-bold'
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="stock_conflict"
-                      checked={stockConflictMode === 'skip'}
-                      onChange={() => handleStockConflictModeChange('skip')}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <div>
-                      <span className="font-bold block text-xs">○ Skip Existing</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Only inserts newly discovered batches; preserves live inventory</span>
+                    <label
+                      className={`flex items-center gap-2.5 p-3 border rounded-xl cursor-pointer transition-colors ${
+                        stockConflictMode === 'skip'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-950 font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="stock_conflict"
+                        checked={stockConflictMode === 'skip'}
+                        onChange={() => handleStockConflictModeChange('skip')}
+                        className="text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <div>
+                        <span className="font-bold block text-xs">○ Skip Existing</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Only inserts newly discovered batches; preserves live inventory</span>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-900 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span>Policy: <strong>Skip Existing Batches</strong> (Safely preserves existing inventory &amp; only inserts new batches)</span>
                     </div>
-                  </label>
-                </div>
+                    <span className="text-[10px] text-slate-500 italic bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                      Override is restricted to Master Settings (Admin only)
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Step 3: File Selector / Dropzone */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Printer,
@@ -18,6 +18,8 @@ import {
   Baby,
 } from 'lucide-react';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableReportFooter from '@/components/common/PrintableReportFooter';
+import A4Sheet from '@/components/common/A4Sheet';
 import { andrologyApi } from '@/lib/api';
 
 export interface OPUAspirationReportModalProps {
@@ -114,6 +116,94 @@ export default function OPUAspirationReportModal({
   const [spermDetails, setSpermDetails] = useState('');
   const [advancedSpermTechnique, setAdvancedSpermTechnique] = useState('');
   const [adviceOnDischarge, setAdviceOnDischarge] = useState('');
+  const [existingRecordId, setExistingRecordId] = useState<string | null>(null);
+
+  // Hydrate existing saved OPU report on mount
+  useEffect(() => {
+    if (!patient?.id) return;
+    const cycleId = resolvedCycle?.id;
+    andrologyApi.list({ patient_id: patient.id, record_type: 'opu_aspiration_report' })
+      .then((records: any[]) => {
+        if (!Array.isArray(records) || records.length === 0) return;
+        const match = cycleId ? records.find((r) => r.data?.cycle_id === cycleId) || records[0] : records[0];
+        if (match && match.data) {
+          setExistingRecordId(match.id);
+          const d = match.data;
+          if (d.report_date) setReportDate(d.report_date);
+          if (d.summary) {
+            if (d.summary.reason_for_art) setReasonForART(d.summary.reason_for_art);
+            if (d.summary.female_factor) setFemaleFactor(d.summary.female_factor);
+            if (d.summary.male_factor) setMaleFactor(d.summary.male_factor);
+            if (d.summary.add_on_drugs) setAddOnDrugs(d.summary.add_on_drugs);
+          }
+          if (d.pre_treatments) {
+            if (d.pre_treatments.protocol) setPreTreatments(d.pre_treatments.protocol);
+            if (d.pre_treatments.comments) setPreTreatmentComments(d.pre_treatments.comments);
+            if (d.pre_treatments.days) setDaysPreTreatment(String(d.pre_treatments.days));
+            if (d.pre_treatments.lmp) setLmp(d.pre_treatments.lmp);
+          }
+          if (d.stimulation) {
+            if (d.stimulation.protocol) setStimulationProtocol(d.stimulation.protocol);
+            if (d.stimulation.days) setDaysStimulation(String(d.stimulation.days));
+            if (d.stimulation.date) setStimulationDate(d.stimulation.date);
+            if (d.stimulation.oral_agents) setOralStimulatingAgents(d.stimulation.oral_agents);
+            if (d.stimulation.down_regulation) setDownRegulation(d.stimulation.down_regulation);
+            if (d.stimulation.down_regulation_days) setDownRegulationDays(String(d.stimulation.down_regulation_days));
+            if (d.stimulation.down_regulation_date) setDownRegulationDate(d.stimulation.down_regulation_date);
+            if (d.stimulation.down_regulation_e2) setDownRegulationE2(d.stimulation.down_regulation_e2);
+            if (d.stimulation.day2_et_mm) setDay2EndometrialThickness(d.stimulation.day2_et_mm);
+          }
+          if (d.hormones) {
+            if (d.hormones.rfsh_dose) setRfshDosage(d.hormones.rfsh_dose);
+            if (d.hormones.rlh_dose) setRlhDosage(d.hormones.rlh_dose);
+            if (d.hormones.hphmg_dose) setHphmgDosage(d.hormones.hphmg_dose);
+            if (d.hormones.hpfsh_dose) setHpfshDosage(d.hormones.hpfsh_dose);
+            if (d.hormones.total_gonadotrophin_dose) setTotalGonadotrophinDose(d.hormones.total_gonadotrophin_dose);
+            if (d.hormones.deviation) setDeviationDuringCycle(d.hormones.deviation);
+            if (d.hormones.et_mm) setEndometrialThickness(d.hormones.et_mm);
+            if (d.hormones.fluid_in_cavity) setFluidInCavity(d.hormones.fluid_in_cavity);
+            if (d.hormones.interventions) setInterventionsDuringCycle(d.hormones.interventions);
+            if (d.hormones.growth_hormone) setGrowthHormoneDosage(d.hormones.growth_hormone);
+          }
+          if (d.trigger) {
+            if (d.trigger.agent) setTrigger(d.trigger.agent);
+            if (d.trigger.comments) setTriggerComments(d.trigger.comments);
+            if (d.trigger.date_time) setTriggerDateTime(d.trigger.date_time);
+            if (d.trigger.repeat_12h) setRepeat12hTrigger(d.trigger.repeat_12h);
+            if (d.trigger.pre_trigger_e2) setPreTriggerE2(d.trigger.pre_trigger_e2);
+            if (d.trigger.pre_trigger_lh) setPreTriggerLH(d.trigger.pre_trigger_lh);
+            if (d.trigger.pre_trigger_p4) setPreTriggerProgesterone(d.trigger.pre_trigger_p4);
+            if (d.trigger.post_trigger_lh) setPostTriggerLH(d.trigger.post_trigger_lh);
+            if (d.trigger.post_trigger_p4) setPostTriggerProgesterone(d.trigger.post_trigger_p4);
+            if (d.trigger.post_trigger_bhcg) setPostTriggerBHCG(d.trigger.post_trigger_bhcg);
+            if (d.trigger.trigger_day_e2) setTriggerDayE2(d.trigger.trigger_day_e2);
+            if (d.trigger.trigger_day_et) setTriggerDayEndometrialThickness(d.trigger.trigger_day_et);
+          }
+          if (d.opu) {
+            if (d.opu.date_time) setOpuDateTime(d.opu.date_time);
+            if (d.opu.surgeon) setSurgeon(d.opu.surgeon);
+            if (d.opu.anaesthetist) setAnaesthetist(d.opu.anaesthetist);
+            if (d.opu.other_surgeons) setOtherSurgeons(d.opu.other_surgeons);
+            if (d.opu.anesthesia_dose) setOpuTotalDose(d.opu.anesthesia_dose);
+            if (d.opu.self_donor) setSelfDonor(d.opu.self_donor);
+            if (d.opu.trigger_opu_diff_hrs) setTriggerOpuDifference(d.opu.trigger_opu_diff_hrs);
+            if (d.opu.follicles_over_14) setFolliclesOver14(String(d.opu.follicles_over_14));
+            if (d.opu.oocytes_retrieved) setOocytesRetrieved(String(d.opu.oocytes_retrieved));
+            if (d.opu.mature_oocytes_mii) setMatureOocytes(String(d.opu.mature_oocytes_mii));
+            if (d.opu.immature_oocytes) setImmatureOocytes(String(d.opu.immature_oocytes));
+            if (d.opu.oocyte_quality) setOocyteQuality(d.opu.oocyte_quality);
+            if (d.opu.abnormalities) setOocyteAbnormalities(d.opu.abnormalities);
+            if (d.opu.freezing_plan) setFreezing(d.opu.freezing_plan);
+            if (d.opu.sperm_details) setSpermDetails(d.opu.sperm_details);
+            if (d.opu.advanced_technique) setAdvancedSpermTechnique(d.opu.advanced_technique);
+            if (d.opu.advice_on_discharge) setAdviceOnDischarge(d.opu.advice_on_discharge);
+          }
+          // Default to preview mode for saved/existing records to prevent accidental edits
+          setViewMode('preview');
+        }
+      })
+      .catch((err) => console.error('Failed to load OPU report:', err));
+  }, [patient?.id, resolvedCycle?.id]);
 
   const handleSave = async () => {
     if (!patient?.id) return;
@@ -124,8 +214,8 @@ export default function OPUAspirationReportModal({
         record_type: 'opu_aspiration_report',
         data: {
           report_date: reportDate,
-          cycle_id: activeCycle?.id || null,
-          cycle_code: activeCycle?.cycle_id || 'ART-01',
+          cycle_id: resolvedCycle?.id || null,
+          cycle_code: resolvedCycle?.cycle_id || 'ART-01',
           summary: {
             reason_for_art: reasonForART,
             female_factor: femaleFactor,
@@ -199,11 +289,11 @@ export default function OPUAspirationReportModal({
 
       await andrologyApi.create(payload);
       setSaveSuccess(true);
+      setViewMode('preview');
       onSaved?.();
       setTimeout(() => {
         setSaveSuccess(false);
-        onClose();
-      }, 1000);
+      }, 3000);
     } catch (err: any) {
       alert(err.message || 'Failed to save OPU aspiration report');
     } finally {
@@ -262,7 +352,7 @@ export default function OPUAspirationReportModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar print:overflow-visible print:p-0 print:m-0 print:h-auto print:max-h-none">
           {viewMode === 'form' ? (
             <div className="space-y-6">
               {/* Section 1: Summary & Pre-Treatments */}
@@ -611,78 +701,122 @@ export default function OPUAspirationReportModal({
               </div>
             </div>
           ) : (
-            /* Printable Report Preview */
-            <div className="max-w-4xl mx-auto bg-white p-8 border border-slate-300 rounded-lg shadow-sm space-y-6 text-slate-800 printable-document print:p-0 print:m-0 print:border-none print:shadow-none">
-              <PrintableReportHeader
-                title="Oocyte Pick-Up (OPU) & Aspiration Operative Record"
-                subtitle="VaidyaMD Embryology Suite · Assisted Reproduction Clinical Record"
-                badge="OPU RECORD"
-                patient={{
-                  name: patient?.name || 'Female Patient',
-                  vid: patient?.vid,
-                }}
-                doctor={{
-                  name: surgeon,
-                }}
-                metaFields={[
-                  { label: 'OPU Date / Time', value: opuDateTime.replace('T', ' ') },
-                  { label: 'Trigger-to-OPU Interval', value: triggerOpuDifference },
-                ]}
-              />
+            /* Authentic A4 Printable Report Preview */
+            <div className="py-6 overflow-y-auto max-h-full flex justify-center bg-slate-100/60 print:bg-white print:p-0 print:m-0">
+              <A4Sheet
+                className="shadow-xl"
+                header={
+                  <PrintableReportHeader
+                    title="Oocyte Pick-Up (OPU) & Operative Aspiration Record"
+                    subtitle="Department of Reproductive Medicine & Assisted Conception · Embryology Suite"
+                    badge="OPU RECORD"
+                    patient={{
+                      name: patient?.name || 'Female Patient',
+                      vid: patient?.vid,
+                    }}
+                    partner={partner?.name ? { name: partner?.name } : undefined}
+                    doctor={{
+                      name: surgeon,
+                    }}
+                    metaFields={[
+                      { label: 'OPU Date & Time', value: opuDateTime ? opuDateTime.replace('T', ' ') : '—' },
+                      { label: 'Trigger-to-OPU Gap', value: triggerOpuDifference || '—' },
+                    ]}
+                  />
+                }
+                footer={
+                  <PrintableReportFooter
+                    signatoryName={surgeon || 'Operating Gynecologist'}
+                    signatoryTitle="Operating ART Surgeon"
+                    signatorySubtitle="Consultant Gynecologist & ART Specialist"
+                    showSignatory={true}
+                    witnessTitle="Senior Clinical Embryologist"
+                    showWitness={true}
+                    disclaimer="This document represents the operative oocyte aspiration record and gamete yield summary under the ART (Regulation) Act, 2021."
+                    pageNumber={1}
+                    totalPages={1}
+                  />
+                }
+              >
+                <div className="p-6 sm:p-8 space-y-5 text-slate-900 text-xs">
+                  {/* Clinical & Operative Parameters Table */}
+                  <table className="w-full border-collapse border border-slate-300 text-xs leading-snug">
+                    <tbody>
+                      <tr className="bg-slate-50 font-semibold">
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 text-slate-600">Operating Surgeon:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 font-bold text-slate-900">{surgeon || '—'}</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 text-slate-600">Anaesthetist:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 w-1/4 font-bold text-slate-900">{anaesthetist || '—'}</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Cycle ID / Indication:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium">{resolvedCycle?.cycle_id || '—'} · {reasonForART || 'Infertility'}</td>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Endometrial Thickness:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-bold text-emerald-800">{endometrialThickness || '—'} mm</td>
+                      </tr>
+                      <tr className="bg-slate-50 font-semibold">
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Trigger Agent &amp; Time:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium">{trigger || '—'} ({triggerDateTime ? triggerDateTime.replace('T', ' ') : '—'})</td>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Trigger-OPU Interval:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-bold text-primary">{triggerOpuDifference || '35.5 hrs'}</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-300 px-3 py-1.5 text-slate-600">Stimulation Protocol:</td>
+                        <td className="border border-slate-300 px-3 py-1.5 font-medium" colSpan={3}>
+                          {stimulationProtocol || 'Antagonist Protocol'} {daysStimulation ? `(${daysStimulation} Days)` : ''} · Gonadotropins: {rfshDosage || ''} {hphmgDosage || ''} ({totalGonadotrophinDose || 'Standard'})
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-              <div className="grid grid-cols-2 text-xs border border-slate-200 divide-x divide-y divide-slate-200 avoid-break">
-                <div className="p-2.5 bg-slate-50 font-bold">Patient Name: <span className="font-normal">{patient?.name}</span></div>
-                <div className="p-2.5 bg-slate-50 font-bold">VID: <span className="font-normal font-mono">{patient?.vid}</span></div>
-                <div className="p-2.5">OPU Date/Time: <span className="font-semibold">{opuDateTime.replace('T', ' ')}</span></div>
-                <div className="p-2.5">Operating Surgeon: <span className="font-semibold">{surgeon}</span></div>
-                <div className="p-2.5">Trigger-OPU Gap: <span className="font-semibold text-primary">{triggerOpuDifference}</span></div>
-                <div className="p-2.5">Endometrial Thickness: <span className="font-semibold text-emerald-800">{endometrialThickness}</span></div>
-              </div>
+                  {/* Gamete Yield Summary Metrics */}
+                  <div className="bg-pink-50/70 p-4 rounded-lg border border-pink-200 grid grid-cols-4 text-center">
+                    <div>
+                      <span className="text-[10.5px] uppercase tracking-wide text-pink-900 block font-bold">Total Oocytes (COCs)</span>
+                      <strong className="text-2xl text-pink-700 font-black">{oocytesRetrieved || '0'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10.5px] uppercase tracking-wide text-emerald-900 block font-bold">Mature (MII) Oocytes</span>
+                      <strong className="text-2xl text-emerald-700 font-black">{matureOocytes || '0'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10.5px] uppercase tracking-wide text-amber-900 block font-bold">Immature (MI / GV)</span>
+                      <strong className="text-2xl text-amber-700 font-black">{immatureOocytes || '0'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10.5px] uppercase tracking-wide text-slate-700 block font-bold">Maturity Rate</span>
+                      <strong className="text-2xl text-slate-800 font-black">
+                        {parseInt(oocytesRetrieved, 10) > 0
+                          ? `${Math.round((parseInt(matureOocytes, 10) / parseInt(oocytesRetrieved, 10)) * 100)}%`
+                          : '—'}
+                      </strong>
+                    </div>
+                  </div>
 
-              {/* Yield Box */}
-              <div className="bg-pink-50 p-4 rounded-lg border border-pink-200 grid grid-cols-3 text-center">
-                <div>
-                  <span className="text-[11px] text-pink-900 block font-bold">Total Oocytes Retrieved</span>
-                  <strong className="text-2xl text-pink-700">{oocytesRetrieved}</strong>
-                </div>
-                <div>
-                  <span className="text-[11px] text-emerald-900 block font-bold">Mature (MII) Oocytes</span>
-                  <strong className="text-2xl text-emerald-700">{matureOocytes}</strong>
-                </div>
-                <div>
-                  <span className="text-[11px] text-amber-900 block font-bold">Immature (MI / GV)</span>
-                  <strong className="text-2xl text-amber-700">{immatureOocytes}</strong>
-                </div>
-              </div>
+                  {/* Hormonal Peak & Gamete Morphological Notes */}
+                  <div className="border border-slate-200 rounded-lg p-3.5 bg-white space-y-2 text-xs">
+                    <h4 className="font-bold text-slate-900 uppercase tracking-wide text-[11px] border-b pb-1">
+                      Endocrine Profile &amp; Gamete Morphology
+                    </h4>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-700">
+                      <div><strong className="text-slate-900">Pre-Trigger Hormones:</strong> E2: {preTriggerE2 || '—'} pg/mL · P4: {preTriggerProgesterone || '—'} ng/mL · LH: {preTriggerLH || '—'} mIU/mL</div>
+                      <div><strong className="text-slate-900">Post-Trigger Check:</strong> LH: {postTriggerLH || '—'} · P4: {postTriggerProgesterone || '—'} · β-hCG: {postTriggerBHCG || '—'}</div>
+                      <div><strong className="text-slate-900">Oocyte Quality &amp; Cytoplasm:</strong> {oocyteQuality || 'Normal cytoplasmic granularity'}</div>
+                      <div><strong className="text-slate-900">Sperm Details &amp; Preparation:</strong> {spermDetails || 'Standard gradient separation / Swim-up'}</div>
+                    </div>
+                  </div>
 
-              {/* Stimulation & Hormones */}
-              <div className="text-xs space-y-2 border-t pt-3">
-                <p><strong>Stimulation Protocol:</strong> {stimulationProtocol} ({daysStimulation} Days)</p>
-                <p><strong>Gonadotropins:</strong> {rfshDosage} + {hphmgDosage} ({totalGonadotrophinDose})</p>
-                <p><strong>Trigger:</strong> {trigger} at {triggerDateTime.replace('T', ' ')}</p>
-                <p><strong>Hormonal Peak:</strong> Pre-Trigger E2: {preTriggerE2} · P4: {preTriggerProgesterone}</p>
-                <p><strong>Gamete Quality:</strong> {oocyteQuality}</p>
-                <p><strong>Sperm Details:</strong> {spermDetails}</p>
-              </div>
-
-              {/* Discharge Advice */}
-              <div className="bg-slate-50 p-3 rounded border border-slate-200 text-xs">
-                <span className="font-bold text-slate-800 block mb-1">Post-OPU Discharge Orders &amp; Medications:</span>
-                <p className="text-slate-700 leading-relaxed">{adviceOnDischarge}</p>
-              </div>
-
-              <div className="pt-8 border-t border-slate-300 grid grid-cols-2 gap-8 text-xs">
-                <div>
-                  <div className="border-b border-slate-400 w-48 mb-1" />
-                  <p className="font-bold text-slate-800">{surgeon}</p>
-                  <p className="text-slate-500">Operating Gynaecologist</p>
+                  {/* Discharge & OHSS Advice */}
+                  {adviceOnDischarge && (
+                    <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs">
+                      <span className="font-bold text-slate-900 block mb-1 uppercase tracking-wide text-[10.5px]">
+                        Post-Operative Orders &amp; Discharge Prophylaxis:
+                      </span>
+                      <p className="text-slate-700 leading-relaxed">{adviceOnDischarge}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right flex flex-col items-end">
-                  <div className="border-b border-slate-400 w-48 mb-1" />
-                  <p className="font-bold text-slate-800">Senior Embryologist</p>
-                  <p className="text-slate-500">Embryology Lab Witness</p>
-                </div>
-              </div>
+              </A4Sheet>
             </div>
           )}
         </div>

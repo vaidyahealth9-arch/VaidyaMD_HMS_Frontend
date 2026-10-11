@@ -220,9 +220,17 @@ export function isScanName(name?: string | null): boolean {
 export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
   const items: PlanTimelineItem[] = [];
 
-  (days || []).forEach((day, dayIdx) => {
-    const dayNumber = day.day_number || dayIdx + 1;
-    const stimDayNumber = day.stim_day_number || day.cycle_day_offset || dayNumber;
+  // Sort days strictly chronologically by date or day_number
+  const sortedDays = [...(days || [])].sort((a, b) => {
+    if (a.date && b.date) {
+      return a.date.localeCompare(b.date);
+    }
+    return (a.day_number || 0) - (b.day_number || 0);
+  });
+
+  sortedDays.forEach((day, dayIdx) => {
+    const dayNumber = dayIdx + 1; // Strict 1-indexed consecutive day order
+    const stimDayNumber = day.stim_day_number;
     const date = day.date || '';
     const displayDate = day.display_date || date;
     const dayOfWeek = day.day_of_week || '';
@@ -255,13 +263,33 @@ export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
     }
 
     // 2. Clinical Procedures first (OPU, ET, IUI, Cyst Aspiration, PESA/TESA, etc.)
+    const isSimilarProc = (p1: string, p2: string) => {
+      const a = p1.toLowerCase().trim();
+      const b = p2.toLowerCase().trim();
+      if (a === b) return true;
+      if ((a.includes('opu') || a.includes('retrieval') || a.includes('egg collection')) &&
+          (b.includes('opu') || b.includes('retrieval') || b.includes('egg collection'))) return true;
+      if (a.includes('transfer') && b.includes('transfer')) return true;
+      if (a.includes('iui') && b.includes('iui')) return true;
+      return false;
+    };
+
+    const isSimilarScanName = (s1: string, s2: string) => {
+      const a = s1.toLowerCase().trim();
+      const b = s2.toLowerCase().trim();
+      if (a === b) return true;
+      if (a.includes('baseline') && b.includes('baseline')) return true;
+      if (a.includes('trigger') && b.includes('trigger')) return true;
+      return false;
+    };
+
     const procList: string[] = [];
     if (Array.isArray(day.procedures) && day.procedures.length > 0) {
       day.procedures.forEach((p: string) => {
-        if (p && !procList.includes(p)) procList.push(p);
+        if (p && !procList.some((existing) => isSimilarProc(existing, p))) procList.push(p);
       });
     }
-    if (day.milestone && isProcedureName(day.milestone) && !procList.includes(day.milestone)) {
+    if (day.milestone && isProcedureName(day.milestone) && !procList.some((existing) => isSimilarProc(existing, day.milestone))) {
       procList.push(day.milestone);
     }
 
@@ -272,11 +300,11 @@ export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
       day.scans.forEach((s: string) => {
         if (!s) return;
         // If s was mistakenly added to scans but is a procedure, route to procList instead
-        if (isProcedureName(s) || procList.includes(s)) {
-          if (!procList.includes(s)) procList.push(s);
+        if (isProcedureName(s)) {
+          if (!procList.some((existing) => isSimilarProc(existing, s))) procList.push(s);
           return;
         }
-        if (!scanNames.includes(s)) scanNames.push(s);
+        if (!scanNames.some((existing) => isSimilarScanName(existing, s))) scanNames.push(s);
       });
     }
 
@@ -290,13 +318,13 @@ export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
       scanNames.push(defaultScanName);
     }
 
-    // Only push milestone to scanNames if it is genuinely a scan and NOT a procedure
+    // Only push milestone to scanNames if it is genuinely a scan, NOT a procedure, AND not already in scanNames
     if (
       day.milestone &&
       isScanName(day.milestone) &&
       !isProcedureName(day.milestone) &&
-      !procList.includes(day.milestone) &&
-      !scanNames.includes(day.milestone)
+      !procList.some((existing) => isSimilarProc(existing, day.milestone)) &&
+      !scanNames.some((existing) => isSimilarScanName(existing, day.milestone))
     ) {
       scanNames.push(day.milestone);
     }
@@ -502,18 +530,106 @@ export function createEmptyDraftCycle(patientId: string, attemptNumber: number =
   };
 }
 
+export function getProtocolActualDays(
+  proto?: any,
+  sentinelDates?: Record<string, any>,
+  treatmentType?: string
+): number {
+  let maxDay = 14;
+
+  if (proto?.rules && Array.isArray(proto.rules)) {
+    proto.rules.forEach((r: any) => {
+      const end = parseInt(r.day_end_offset, 10);
+      if (!isNaN(end) && end > maxDay) maxDay = end;
+    });
+  }
+
+  if (proto?.timeline_events && Array.isArray(proto.timeline_events)) {
+    proto.timeline_events.forEach((ev: any) => {
+      const off = parseInt(ev.day_offset, 10);
+      if (!isNaN(off) && off > maxDay) maxDay = off;
+    });
+  }
+
+  const startStr =
+    sentinelDates?.lmp_date ||
+    sentinelDates?.lmp_day1 ||
+    sentinelDates?.stim_start_date ||
+    sentinelDates?.stim_start ||
+    sentinelDates?.baseline_scan_date ||
+    sentinelDates?.baseline_scan;
+
+  if (startStr && sentinelDates?.beta_hcg_date) {
+    const d1 = new Date(startStr.split('T')[0]);
+    const d2 = new Date(sentinelDates.beta_hcg_date.split('T')[0]);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (diff > maxDay) maxDay = diff;
+    }
+  }
+
+  if (startStr && (sentinelDates?.et_datetime || sentinelDates?.et)) {
+    const d1 = new Date(startStr.split('T')[0]);
+    const etStr = (sentinelDates.et_datetime || sentinelDates.et).split('T')[0];
+    const d2 = new Date(etStr);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (diff + 10 > maxDay) maxDay = Math.min(diff + 10, 35);
+    }
+  }
+
+  const tUpper = (treatmentType || proto?.category || '').toUpperCase();
+  if ((tUpper.includes('IVF') || tUpper.includes('ICSI') || tUpper.includes('FET') || tUpper.includes('STIMULATION')) && maxDay < 28) {
+    maxDay = 28;
+  }
+
+  return Math.max(maxDay, 14);
+}
+
 export function generateDaysFromProtocol(
   proto: any,
   startDateStr?: string,
-  totalDays: number = 14
+  totalDays?: number,
+  sentinelDates?: Record<string, any>,
+  treatmentType?: string
 ): any[] {
   if (!proto) return [];
   const baseDate = new Date(startDateStr || new Date().toISOString().split('T')[0]);
   const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+  const actualDuration = totalDays || getProtocolActualDays(proto, sentinelDates, treatmentType);
+  const duration = Math.max(actualDuration, 14);
   const days: any[] = [];
-  const duration = Math.max(totalDays, 14);
+
+  // Helper to extract clean YYYY-MM-DD
+  const cleanDate = (v?: string) => (v ? v.split('T')[0] : '');
+
+  // Normalized sentinel date lookup
+  const sentinelMap = new Map<string, { milestone: string; scan?: string; procedure?: string; investigation?: string; notes?: string }>();
+  const lmpD = cleanDate(sentinelDates?.lmp_date || sentinelDates?.lmp_day1);
+  const baselineD = cleanDate(sentinelDates?.baseline_scan_date || sentinelDates?.baseline_scan);
+  const stimD = cleanDate(sentinelDates?.stim_start_date || sentinelDates?.stim_start);
+  const triggerD = cleanDate(sentinelDates?.trigger_datetime || sentinelDates?.trigger);
+  const opuD = cleanDate(sentinelDates?.opu_datetime || sentinelDates?.opu);
+  const lpsD = cleanDate(sentinelDates?.lps_start_date || sentinelDates?.p0_date);
+  const etD = cleanDate(sentinelDates?.et_datetime || sentinelDates?.et);
+  const betaD = cleanDate(sentinelDates?.beta_hcg_date);
+
+  if (lmpD) sentinelMap.set(lmpD, { milestone: 'Cycle Day 1 (LMP) 🩸', notes: 'Start of follicular phase' });
+  if (baselineD) sentinelMap.set(baselineD, { milestone: 'Baseline Follicular Scan 🔍', scan: 'Baseline TVS Scan', notes: 'Baseline antral follicle count & endometrial receptivity' });
+  if (stimD) {
+    if (stimD === baselineD) {
+      sentinelMap.set(stimD, { milestone: 'Stimulation Start & Baseline Scan 🔍', scan: 'Baseline TVS Scan', notes: 'Gonadotropin injections initiated' });
+    } else {
+      sentinelMap.set(stimD, { milestone: 'Stimulation Start ⚡', notes: 'Ovarian stimulation initiated (Stim Day 1)' });
+    }
+  }
+  if (triggerD) sentinelMap.set(triggerD, { milestone: 'Trigger Checkpoint (hCG / Agonist) ⚡', scan: 'Pre-Trigger Scan', notes: 'Precision trigger timing checkpoint' });
+  if (opuD) sentinelMap.set(opuD, { milestone: 'Oocyte Pick-Up (OPU / Egg Retrieval) 🧫', procedure: 'Oocyte Pick-Up (OPU / Egg Retrieval)', notes: 'Surgical oocyte retrieval under ultrasound guidance' });
+  if (lpsD) sentinelMap.set(lpsD, { milestone: 'Luteal Support Start (P0) 💊', notes: 'Progesterone priming start' });
+  if (etD) sentinelMap.set(etD, { milestone: 'Embryo Transfer (ET) 👶', procedure: 'Embryo Transfer (ET)', notes: 'Ultrasound guided intrauterine embryo transfer' });
+  if (betaD) sentinelMap.set(betaD, { milestone: 'Beta-hCG Pregnancy Test 🩸', investigation: 'Serum Beta-hCG (Total)', notes: 'Pregnancy outcome confirmation' });
 
   for (let dayNum = 1; dayNum <= duration; dayNum++) {
     const d = new Date(baseDate);
@@ -522,12 +638,29 @@ export function generateDaysFromProtocol(
     const displayDate = `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
     const isoDate = d.toISOString().split('T')[0];
 
+    // Calculate Stim Day Number relative to stimD
+    let stimDayNumber: number | undefined = dayNum;
+    let stimDayLabel: string | undefined = undefined;
+    if (stimD) {
+      const stimDateObj = new Date(stimD);
+      const diffDays = Math.round((d.getTime() - stimDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        stimDayNumber = undefined;
+        stimDayLabel = `CD ${dayNum}`;
+      } else {
+        stimDayNumber = diffDays + 1;
+        stimDayLabel = `Stim Day ${stimDayNumber}`;
+      }
+    }
+
     const medications: any[] = [];
     if (proto.rules && Array.isArray(proto.rules)) {
       proto.rules.forEach((rule: any) => {
         const start = rule.day_start_offset || 1;
         const end = rule.day_end_offset || duration;
-        if (dayNum >= start && dayNum <= end) {
+        // In protocols with stim_start anchor, rule offsets map to stimulation days
+        const activeOffset = rule.sentinel_anchor === 'stim_start' && stimDayNumber !== undefined ? stimDayNumber : dayNum;
+        if (activeOffset >= start && activeOffset <= end) {
           medications.push({
             drug_name: rule.drug_name,
             dose: rule.dose,
@@ -546,11 +679,23 @@ export function generateDaysFromProtocol(
     let milestone: string | undefined = undefined;
     let notes = '';
 
-    // Check if timeline_events defined in protocol from Master Settings
-    if (proto.timeline_events && Array.isArray(proto.timeline_events) && proto.timeline_events.length > 0) {
+    // Check if this date directly matches a sentinel milestone
+    const sentinelMatch = sentinelMap.get(isoDate);
+    if (sentinelMatch) {
+      milestone = sentinelMatch.milestone;
+      if (sentinelMatch.scan) scans.push(sentinelMatch.scan);
+      if (sentinelMatch.procedure) procedures.push(sentinelMatch.procedure);
+      if (sentinelMatch.investigation) investigations.push(sentinelMatch.investigation);
+      if (sentinelMatch.notes) notes = sentinelMatch.notes;
+    } else if (proto.timeline_events && Array.isArray(proto.timeline_events) && proto.timeline_events.length > 0) {
+      // Protocol template timeline events
       proto.timeline_events.forEach((ev: any) => {
-        const evOffset = parseInt(ev.day_offset) || 1;
+        const evOffset = parseInt(ev.day_offset, 10) || 1;
         if (evOffset === dayNum) {
+          // Do not add baseline scan if baseline scan is scheduled on a different date
+          if (ev.title.toLowerCase().includes('baseline') && baselineD && isoDate !== baselineD) {
+            return;
+          }
           if (ev.type === 'scan') {
             scans.push(ev.title);
             if (!milestone) milestone = ev.title;
@@ -566,17 +711,17 @@ export function generateDaysFromProtocol(
         }
       });
     } else {
-      // Default clinical checkpoints if no timeline events in template
-      if (dayNum === 1 || dayNum === 2) {
+      // Default clinical checkpoints only if no timeline events and no sentinel dates configured
+      if (!baselineD && (dayNum === 1 || dayNum === 2)) {
         scans.push('Baseline TVS Scan');
         milestone = 'Baseline Follicular Scan';
         notes = 'Baseline antral follicle count & endometrial receptivity';
-      } else if (dayNum === 6 || dayNum === 8 || dayNum === 10) {
+      } else if (!triggerD && (dayNum === 6 || dayNum === 8 || dayNum === 10)) {
         scans.push(`Follicular Scan Day ${dayNum}`);
         milestone = `Follicular Tracking (Day ${dayNum})`;
-      } else if (dayNum === 12) {
+      } else if (!triggerD && dayNum === 12) {
         milestone = 'Trigger Checkpoint (hCG / Agonist)';
-      } else if (dayNum === 14) {
+      } else if (!opuD && dayNum === 14) {
         procedures.push('Oocyte Pick-Up (OPU / Egg Retrieval)');
         milestone = 'Oocyte Pick-Up (OPU / Egg Retrieval)';
       }
@@ -584,7 +729,9 @@ export function generateDaysFromProtocol(
 
     days.push({
       day_number: dayNum,
-      stim_day_number: dayNum,
+      stim_day_number: stimDayNumber,
+      stim_day_label: stimDayLabel,
+      cycle_day_offset: dayNum,
       date: isoDate,
       display_date: displayDate,
       day_of_week: dayOfWeek,
@@ -601,6 +748,161 @@ export function generateDaysFromProtocol(
   }
 
   return days;
+}
+
+export function syncCalendarDaysWithSentinelDates(
+  existingDays: any[],
+  sentinelDates: Record<string, any>,
+  proto?: any,
+  treatmentType?: string
+): any[] {
+  if (!sentinelDates) return existingDays || [];
+
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const cleanDate = (v?: string) => (v ? v.split('T')[0] : '');
+
+  // 1. Determine anchor cycle start date: LMP Day 1 takes first priority as true Cycle Day 1
+  const anchorDateStr =
+    cleanDate(sentinelDates.lmp_date || sentinelDates.lmp_day1) ||
+    cleanDate(sentinelDates.baseline_scan_date || sentinelDates.baseline_scan) ||
+    cleanDate(sentinelDates.stim_start_date || sentinelDates.stim_start) ||
+    existingDays?.[0]?.date ||
+    new Date().toISOString().split('T')[0];
+
+  const baseDate = new Date(anchorDateStr);
+  const targetDaysCount = Math.max(
+    existingDays?.length || 0,
+    getProtocolActualDays(proto, sentinelDates, treatmentType)
+  );
+
+  // 2. Prepare milestone map
+  const milestoneMap = new Map<string, { milestone: string; scan?: string; procedure?: string; investigation?: string; notes?: string }>();
+  const lmpD = cleanDate(sentinelDates.lmp_date || sentinelDates.lmp_day1);
+  const baselineD = cleanDate(sentinelDates.baseline_scan_date || sentinelDates.baseline_scan);
+  const stimD = cleanDate(sentinelDates.stim_start_date || sentinelDates.stim_start);
+  const triggerD = cleanDate(sentinelDates.trigger_datetime || sentinelDates.trigger);
+  const opuD = cleanDate(sentinelDates.opu_datetime || sentinelDates.opu);
+  const lpsD = cleanDate(sentinelDates.lps_start_date || sentinelDates.p0_date);
+  const etD = cleanDate(sentinelDates.et_datetime || sentinelDates.et);
+  const betaD = cleanDate(sentinelDates.beta_hcg_date);
+
+  if (lmpD) milestoneMap.set(lmpD, { milestone: 'Cycle Day 1 (LMP) 🩸', notes: 'Start of follicular phase' });
+  if (baselineD) milestoneMap.set(baselineD, { milestone: 'Baseline Follicular Scan 🔍', scan: 'Baseline TVS Scan', notes: 'Baseline antral follicle count & endometrial receptivity' });
+  if (stimD) {
+    if (stimD === baselineD) {
+      milestoneMap.set(stimD, { milestone: 'Stimulation Start & Baseline Scan 🔍', scan: 'Baseline TVS Scan', notes: 'Gonadotropin injections initiated' });
+    } else {
+      milestoneMap.set(stimD, { milestone: 'Stimulation Start ⚡', notes: 'Ovarian stimulation initiated (Stim Day 1)' });
+    }
+  }
+  if (triggerD) milestoneMap.set(triggerD, { milestone: 'Trigger Checkpoint (hCG / Agonist) ⚡', scan: 'Pre-Trigger Scan', notes: 'Precision trigger timing checkpoint' });
+  if (opuD) milestoneMap.set(opuD, { milestone: 'Oocyte Pick-Up (OPU / Egg Retrieval) 🧫', procedure: 'Oocyte Pick-Up (OPU / Egg Retrieval)', notes: 'Surgical oocyte retrieval under ultrasound guidance' });
+  if (lpsD) milestoneMap.set(lpsD, { milestone: 'Luteal Support Start (P0) 💊', notes: 'Progesterone priming start' });
+  if (etD) milestoneMap.set(etD, { milestone: 'Embryo Transfer (ET) 👶', procedure: 'Embryo Transfer (ET)', notes: 'Ultrasound guided intrauterine embryo transfer' });
+  if (betaD) milestoneMap.set(betaD, { milestone: 'Beta-hCG Pregnancy Test 🩸', investigation: 'Serum Beta-hCG (Total)', notes: 'Pregnancy outcome confirmation' });
+
+  // 3. Known milestone keywords to clear when relocating milestones to new dates
+  const isDynamicMilestone = (m?: string) => {
+    if (!m) return false;
+    const lower = m.toLowerCase();
+    return lower.includes('trigger') || lower.includes('opu') || lower.includes('egg retrieval') ||
+      lower.includes('embryo transfer') || lower.includes('beta-hcg') || lower.includes('baseline') || lower.includes('stim');
+  };
+
+  const updatedDays: any[] = [];
+  for (let i = 1; i <= targetDaysCount; i++) {
+    const curDate = new Date(baseDate);
+    curDate.setDate(curDate.getDate() + (i - 1));
+    const isoDate = curDate.toISOString().split('T')[0];
+    const displayDate = `${String(curDate.getDate()).padStart(2, '0')}-${months[curDate.getMonth()]}-${curDate.getFullYear()}`;
+    const dayOfWeek = weekdays[curDate.getDay()];
+
+    const existingDay = existingDays?.find((d: any) => d.day_number === i) || {};
+
+    let milestone = existingDay.milestone;
+    let scans: string[] = Array.isArray(existingDay.scans) ? [...existingDay.scans] : [];
+    let procedures: string[] = Array.isArray(existingDay.procedures) ? [...existingDay.procedures] : [];
+    let investigations: string[] = Array.isArray(existingDay.investigations) ? [...existingDay.investigations] : [];
+    let notes = existingDay.notes || '';
+
+    // Clear old dynamic milestone if it was here previously and is now moved elsewhere
+    if (isDynamicMilestone(milestone) && !milestoneMap.has(isoDate)) {
+      milestone = undefined;
+    }
+
+    // Clean moved scans/procedures/investigations to prevent duplicate accumulation
+    if (baselineD && isoDate !== baselineD) {
+      scans = scans.filter((s) => !s.toLowerCase().includes('baseline'));
+    }
+    if (triggerD && isoDate !== triggerD) {
+      scans = scans.filter((s) => !s.toLowerCase().includes('pre-trigger') && !s.toLowerCase().includes('trigger scan'));
+    }
+    if (opuD && isoDate !== opuD) {
+      procedures = procedures.filter((p) => !p.toLowerCase().includes('opu') && !p.toLowerCase().includes('retrieval') && !p.toLowerCase().includes('egg collection'));
+    }
+    if (etD && isoDate !== etD) {
+      procedures = procedures.filter((p) => !p.toLowerCase().includes('transfer'));
+    }
+    if (betaD && isoDate !== betaD) {
+      investigations = investigations.filter((inv) => !inv.toLowerCase().includes('beta-hcg'));
+    }
+
+    // Apply milestone for this date if specified in sentinel milestones
+    const sentinelMatch = milestoneMap.get(isoDate);
+    if (sentinelMatch) {
+      milestone = sentinelMatch.milestone;
+      if (sentinelMatch.scan && !scans.some((s) => s.toLowerCase().includes(sentinelMatch.scan!.toLowerCase()))) {
+        scans.push(sentinelMatch.scan);
+      }
+      if (sentinelMatch.procedure && !procedures.some((p) => p.toLowerCase().includes(sentinelMatch.procedure!.toLowerCase()))) {
+        procedures.push(sentinelMatch.procedure);
+      }
+      if (sentinelMatch.investigation && !investigations.some((inv) => inv.toLowerCase().includes(sentinelMatch.investigation!.toLowerCase()))) {
+        investigations.push(sentinelMatch.investigation);
+      }
+      if (sentinelMatch.notes) notes = notes ? `${notes}; ${sentinelMatch.notes}` : sentinelMatch.notes;
+    }
+
+    // Deduplicate arrays
+    scans = Array.from(new Set(scans));
+    procedures = Array.from(new Set(procedures));
+    investigations = Array.from(new Set(investigations));
+
+    // Calculate Stim Day Number relative to stimD
+    let stimDayNumber: number | undefined = i;
+    let stimDayLabel: string | undefined = undefined;
+    if (stimD) {
+      const stimDateObj = new Date(stimD);
+      const diffDays = Math.round((curDate.getTime() - stimDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        stimDayNumber = undefined;
+        stimDayLabel = `CD ${i}`;
+      } else {
+        stimDayNumber = diffDays + 1;
+        stimDayLabel = `Stim Day ${stimDayNumber}`;
+      }
+    }
+
+    updatedDays.push({
+      ...existingDay,
+      day_number: i,
+      stim_day_number: stimDayNumber,
+      stim_day_label: stimDayLabel,
+      cycle_day_offset: i,
+      date: isoDate,
+      display_date: displayDate,
+      day_of_week: dayOfWeek,
+      milestone,
+      scans,
+      procedures,
+      investigations,
+      notes,
+      medications: existingDay.medications || [],
+    });
+  }
+
+  return updatedDays;
 }
 
 

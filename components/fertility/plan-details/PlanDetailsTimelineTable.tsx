@@ -216,10 +216,13 @@ export default function PlanDetailsTimelineTable({
                     {item.display_date || item.date}
                   </td>
 
-                  {/* Stim Day Number */}
+                  {/* Day Number */}
                   <td className="py-2 px-3 text-center">
-                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                      {item.stim_day_number}
+                    <span
+                      title={item.stim_day_number ? `Stim Day ${item.stim_day_number}` : `Day ${item.day_number}`}
+                      className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200"
+                    >
+                      {item.day_number}
                     </span>
                   </td>
 

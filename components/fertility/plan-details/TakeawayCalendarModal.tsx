@@ -50,7 +50,19 @@ export default function TakeawayCalendarModal({
   const effectiveModality = cycle?.treatment_type || 'Controlled Ovarian Stimulation';
 
   // 1. Build calendar cells starting from Day 1's actual weekday (zero leading waste)
-  const sortedDays = [...(days || [])].sort((a, b) => (a.day_number || 0) - (b.day_number || 0));
+  // Deduplicate days by date or day_number to avoid phantom extra rows
+  const uniqueDaysMap = new Map<string, any>();
+  (days || []).forEach((d) => {
+    const key = d.date || `day-${d.day_number}`;
+    if (!uniqueDaysMap.has(key)) {
+      uniqueDaysMap.set(key, d);
+    }
+  });
+
+  const sortedDays = Array.from(uniqueDaysMap.values()).sort((a, b) => {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    return (a.day_number || 0) - (b.day_number || 0);
+  });
 
   const weekdaysFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const weekdaysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -96,15 +108,114 @@ export default function TakeawayCalendarModal({
     calendarRows.push(cells.slice(i, i + 7));
   }
 
-  // Group rows into pages:
-  // Up to 4 rows (28 days): FIT ON 1 SINGLE LANDSCAPE PAGE!
-  // > 4 rows (> 28 days, e.g. 35 days): chunk 3 rows per page
+  // Dynamic page chunking based on content density & available A4 landscape vertical height
+  const estimateRowHeight = (row: CalendarCell[]): number => {
+    let maxCellH = 32;
+    for (const cell of row) {
+      if (!cell.day) continue;
+      const d = cell.day;
+      let h = 20; // Date & Stim Day header
+
+      // Blood / Lab Investigations
+      let invCount = 0;
+      if (d.e2_pgml) invCount++;
+      if (d.lh_miu) invCount++;
+      if (d.p4_ngml) invCount++;
+      if (Array.isArray(d.investigations)) {
+        invCount += d.investigations.filter(
+          (inv: string) =>
+            !inv.toLowerCase().includes('estradiol') &&
+            !inv.toLowerCase().includes('luteinising') &&
+            !inv.toLowerCase().includes('progesterone')
+        ).length;
+      }
+      h += invCount * 9;
+
+      // Scans & Folliculometry
+      if (
+        d.milestone?.toLowerCase().includes('scan') ||
+        d.milestone?.toLowerCase().includes('tracking') ||
+        d.milestone?.toLowerCase().includes('baseline')
+      ) {
+        h += 10;
+      }
+      if (d.endometrium_mm || d.right_follicles || d.left_follicles) {
+        h += 16;
+      }
+
+      // Scheduled Medications
+      if (Array.isArray(d.medications) && d.medications.length > 0) {
+        h += d.medications.length * 11;
+      }
+
+      // Clinical Procedures
+      const isOpu =
+        d.milestone?.toLowerCase().includes('opu') ||
+        d.milestone?.toLowerCase().includes('collection') ||
+        (Array.isArray(d.procedures) &&
+          d.procedures.some(
+            (p: string) =>
+              p.toLowerCase().includes('opu') ||
+              p.toLowerCase().includes('collection') ||
+              p.toLowerCase().includes('retrieval')
+          ));
+      if ((Array.isArray(d.procedures) && d.procedures.length > 0) || isOpu) {
+        h += 14;
+      }
+
+      // 1 fontline breathing cushion
+      h += 8;
+
+      if (h > maxCellH) {
+        maxCellH = h;
+      }
+    }
+    return maxCellH;
+  };
+
+  const THEAD_HEIGHT = 20;
+  const PAGE_HEIGHT_BUDGET = 470; // safe budget for table area on A4 landscape (total available is ~520px)
+
   const pages: CalendarCell[][][] = [];
-  if (calendarRows.length <= 4) {
+  const rowHeights = calendarRows.map(estimateRowHeight);
+  const totalPlanHeight = rowHeights.reduce((sum, h) => sum + h, 0) + THEAD_HEIGHT;
+
+  // If all rows can fit on 1 single page without spilling over, keep them together on 1 page!
+  // This allows 5 rows (e.g. 29-35 days) or even 6 lighter rows to comfortably sit on 1 page.
+  if (calendarRows.length <= 6 && totalPlanHeight <= 490) {
     pages.push(calendarRows);
   } else {
-    for (let i = 0; i < calendarRows.length; i += 3) {
-      pages.push(calendarRows.slice(i, i + 3));
+    let currentPageRows: CalendarCell[][] = [];
+    let currentHeight = THEAD_HEIGHT;
+
+    for (let i = 0; i < calendarRows.length; i++) {
+      const row = calendarRows[i];
+      const rowH = rowHeights[i];
+      const remainingRows = calendarRows.length - i;
+
+      // If only 1 row remains and adding it fits within 490px, absorb it into current page
+      // to avoid leaving an awkward 1-row second page!
+      const canAbsorbLastRow =
+        remainingRows === 1 &&
+        currentHeight + rowH <= 490 &&
+        currentPageRows.length < 6;
+
+      if (
+        currentPageRows.length > 0 &&
+        !canAbsorbLastRow &&
+        (currentHeight + rowH > PAGE_HEIGHT_BUDGET || currentPageRows.length >= 5)
+      ) {
+        pages.push(currentPageRows);
+        currentPageRows = [row];
+        currentHeight = THEAD_HEIGHT + rowH;
+      } else {
+        currentPageRows.push(row);
+        currentHeight += rowH;
+      }
+    }
+
+    if (currentPageRows.length > 0) {
+      pages.push(currentPageRows);
     }
   }
 
@@ -212,24 +323,28 @@ export default function TakeawayCalendarModal({
               .a4-print-sheet.a4-landscape-page {
                 width: 297mm !important;
                 max-width: 297mm !important;
-                min-height: 209mm !important;
-                height: 209mm !important;
-                max-height: 209mm !important;
+                min-height: 208mm !important;
+                height: auto !important;
+                max-height: 208.5mm !important;
                 margin: 0 auto !important;
                 padding: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
                 border-radius: 0 !important;
-                page-break-after: always !important;
-                break-after: page !important;
                 box-sizing: border-box !important;
                 overflow: hidden !important; /* Suppresses subpixel rounding extra blank page */
               }
+              .a4-print-sheet.a4-landscape-page:not(:last-child):not(:last-of-type) {
+                page-break-after: always !important;
+                break-after: page !important;
+              }
               /* Suppress trailing empty page on last sheet */
               .a4-print-sheet.a4-landscape-page:last-child,
-              .a4-print-sheet.a4-landscape-page:last-of-type {
-                page-break-after: auto !important;
-                break-after: auto !important;
+              .a4-print-sheet.a4-landscape-page:last-of-type,
+              .a4-print-sheet.a4-landscape-page:only-child,
+              .a4-print-sheet.a4-landscape-page:only-of-type {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
               }
               table.print-header-table,
               table.print-header-table td,
@@ -256,23 +371,6 @@ export default function TakeawayCalendarModal({
           {pages.map((weeksForPage, pageIdx) => {
             const rowsOnThisPage = weeksForPage.length;
             const isCompact = rowsOnThisPage >= 4;
-            const cellHeightClass =
-              rowsOnThisPage >= 4
-                ? 'min-h-[72px] h-[72px]'
-                : rowsOnThisPage === 3
-                ? 'min-h-[105px] h-[105px]'
-                : rowsOnThisPage === 2
-                ? 'min-h-[145px] h-[145px]'
-                : 'min-h-[180px] h-[180px]';
-
-            const cellInnerMinHeight =
-              rowsOnThisPage >= 4
-                ? 'min-h-[64px]'
-                : rowsOnThisPage === 3
-                ? 'min-h-[96px]'
-                : rowsOnThisPage === 2
-                ? 'min-h-[135px]'
-                : 'min-h-[170px]';
 
             return (
               <A4Sheet
@@ -403,35 +501,34 @@ export default function TakeawayCalendarModal({
                   />
                 }
               >
-                {/* 7-Column Calendar Grid Tables — starting on Day 1's weekday */}
-                <div className={`w-full px-6 sm:px-8 print:px-8 ${rowsOnThisPage >= 4 ? 'space-y-1' : 'space-y-2.5'} my-auto flex-1 flex flex-col justify-between py-1`}>
-                  {weeksForPage.map((week, wIdx) => (
-                    <table
-                      key={`week-${wIdx}`}
-                      className="w-full border-collapse border border-black table-fixed text-[8px] print:text-[7.5px] print-calendar-table"
-                      style={{ borderCollapse: 'collapse', border: '1.5px solid #000000' }}
-                    >
-                      <thead>
-                        <tr className="bg-slate-100 text-black border-b border-black">
-                          {columnHeaders.map((colName, cIdx) => (
-                            <th
-                              key={cIdx}
-                              className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900 text-[8.5px] print:text-[8px] uppercase tracking-wide"
-                            >
-                              {colName}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
+                {/* 7-Column Calendar Grid Table — Single Unified Table per Page */}
+                <div className="w-full px-6 sm:px-8 print:px-8 my-auto flex-1 flex flex-col justify-start py-1">
+                  <table
+                    className="w-full border-collapse border border-black table-fixed text-[8px] print:text-[7.5px] print-calendar-table"
+                    style={{ borderCollapse: 'collapse', border: '1.5px solid #000000' }}
+                  >
+                    <thead>
+                      <tr className="bg-slate-100 text-black border-b border-black">
+                        {columnHeaders.map((colName, cIdx) => (
+                          <th
+                            key={cIdx}
+                            className="border border-black py-0.5 px-1 text-center font-bold w-[14.28%] text-slate-900 text-[8.5px] print:text-[8px] uppercase tracking-wide"
+                          >
+                            {colName}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeksForPage.map((week, wIdx) => (
+                        <tr key={`week-${wIdx}`}>
                           {week.map((cell, cIdx) => {
                             const isLeftEdge = cIdx === 0;
                             if (cell.isPadding || !cell.day) {
                               return (
                                 <td
                                   key={`pad-${cIdx}`}
-                                  className={`border border-black bg-slate-50/40 p-1.5 align-top box-border ${cellHeightClass}`}
+                                  className="border border-black bg-slate-50/40 p-1 align-top box-border h-auto"
                                 >
                                   {/* Blank padding cell */}
                                 </td>
@@ -454,8 +551,12 @@ export default function TakeawayCalendarModal({
                             return (
                               <td
                                 key={`day-${day.day_number}-${cIdx}`}
-                                className={`border border-black align-top text-black box-border ${cellHeightClass} ${
-                                  isCompact ? 'p-0.5' : isLeftEdge ? 'pl-2 pr-1 py-1' : 'p-1'
+                                className={`border border-black align-top text-black box-border h-auto ${
+                                  isCompact
+                                    ? 'px-1 pt-1 pb-2 print:px-1 print:pt-0.5 print:pb-2'
+                                    : isLeftEdge
+                                    ? 'pl-1.5 pr-1 pt-1 pb-3 print:pb-3'
+                                    : 'px-1 pt-1 pb-3 print:pb-3'
                                 } ${
                                   isTrigger
                                     ? 'bg-amber-50/40'
@@ -464,7 +565,7 @@ export default function TakeawayCalendarModal({
                                     : 'bg-white'
                                 }`}
                               >
-                                <div className={`flex flex-col justify-between h-full pb-0.5 ${cellInnerMinHeight}`}>
+                                <div className="flex flex-col justify-between h-full min-h-[38px] pb-0.5">
                                   <div>
                                     {/* Cell Header: Date (Day X · Stim Y) */}
                                     <div className="font-extrabold text-[8.5px] border-b border-black pb-0.5 mb-1 text-slate-900 flex items-center justify-between whitespace-nowrap overflow-visible">
@@ -545,9 +646,9 @@ export default function TakeawayCalendarModal({
                             );
                           })}
                         </tr>
-                      </tbody>
-                    </table>
-                  ))}
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </A4Sheet>
             );

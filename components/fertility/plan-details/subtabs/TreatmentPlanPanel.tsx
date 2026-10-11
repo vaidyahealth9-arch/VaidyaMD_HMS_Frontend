@@ -5,7 +5,7 @@ import { Calendar, Save, Check, Clock, Stethoscope, AlertCircle, Loader2 } from 
 import { TreatmentCycleRecord } from '../types';
 import { treatmentCyclesApi, protocolsApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
-import { generateDaysFromProtocol } from '../utils';
+import { generateDaysFromProtocol, syncCalendarDaysWithSentinelDates, getProtocolActualDays } from '../utils';
 
 interface TreatmentPlanPanelProps {
   cycle: TreatmentCycleRecord;
@@ -139,35 +139,44 @@ export default function TreatmentPlanPanel({ cycle, onUpdateCycle, onNavigateNex
   const handleSave = async (andNext = false) => {
     const selectedProto = dbProtocols.find((p) => p.name === protocolName);
     const protocolTemplateId = selectedProto?.id || (cycle as any).protocol_template_id;
+    const cleanDate = (v?: string) => (v ? v.split('T')[0] : '');
 
-    // Auto-generate medication calendar if empty or if protocol changed
+    const sentinelDatesPayload = {
+      protocol_name: protocolName,
+      protocol_notes: protocolNotes,
+      lmp_date: lmpDate,
+      baseline_scan_date: baselineScanDate,
+      stim_start_date: stimStartDate,
+      trigger_datetime: triggerDatetime,
+      opu_datetime: opuDatetime,
+      lps_start_date: lpsStartDate,
+      et_datetime: etDatetime,
+      beta_hcg_date: betaHcgDate,
+      // backwards compatibility aliases
+      lmp_day1: lmpDate,
+      baseline_scan: baselineScanDate,
+      stim_start: stimStartDate,
+      trigger: cleanDate(triggerDatetime) || triggerDatetime,
+      opu: cleanDate(opuDatetime) || opuDatetime,
+      et: cleanDate(etDatetime) || etDatetime,
+      p0_date: lpsStartDate,
+    };
+
+    const actualSpan = getProtocolActualDays(selectedProto, sentinelDatesPayload, cycle.treatment_type);
+
+    // Auto-generate medication calendar if empty or if protocol changed, OR sync existing days with manual milestone edits
     let medCalendar = cycle.medication_calendar;
     if (selectedProto && (!medCalendar || medCalendar.length === 0 || protocolName !== currentDates.protocol_name)) {
-      const startRef = stimStartDate || baselineScanDate || lmpDate || cycle.start_date || new Date().toISOString().split('T')[0];
-      medCalendar = generateDaysFromProtocol(selectedProto, startRef, 14);
+      const startRef = lmpDate || stimStartDate || baselineScanDate || cycle.start_date || new Date().toISOString().split('T')[0];
+      medCalendar = generateDaysFromProtocol(selectedProto, startRef, actualSpan, sentinelDatesPayload, cycle.treatment_type);
+    } else if (medCalendar && medCalendar.length > 0) {
+      // Sync manual milestone date changes with calendar days!
+      medCalendar = syncCalendarDaysWithSentinelDates(medCalendar, sentinelDatesPayload, selectedProto, cycle.treatment_type);
     }
 
     const payload: any = {
       protocol_template_id: protocolTemplateId || undefined,
-      sentinel_dates: {
-        protocol_name: protocolName,
-        protocol_notes: protocolNotes,
-        lmp_date: lmpDate,
-        baseline_scan_date: baselineScanDate,
-        stim_start_date: stimStartDate,
-        trigger_datetime: triggerDatetime,
-        opu_datetime: opuDatetime,
-        lps_start_date: lpsStartDate,
-        et_datetime: etDatetime,
-        beta_hcg_date: betaHcgDate,
-        // backwards compatibility aliases
-        lmp_day1: lmpDate,
-        baseline_scan: baselineScanDate,
-        stim_start: stimStartDate,
-        trigger: triggerDatetime,
-        opu: opuDatetime,
-        et: etDatetime,
-      },
+      sentinel_dates: sentinelDatesPayload,
       medication_calendar: medCalendar || [],
     };
 

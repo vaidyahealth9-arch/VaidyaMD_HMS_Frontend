@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { appointmentsApi, patientsApi, treatmentCyclesApi, billingApi } from '@/lib/api';
+import { appointmentsApi, patientsApi, treatmentCyclesApi, billingApi, analyticsApi } from '@/lib/api';
 import { formatDateTime, statusColors, statusLabels, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import PageLayout from '@/components/common/PageLayout';
 import { CalendarDays, Users, Activity, CreditCard, UserPlus, Calendar, Receipt, Microscope } from 'lucide-react';
 import { Badge } from '@/shared/ui/badge';
+import MiniSparkline from '@/components/dashboard/MiniSparkline';
+import WeeklyPulseWidget from '@/components/dashboard/WeeklyPulseWidget';
 
 export default function DashboardPage() {
   const { user, activeRole } = useAuth();
@@ -16,11 +18,21 @@ export default function DashboardPage() {
   const [activeCycleCount, setActiveCycleCount] = useState(0);
   const [pendingDuesTotal, setPendingDuesTotal] = useState(0);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
+  const [hospitalPulse, setHospitalPulse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPulseLoading, setIsPulseLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
+    setIsPulseLoading(true);
     const today = new Date().toISOString().split('T')[0];
+
+    analyticsApi
+      .getHospitalPulse(7)
+      .then((data: any) => setHospitalPulse(data))
+      .catch(() => setHospitalPulse(null))
+      .finally(() => setIsPulseLoading(false));
+
     Promise.all([
       appointmentsApi.list({ date_filter: today }).catch(() => ({ appointments: [] })),
       patientsApi.list({ per_page: 100 }).catch(() => ({ patients: [], total: 0 })),
@@ -46,24 +58,36 @@ export default function DashboardPage() {
       sub: appointments.length > 0
         ? `${appointments.filter(a => a.status === 'in_progress').length} in consultation`
         : 'No appointments today',
+      sparkline: hospitalPulse?.sparklines?.appointments || [0, 0, 0, 0, 0, 0, appointments.length],
+      sparkColor: '#4f46e5',
+      delta: hospitalPulse?.summary?.deltas?.appointments,
     },
     {
       label: 'Registered Patients',
       value: patientCount.toString(),
       icon: Users,
-      sub: patientCount > 0 ? `${patientCount} active files` : 'No records yet',
+      sub: patientCount > 0 ? `${patientCount} active records` : 'No records yet',
+      sparkline: hospitalPulse?.sparklines?.patients || [0, 0, 0, 0, 0, 0, patientCount],
+      sparkColor: '#06b6d4',
+      delta: hospitalPulse?.summary?.deltas?.patients,
     },
     {
       label: 'Active IVF / ART Cycles',
       value: activeCycleCount.toString(),
       icon: Activity,
       sub: activeCycleCount > 0 ? `${activeCycleCount} running protocols` : 'No active cycles',
+      sparkline: hospitalPulse?.sparklines?.active_cycles || [0, 0, 0, 0, 0, 0, activeCycleCount],
+      sparkColor: '#8b5cf6',
+      delta: activeCycleCount > 0 ? `${activeCycleCount} active` : undefined,
     },
     {
       label: 'Pending Dues',
       value: pendingDuesTotal > 0 ? `₹${pendingDuesTotal.toLocaleString()}` : '₹0',
       icon: CreditCard,
       sub: pendingInvoicesCount > 0 ? `${pendingInvoicesCount} invoices outstanding` : 'All invoices cleared',
+      sparkline: hospitalPulse?.sparklines?.billed || [0, 0, 0, 0, 0, 0, pendingDuesTotal],
+      sparkColor: '#10b981',
+      delta: hospitalPulse?.summary?.deltas?.revenue,
     },
   ];
 
@@ -122,14 +146,14 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards with Sparklines */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.label}
-              className="rounded-lg p-4 space-y-3"
+              className="rounded-lg p-4 space-y-2"
               style={{ background: 'white', border: '1px solid rgb(var(--clr-border))', boxShadow: 'var(--shadow-card)' }}
             >
               <div className="flex items-center justify-between">
@@ -137,18 +161,37 @@ export default function DashboardPage() {
                   {card.label}
                 </p>
                 <div className="w-7 h-7 rounded-md flex items-center justify-center"
-                  style={{ background: 'rgb(var(--clr-primary-light))', }}>
+                  style={{ background: 'rgb(var(--clr-primary-light))' }}>
                   <Icon className="w-4 h-4" style={{ color: 'rgb(var(--clr-primary))' }} strokeWidth={1.75} />
                 </div>
               </div>
-              <p className="text-2xl font-semibold font-mono" style={{ color: 'rgb(var(--clr-text))' }}>
-                {card.value}
-              </p>
-              <p className="text-[11px]" style={{ color: 'rgb(var(--clr-text-muted))' }}>{card.sub}</p>
+              <div className="flex items-end justify-between pt-1">
+                <div>
+                  <p className="text-2xl font-semibold font-mono" style={{ color: 'rgb(var(--clr-text))' }}>
+                    {card.value}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {card.delta && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        card.delta.startsWith('-') ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+                      }`}>
+                        {card.delta}
+                      </span>
+                    )}
+                    <p className="text-[11px]" style={{ color: 'rgb(var(--clr-text-muted))' }}>{card.sub}</p>
+                  </div>
+                </div>
+                <div className="pb-0.5 pl-2">
+                  <MiniSparkline data={card.sparkline} color={card.sparkColor} width={72} height={26} />
+                </div>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* Weekly Hospital Pulse Analytics Widget */}
+      <WeeklyPulseWidget data={hospitalPulse} isLoading={isPulseLoading} />
 
       {/* Today's Schedule */}
       <div className="rounded-lg overflow-hidden" style={{ background: 'white', border: '1px solid rgb(var(--clr-border))', boxShadow: 'var(--shadow-card)' }}>

@@ -135,7 +135,9 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
       onClose={onClose}
       title={`Invoice Preview — ${invoice.invoice_number}`}
       subtitle="Review before printing or sending to patient"
-      maxWidth={layout === 'thermal' ? 'max-w-md' : layout === 'a5' ? 'max-w-xl' : 'max-w-2xl'}
+      pageSize={layout === 'a5' ? 'a5' : 'a4'}
+      printLabel={layout === 'a5' ? 'Print (A5)' : layout === 'thermal' ? 'Print (POS Slip)' : 'Print (A4)'}
+      maxWidth={layout === 'thermal' ? 'max-w-md' : layout === 'a5' ? 'max-w-3xl' : 'max-w-2xl'}
     >
       {({ hideHeader }: { hideHeader: boolean }) => (
         <div className="space-y-3">
@@ -143,7 +145,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
             <style jsx global>{`
               @media print {
                 @page {
-                  size: A5 portrait !important;
+                  size: A5 landscape !important;
                   margin: 0 !important;
                 }
               }
@@ -177,7 +179,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                   layout === 'a5' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                📋 A5 Slip (Half-Sheet)
+                📋 A5 Slip (Landscape)
               </button>
               <button
                 type="button"
@@ -328,12 +330,12 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                 />
               }
             >
-              <div className={`py-2.5 flex-1 flex flex-col justify-between ${layout === 'a5' ? 'px-4 sm:px-6 print:px-[8mm] space-y-2.5 text-[11px]' : 'px-6 sm:px-8 print:px-[12mm] space-y-4'}`}>
-                <div className={layout === 'a5' ? 'space-y-2' : 'space-y-4'}>
-                  <div className="grid grid-cols-2 gap-3 p-2.5 rounded-md" style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
+              <div className={`flex-1 flex flex-col justify-between ${layout === 'a5' ? 'py-1 px-4 print:px-[6mm] space-y-1.5 text-[10px]' : 'py-2.5 px-6 sm:px-8 print:px-[12mm] space-y-4'}`}>
+                <div className={layout === 'a5' ? 'space-y-1.5' : 'space-y-4'}>
+                  <div className={`grid grid-cols-2 gap-3 rounded-md ${layout === 'a5' ? 'p-1.5 text-[9.5px]' : 'p-2.5'}`} style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#9ca3af' }}>Patient Information</p>
-                      <p className="font-semibold text-sm" style={{ color: '#111827' }}>{invoice.patient_name || 'Patient'}</p>
+                      <p className={`font-semibold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: '#111827' }}>{invoice.patient_name || 'Patient'}</p>
                       <p className="font-mono text-xs mt-0.5" style={{ color: '#4b5563' }}>VID / MRN: {invoice.patient_vid || invoice.patient_mrn || '—'}</p>
                       {invoice.reason_for_attendance && (
                         <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>
@@ -343,7 +345,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                     </div>
                     <div className="text-right">
                       <p className="text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#9ca3af' }}>Invoice Details</p>
-                      <p className="font-mono font-bold text-sm" style={{ color: '#0B4F6C' }}>{invoice.invoice_number}</p>
+                      <p className={`font-mono font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: '#0B4F6C' }}>{invoice.invoice_number}</p>
                       <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>Date: {formatDate(invoice.created_at)}</p>
                       <p className="text-[10px]" style={{ color: '#4b5563' }}>
                         Dept / Source: <strong style={{ color: '#111827' }}>{invoice.appointment_source || 'OPD'}</strong>
@@ -360,26 +362,26 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                   <table className="w-full text-left text-xs border-collapse print-table">
                     <thead>
                       <tr style={{ background: '#F7F8FA', borderBottom: '1px solid #E3E8EE', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', fontWeight: 600 }}>
-                        <th className={layout === 'a5' ? 'p-1.5' : 'p-2.5'}>Item / Procedure Description</th>
-                        <th className={`text-center ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`}>Qty</th>
-                        <th className={`text-right ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`}>Unit Rate (₹)</th>
-                        <th className={`text-right ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`}>Total (₹)</th>
+                        <th className={layout === 'a5' ? 'p-1 text-[9px]' : 'p-2.5'}>Item / Procedure Description</th>
+                        <th className={`text-center ${layout === 'a5' ? 'p-1 text-[9px]' : 'p-2.5'}`}>Qty</th>
+                        <th className={`text-right ${layout === 'a5' ? 'p-1 text-[9px]' : 'p-2.5'}`}>Unit Rate (₹)</th>
+                        <th className={`text-right ${layout === 'a5' ? 'p-1 text-[9px]' : 'p-2.5'}`}>Total (₹)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {invoice.items?.map((it, i) => (
                         <tr key={i} style={{ borderBottom: '0.5px solid #f3f4f6' }}>
-                          <td className={`font-medium ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`} style={{ color: '#111827' }}>{it.description || it.item_name || 'Medication Dispensed'}</td>
-                          <td className={`text-center ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`} style={{ color: '#6b7280' }}>{it.quantity}</td>
-                          <td className={`text-right font-mono ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`} style={{ color: '#374151' }}>₹{getUnitPrice(it).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className={`text-right font-mono font-semibold ${layout === 'a5' ? 'p-1.5' : 'p-2.5'}`} style={{ color: '#111827' }}>₹{n(it.total).toLocaleString()}</td>
+                          <td className={`font-medium ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>{it.description || it.item_name || 'Medication Dispensed'}</td>
+                          <td className={`text-center ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#6b7280' }}>{it.quantity}</td>
+                          <td className={`text-right font-mono ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#374151' }}>₹{getUnitPrice(it).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className={`text-right font-mono font-semibold ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>₹{n(it.total).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
                   {/* Totals */}
-                  <div className="pt-3 space-y-1 text-xs" style={{ borderTop: '1px solid #e5e7eb' }}>
+                  <div className={`${layout === 'a5' ? 'pt-1.5 space-y-0.5 text-[9.5px]' : 'pt-3 space-y-1 text-xs'}`} style={{ borderTop: '1px solid #e5e7eb' }}>
                     <div className="flex justify-between" style={{ color: '#6b7280' }}>
                       <span>Subtotal / Gross Amount:</span>
                       <span className="font-mono font-medium">₹{n(invoice.subtotal || invoice.total_amount).toLocaleString()}</span>
@@ -390,7 +392,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                         <span className="font-mono">− ₹{n(invoice.discount).toLocaleString()}</span>
                       </div>
                     )}
-                    <div className="flex justify-between" style={{ color: '#9ca3af', fontSize: '10px' }}>
+                    <div className="flex justify-between" style={{ color: '#9ca3af', fontSize: layout === 'a5' ? '8.5px' : '10px' }}>
                       <span>GST (Healthcare Services — Exempted):</span>
                       <span className="font-mono">₹0.00 (0%)</span>
                     </div>
@@ -400,7 +402,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                         <span className="font-mono">− ₹{n(invoice.wallet_amount_used).toLocaleString()}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-sm font-bold pt-2" style={{ borderTop: '1px solid #d1d5db', color: '#111827' }}>
+                    <div className={`flex justify-between font-bold pt-1 ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ borderTop: '1px solid #d1d5db', color: '#111827' }}>
                       <span>Net Total Billable:</span>
                       <span className="font-mono" style={{ color: '#0B4F6C' }}>₹{n(invoice.total_amount).toLocaleString()}</span>
                     </div>
@@ -408,7 +410,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                       <span>Total Amount Paid {invoice.payment_method ? `(${invoice.payment_method})` : ''}:</span>
                       <span className="font-mono">₹{paid.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between font-bold text-sm" style={{ color: due > 0 ? '#B91C1C' : '#0D7A55' }}>
+                    <div className={`flex justify-between font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: due > 0 ? '#B91C1C' : '#0D7A55' }}>
                       <span>Balance Due:</span>
                       <span className="font-mono">₹{due.toLocaleString()}</span>
                     </div>
@@ -416,10 +418,16 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                 </div>
 
                 {/* Terms & Notes */}
-                <div className="pt-3 pb-1 text-[10px] text-gray-500 border-t border-gray-200">
-                  <p className="font-semibold text-gray-700 mb-0.5">Terms & Conditions:</p>
-                  <p>1. Payments received are non-refundable.</p>
-                  <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
+                <div className={`border-t border-gray-200 text-gray-500 ${layout === 'a5' ? 'pt-1 pb-0 text-[8px]' : 'pt-3 pb-1 text-[10px]'}`}>
+                  {layout === 'a5' ? (
+                    <p><strong>Terms:</strong> Payments non-refundable · Healthcare services GST exempted under Notification No. 12/2017-CT(R).</p>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-gray-700 mb-0.5">Terms & Conditions:</p>
+                      <p>1. Payments received are non-refundable.</p>
+                      <p>2. Healthcare services are exempted from GST under Notification No. 12/2017-CT(R).</p>
+                    </>
+                  )}
                 </div>
               </div>
             </A4Sheet>

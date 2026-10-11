@@ -45,7 +45,17 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: 'Unknown server error' }));
-    throw new ApiError(res.status, error.detail || 'Request failed');
+    let errorMsg = 'Request failed';
+    if (typeof error.detail === 'string') {
+      errorMsg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      errorMsg = error.detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join('; ');
+    } else if (error.detail && typeof error.detail === 'object') {
+      errorMsg = error.detail.msg || error.detail.message || JSON.stringify(error.detail);
+    } else if (error.message) {
+      errorMsg = typeof error.message === 'string' ? error.message : JSON.stringify(error.message);
+    }
+    throw new ApiError(res.status, errorMsg);
   }
 
   return res.json();
@@ -156,3 +166,8 @@ export { documentsApi } from '@/features/documents/api';
 // 13. Pre-ART Clinical Counseling
 // ==========================================
 export { counselingApi, type CounselingNote } from '@/features/counseling/api';
+
+// ==========================================
+// 14. CRM & Telecaller Dialer
+// ==========================================
+export { crmApi } from '@/features/crm/api';

@@ -16,7 +16,7 @@ export interface A4SheetProps {
 
 /**
  * A4Sheet — Self-contained authentic A4 / A5 page component with strict flex layout.
- * • Dimensions: 210mm x 297mm (A4 portrait), 297mm x 210mm (A4 landscape), or 148mm x 210mm (A5) with paper drop-shadow.
+ * • Dimensions: 210mm x 297mm (A4 portrait), 297mm x 210mm (A4 landscape), or 210mm x 148mm (A5 landscape) with paper drop-shadow.
  * • Strict flexbox: Header at top (shrink-0), Content in middle with flex-1, Footer pinned at bottom (mt-auto).
  * • Zero margin @page enables full-bleed stripes touching paper edges.
  */

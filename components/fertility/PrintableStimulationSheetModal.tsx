@@ -210,14 +210,14 @@ export default function PrintableStimulationSheetModal({
                         </div>
                       )}
 
-                      {/* 7-Day Weeks */}
-                      <div className="space-y-3">
+                      {/* 7-Day Weeks (Stacked without dead space between rows; row height dynamically adjusts to content) */}
+                      <div className="border border-slate-300 rounded-lg overflow-hidden divide-y divide-slate-300 bg-white">
                         {weeksForPage.map((week, wIdx) => {
-                          const weekNumber = pageIdx * 2 + wIdx + 1;
+                          const weekNumber = Math.floor(((week[0]?.day_number || 1) - 1) / 7) + 1;
                           return (
-                            <div key={wIdx} className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                            <div key={wIdx} className="bg-white">
                               {/* Week Header */}
-                              <div className="bg-slate-100 border-b border-slate-300 px-3 py-1 flex items-center justify-between text-[10px] font-bold text-slate-800">
+                              <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center justify-between text-[10px] font-bold text-slate-800">
                                 <span className="flex items-center gap-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
                                   <span>Week {weekNumber}</span>
@@ -245,7 +245,7 @@ export default function PrintableStimulationSheetModal({
                                   return (
                                     <div
                                       key={day.day_number}
-                                      className={`p-1.5 flex flex-col justify-between min-h-[140px] text-[8.5px] ${
+                                      className={`p-1.5 flex flex-col justify-between min-h-[50px] h-auto text-[8.5px] ${
                                         isTrigger
                                           ? 'bg-amber-50/60'
                                           : isOpu
@@ -256,7 +256,7 @@ export default function PrintableStimulationSheetModal({
                                       }`}
                                     >
                                       <div>
-                                        <div className="flex items-center justify-between border-b border-slate-200 pb-1 mb-1">
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-0.5 mb-1">
                                           <span className="font-extrabold text-slate-900 text-[9px]">
                                             Day {day.day_number}
                                           </span>
@@ -264,7 +264,7 @@ export default function PrintableStimulationSheetModal({
                                             {day.day_of_week?.slice(0, 3)}
                                           </span>
                                         </div>
-                                        <div className="text-[7.5px] text-slate-400 mb-1">
+                                        <div className="text-[7.5px] text-slate-400 mb-0.5">
                                           {day.display_date?.split(' ').slice(0, 2).join(' ')}
                                         </div>
 
@@ -291,49 +291,45 @@ export default function PrintableStimulationSheetModal({
                                                 </div>
                                               </div>
                                             ))
-                                          ) : (
-                                            <div className="text-slate-300 italic text-[7.5px] py-1 text-center">
+                                          ) : !hasScan ? (
+                                            <div className="text-slate-300 italic text-[7px] py-0.5 text-center">
                                               —
                                             </div>
-                                          )}
+                                          ) : null}
                                         </div>
                                       </div>
 
-                                      <div className="mt-1 pt-1 border-t border-slate-200 text-[7px] space-y-0.5">
-                                        {hasScan ? (
-                                          <>
-                                            {day.endometrium_mm && (
-                                              <div className="font-bold text-emerald-800 flex justify-between">
-                                                <span>Endo:</span>
-                                                <span>{day.endometrium_mm}mm</span>
-                                              </div>
-                                            )}
-                                            {(rFollicles.tokens.length > 0 || lFollicles.tokens.length > 0) && (
-                                              <div className="leading-tight text-slate-700">
-                                                {rFollicles.tokens.length > 0 && (
-                                                  <div className="truncate">
-                                                    <span className="font-bold text-rose-700">R:</span>{' '}
-                                                    {rFollicles.tokens.map((t: any) => `${t.mm}`).join(', ')}
-                                                  </div>
-                                                )}
-                                                {lFollicles.tokens.length > 0 && (
-                                                  <div className="truncate">
-                                                    <span className="font-bold text-rose-700">L:</span>{' '}
-                                                    {lFollicles.tokens.map((t: any) => `${t.mm}`).join(', ')}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                            {day.e2_pgml && (
-                                              <div className="text-amber-800 font-bold truncate">
-                                                E2: {day.e2_pgml} pg
-                                              </div>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <div className="text-slate-300 text-[7px] text-center">—</div>
-                                        )}
-                                      </div>
+                                      {hasScan && (
+                                        <div className="mt-1 pt-0.5 border-t border-slate-200 text-[7px] space-y-0.5">
+                                          {day.endometrium_mm && (
+                                            <div className="font-bold text-emerald-800 flex justify-between">
+                                              <span>Endo:</span>
+                                              <span>{day.endometrium_mm}mm</span>
+                                            </div>
+                                          )}
+                                          {(rFollicles.tokens.length > 0 || lFollicles.tokens.length > 0) && (
+                                            <div className="leading-tight text-slate-700">
+                                              {rFollicles.tokens.length > 0 && (
+                                                <div className="truncate">
+                                                  <span className="font-bold text-rose-700">R:</span>{' '}
+                                                  {rFollicles.tokens.map((t: any) => `${t.mm}`).join(', ')}
+                                                </div>
+                                              )}
+                                              {lFollicles.tokens.length > 0 && (
+                                                <div className="truncate">
+                                                  <span className="font-bold text-rose-700">L:</span>{' '}
+                                                  {lFollicles.tokens.map((t: any) => `${t.mm}`).join(', ')}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                          {day.e2_pgml && (
+                                            <div className="text-amber-800 font-bold truncate">
+                                              E2: {day.e2_pgml} pg
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
