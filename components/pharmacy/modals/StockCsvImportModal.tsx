@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { adminApi, pharmacyApi } from '@/lib/api';
 import {
@@ -16,6 +16,7 @@ import {
   Trash2,
   Search,
   X,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -50,6 +51,79 @@ export default function StockCsvImportModal({
   const [stockPreviewSearch, setStockPreviewSearch] = useState<string>('');
   const [editingStockRowIndex, setEditingStockRowIndex] = useState<number | null>(null);
   const stockFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-time duplicate item_code collision detection across different medicines
+  const codeCollisions = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const row of stockCsvPreviewRows) {
+      const code = String(row.raw?.item_code || '').trim().toUpperCase();
+      const name = String(row.raw?.item_name || row.name || '').trim();
+      if (code && name) {
+        if (!map.has(code)) {
+          map.set(code, new Set());
+        }
+        map.get(code)!.add(name);
+      }
+    }
+    const collisions = new Map<string, string[]>();
+    for (const [code, names] of map.entries()) {
+      if (names.size > 1) {
+        collisions.set(code, Array.from(names));
+      }
+    }
+    return collisions;
+  }, [stockCsvPreviewRows]);
+
+  const handleAutoFixCollisions = () => {
+    const medToCode = new Map<string, string>();
+    const usedCodes = new Set<string>();
+
+    // Collect existing valid non-colliding codes
+    for (const row of stockCsvPreviewRows) {
+      const code = String(row.raw?.item_code || '').trim().toUpperCase();
+      const name = String(row.raw?.item_name || row.name || '').trim();
+      if (code && !codeCollisions.has(code)) {
+        medToCode.set(name.toUpperCase(), code);
+        usedCodes.add(code);
+      }
+    }
+
+    const updatedRows = stockCsvPreviewRows.map((row) => {
+      const code = String(row.raw?.item_code || '').trim().toUpperCase();
+      const name = String(row.raw?.item_name || row.name || '').trim();
+      const normName = name.toUpperCase();
+
+      if (codeCollisions.has(code)) {
+        let newCode = medToCode.get(normName);
+        if (!newCode) {
+          const slug = name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20).toUpperCase();
+          newCode = `MED-${slug}`;
+          let c = 1;
+          const base = newCode;
+          while (usedCodes.has(newCode)) {
+            newCode = `${base}-${c}`;
+            c++;
+          }
+          medToCode.set(normName, newCode);
+          usedCodes.add(newCode);
+        }
+
+        const raw = { ...row.raw, item_code: newCode };
+        if (/^\d{4,8}$/.test(code) && !raw.hsn_code) {
+          raw.hsn_code = code;
+        }
+
+        return {
+          ...row,
+          details: `Fixed: Assigned unique SKU ${newCode} (was ${code})`,
+          raw,
+        };
+      }
+      return row;
+    });
+
+    setStockCsvPreviewRows(updatedRows);
+  };
 
   const handleClose = () => {
     setStockCsvFile(null);
@@ -445,6 +519,41 @@ export default function StockCsvImportModal({
                     </div>
                   </div>
 
+                  {/* Duplicate Item Code Collision Warning Banner */}
+                  {codeCollisions.size > 0 && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl space-y-2.5 animate-in fade-in duration-200">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="font-bold text-rose-900 text-xs">
+                              Duplicate Item Code Collision Detected ({codeCollisions.size} Conflicting Codes)
+                            </h4>
+                            <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                              Multiple different medicines share the same Item Code / SKU. In FEFO pharmacy, each medicine formulation must have a unique Item Code to avoid dispensing the wrong medication on invoices.
+                            </p>
+                            <div className="mt-2 space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                              {Array.from(codeCollisions.entries()).map(([code, names]) => (
+                                <div key={code} className="text-[10px] font-mono bg-white/90 p-1.5 rounded border border-rose-200 text-rose-800">
+                                  <span className="font-bold text-rose-900">Code &apos;{code}&apos;:</span> Shared across{' '}
+                                  <span className="font-semibold">{names.join(' · ')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAutoFixCollisions}
+                          className="shrink-0 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors"
+                        >
+                          <Wand2 className="w-3.5 h-3.5" />
+                          <span>⚡ Auto-Fix Collisions</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Filter tabs and search */}
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg">
@@ -540,8 +649,24 @@ export default function StockCsvImportModal({
                                 )}
                               </td>
                               <td className="py-2 px-3 font-mono font-bold text-slate-800 text-[11px]">{row.identifier}</td>
-                              <td className="py-2 px-3 text-slate-700 font-medium">{row.name}</td>
-                              <td className="py-2 px-3 text-slate-500 text-[11px]">{row.details}</td>
+                              <td className="py-2 px-3 text-slate-700 font-medium">
+                                <div>{row.name}</div>
+                                {row.raw?.item_code && (
+                                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                    SKU: <span className="font-semibold text-slate-600">{row.raw.item_code}</span>
+                                    {row.raw?.hsn_code && <span className="ml-2 text-slate-400">HSN: {row.raw.hsn_code}</span>}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 text-[11px]">
+                                {row.raw?.item_code && codeCollisions.has(String(row.raw.item_code).trim().toUpperCase()) && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 w-fit mb-1">
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    <span>Code Collision ({codeCollisions.get(String(row.raw.item_code).trim().toUpperCase())?.length} Meds)</span>
+                                  </span>
+                                )}
+                                {row.details}
+                              </td>
                               <td className="py-2 px-3 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   <button
@@ -628,24 +753,41 @@ export default function StockCsvImportModal({
                 Close
               </Button>
 
-              <Button
-                type="button"
-                disabled={(!stockCsvFile && stockCsvPreviewRows.length === 0) || isStockImporting || isStockPreviewing}
-                onClick={handleExecuteStockImport}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-6 gap-2 shadow-sm"
-              >
-                {isStockImporting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Ingesting Stock Batches...</span>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Execute Stock Ingestion ({stockCsvPreviewRows.length} Rows)</span>
-                  </>
+              <div className="flex items-center gap-2">
+                {codeCollisions.size > 0 && (
+                  <span className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mr-2">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Auto-Fix or resolve {codeCollisions.size} duplicate codes to proceed</span>
+                  </span>
                 )}
-              </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    (!stockCsvFile && stockCsvPreviewRows.length === 0) ||
+                    isStockImporting ||
+                    isStockPreviewing ||
+                    codeCollisions.size > 0
+                  }
+                  onClick={handleExecuteStockImport}
+                  className={`text-white font-bold text-xs h-9 px-6 gap-2 shadow-sm transition-colors ${
+                    codeCollisions.size > 0
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  {isStockImporting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Ingesting Stock Batches...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Execute Stock Ingestion ({stockCsvPreviewRows.length} Rows)</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
-import type { ObstetricRow } from './types';
+import type { ObstetricRow, MedicationRow, CustomInvestigationRow } from './types';
 
 interface ProformaPrintViewProps {
   patient: any;
@@ -105,6 +105,17 @@ interface ProformaPrintViewProps {
     gestationalAge?: string;
     conceptionMode?: string;
     currentPregnancyNotes?: string;
+    invAmh?: string;
+    invTsh?: string;
+    invTubalPatency?: string;
+    invHysteroLap?: string;
+    invSemenAnalysis?: string;
+    invDfi?: string;
+    fertilityTreatments?: string;
+    femaleCustomInvestigations?: CustomInvestigationRow[];
+    maleCustomInvestigations?: CustomInvestigationRow[];
+    femaleMedications?: MedicationRow[];
+    maleMedications?: MedicationRow[];
   };
 }
 
@@ -568,6 +579,107 @@ export default function ProformaPrintView({
         </div>
       </div>
 
+      {/* Baseline Fertility Investigations (Male & Female Separated, Blank lines for manual fill, No fixed FSH/LH) */}
+      <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
+        <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider flex items-center justify-between">
+          <span>Fertility Investigations (Male &amp; Female Separated)</span>
+          <span className="text-[10px] text-slate-500 font-normal">Baseline Reports</span>
+        </div>
+        <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Female Investigations */}
+          <div className="space-y-1.5 border-r sm:border-r border-slate-100 pr-2">
+            <span className="font-bold text-rose-900 block border-b border-rose-100 pb-1 uppercase tracking-wide">
+              Female Investigations (Wife)
+            </span>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+              <div>
+                <span className="text-[10px] text-slate-400 block">AMH:</span>
+                <strong>{data.invAmh || '____________________'}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block">TSH:</span>
+                <strong>{data.invTsh || '____________________'}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block">Tubal Patency:</span>
+                <strong>{data.invTubalPatency || '____________________'}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block">Hystero/Lap:</span>
+                <strong>{data.invHysteroLap || '____________________'}</strong>
+              </div>
+            </div>
+
+            {/* Custom / Manual Female Tests without FSH/LH hardcoding */}
+            <div className="pt-1.5 border-t border-slate-100 space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Additional Tests:</span>
+              {Array.isArray(data.femaleCustomInvestigations) &&
+              data.femaleCustomInvestigations.filter((r) => r.testName || r.result).length > 0 ? (
+                data.femaleCustomInvestigations
+                  .filter((r) => r.testName || r.result)
+                  .map((r, i) => (
+                    <div key={i} className="flex justify-between py-0.5 border-b border-slate-50">
+                      <span className="text-slate-600">{r.testName || 'Blank Test'}:</span>
+                      <strong className="text-slate-900">{r.result || '____________________'}</strong>
+                    </div>
+                  ))
+              ) : (
+                <div className="space-y-1 text-slate-400">
+                  <div className="flex justify-between">
+                    <span>____________________ :</span>
+                    <span>____________________</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>____________________ :</span>
+                    <span>____________________</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Male Investigations */}
+          <div className="space-y-1.5 pl-2">
+            <span className="font-bold text-sky-900 block border-b border-sky-100 pb-1 uppercase tracking-wide">
+              Male Investigations (Husband)
+            </span>
+            <div className="space-y-1">
+              <div>
+                <span className="text-[10px] text-slate-400 block">Semen Analysis:</span>
+                <strong>{data.invSemenAnalysis || '________________________________________'}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block">Sperm DFI (%):</span>
+                <strong>{data.invDfi || '________________________________________'}</strong>
+              </div>
+            </div>
+
+            {/* Custom / Manual Male Tests */}
+            <div className="pt-1.5 border-t border-slate-100 space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Additional Tests:</span>
+              {Array.isArray(data.maleCustomInvestigations) &&
+              data.maleCustomInvestigations.filter((r) => r.testName || r.result).length > 0 ? (
+                data.maleCustomInvestigations
+                  .filter((r) => r.testName || r.result)
+                  .map((r, i) => (
+                    <div key={i} className="flex justify-between py-0.5 border-b border-slate-50">
+                      <span className="text-slate-600">{r.testName || 'Blank Test'}:</span>
+                      <strong className="text-slate-900">{r.result || '____________________'}</strong>
+                    </div>
+                  ))
+              ) : (
+                <div className="space-y-1 text-slate-400">
+                  <div className="flex justify-between">
+                    <span>____________________ :</span>
+                    <span>____________________</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Recommended Investigations */}
       <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
         <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
@@ -639,6 +751,88 @@ export default function ProformaPrintView({
             <strong className="text-sm text-slate-900">{data.finalDiagnosis}</strong>
           </div>
         )}
+      </div>
+
+      {/* 9. Prescribed Medications (Separated Columns for Female and Male) */}
+      <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
+        <div className="bg-[#2878a8]/10 text-[#2878a8] px-3 py-1 font-bold uppercase tracking-wider">
+          Prescribed Medications (Male &amp; Female Separated Regimen)
+        </div>
+        <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Female Medications Column */}
+          <div className="space-y-2 border-r md:border-r border-slate-200 pr-3">
+            <span className="font-bold text-rose-900 block border-b border-rose-200 pb-1 uppercase tracking-wide">
+              Female Medications (Wife)
+            </span>
+            {Array.isArray(data.femaleMedications) && data.femaleMedications.some((m) => m.drug?.trim()) ? (
+              <table className="w-full text-left border-collapse text-[11px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-rose-50/50 text-[10px] uppercase text-rose-900">
+                    <th className="p-1">Drug</th>
+                    <th className="p-1">Dose</th>
+                    <th className="p-1">Freq</th>
+                    <th className="p-1">Duration</th>
+                    <th className="p-1">Instructions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.femaleMedications
+                    .filter((m) => m.drug?.trim())
+                    .map((m, i) => (
+                      <tr key={i} className="border-b border-slate-100">
+                        <td className="p-1 font-bold text-slate-900">{m.drug}</td>
+                        <td className="p-1">{m.dose || '-'}</td>
+                        <td className="p-1">{m.frequency || '-'}</td>
+                        <td className="p-1">{m.duration || '-'}</td>
+                        <td className="p-1 text-slate-600 italic">{m.instructions || '-'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-2 border border-dashed border-rose-200 rounded text-slate-400 italic text-[11px]">
+                No female medications prescribed.
+              </div>
+            )}
+          </div>
+
+          {/* Male Medications Column */}
+          <div className="space-y-2 pl-1">
+            <span className="font-bold text-sky-900 block border-b border-sky-200 pb-1 uppercase tracking-wide">
+              Male Medications (Husband)
+            </span>
+            {Array.isArray(data.maleMedications) && data.maleMedications.some((m) => m.drug?.trim()) ? (
+              <table className="w-full text-left border-collapse text-[11px]">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-sky-50/50 text-[10px] uppercase text-sky-900">
+                    <th className="p-1">Drug</th>
+                    <th className="p-1">Dose</th>
+                    <th className="p-1">Freq</th>
+                    <th className="p-1">Duration</th>
+                    <th className="p-1">Instructions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.maleMedications
+                    .filter((m) => m.drug?.trim())
+                    .map((m, i) => (
+                      <tr key={i} className="border-b border-slate-100">
+                        <td className="p-1 font-bold text-slate-900">{m.drug}</td>
+                        <td className="p-1">{m.dose || '-'}</td>
+                        <td className="p-1">{m.frequency || '-'}</td>
+                        <td className="p-1">{m.duration || '-'}</td>
+                        <td className="p-1 text-slate-600 italic">{m.instructions || '-'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-2 border border-dashed border-sky-200 rounded text-slate-400 italic text-[11px]">
+                No male medications prescribed.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Signatures */}

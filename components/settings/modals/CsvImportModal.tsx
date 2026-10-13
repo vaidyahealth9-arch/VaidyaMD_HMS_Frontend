@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import {
   X,
@@ -12,6 +12,8 @@ import {
   Trash2,
   Check,
   RefreshCw,
+  Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface CsvImportModalProps {
@@ -36,6 +38,117 @@ export default function CsvImportModal({
   const [editingCsvRowForm, setEditingCsvRowForm] = useState<any>({});
   const [importResult, setImportResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cross-entity collision detector across preview rows & live database
+  const detectedCollisions = useMemo(() => {
+    // If backend returned collisions in stats
+    if (csvPreviewData?.stats?.collisions?.length) {
+      const backendMap = new Map<string, string[]>();
+      for (const col of csvPreviewData.stats.collisions) {
+        const key = String(col.identifier || col.item_code || col.code || '').trim().toUpperCase();
+        const entities = col.entities || col.medicines || [];
+        if (key && entities.length > 0) {
+          backendMap.set(key, entities);
+        }
+      }
+      if (backendMap.size > 0) return backendMap;
+    }
+
+    // Client-side detection across rows
+    const map = new Map<string, Set<string>>();
+    for (const row of csvPreviewRows) {
+      const ident = String(
+        row.identifier ||
+        row.raw?.code ||
+        row.raw?.item_code ||
+        row.raw?.test_code ||
+        row.raw?.record_type ||
+        row.raw?.email ||
+        ''
+      ).trim().toUpperCase();
+      const name = String(
+        row.name ||
+        row.raw?.name ||
+        row.raw?.item_name ||
+        row.raw?.test_name ||
+        row.raw?.title ||
+        ''
+      ).trim();
+      if (ident && name) {
+        if (!map.has(ident)) {
+          map.set(ident, new Set());
+        }
+        map.get(ident)!.add(name);
+      }
+    }
+    const collisions = new Map<string, string[]>();
+    for (const [key, names] of map.entries()) {
+      if (names.size > 1) {
+        collisions.set(key, Array.from(names));
+      }
+    }
+    return collisions;
+  }, [csvPreviewRows, csvPreviewData]);
+
+  const handleAutoFixCollisions = () => {
+    const itemToCode = new Map<string, string>();
+    const usedCodes = new Set<string>();
+
+    const domainKey = String(importDomainModal?.key || '').toLowerCase();
+    const prefix = domainKey.includes('service') ? 'SRV' :
+                   domainKey.includes('lims') ? 'LAB' :
+                   domainKey.includes('template') ? 'TMPL' :
+                   domainKey.includes('stock') || domainKey.includes('pharmacy') ? 'MED' :
+                   domainKey.includes('cryo') ? 'CRY' : 'KEY';
+
+    for (const row of csvPreviewRows) {
+      const ident = String(row.identifier || row.raw?.code || row.raw?.item_code || row.raw?.test_code || row.raw?.record_type || '').trim().toUpperCase();
+      const name = String(row.name || row.raw?.name || row.raw?.item_name || row.raw?.test_name || row.raw?.title || '').trim();
+      if (ident && !detectedCollisions.has(ident)) {
+        itemToCode.set(name.toUpperCase(), ident);
+        usedCodes.add(ident);
+      }
+    }
+
+    const updatedRows = csvPreviewRows.map((row) => {
+      const ident = String(row.identifier || row.raw?.code || row.raw?.item_code || row.raw?.test_code || row.raw?.record_type || '').trim().toUpperCase();
+      const name = String(row.name || row.raw?.name || row.raw?.item_name || row.raw?.test_name || row.raw?.title || '').trim();
+      const normName = name.toUpperCase();
+
+      if (detectedCollisions.has(ident)) {
+        let newCode = itemToCode.get(normName);
+        if (!newCode) {
+          const slug = name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 16).toUpperCase();
+          newCode = `${prefix}-${slug || 'ITEM'}`;
+          let c = 1;
+          const base = newCode;
+          while (usedCodes.has(newCode)) {
+            newCode = `${base}-${c}`;
+            c++;
+          }
+          itemToCode.set(normName, newCode);
+          usedCodes.add(newCode);
+        }
+
+        const raw = { ...row.raw };
+        if ('item_code' in raw) raw.item_code = newCode;
+        if ('code' in raw) raw.code = newCode;
+        if ('test_code' in raw) raw.test_code = newCode;
+        if ('record_type' in raw) raw.record_type = newCode;
+
+        return {
+          ...row,
+          identifier: newCode,
+          has_collision: false,
+          details: `Fixed: Assigned unique identifier ${newCode} (was ${ident})`,
+          raw,
+        };
+      }
+      return row;
+    });
+
+    setCsvPreviewRows(updatedRows);
+  };
 
   const handleFileSelectForImport = async (file: File, mode: 'overwrite' | 'skip' = conflictMode) => {
     setImportFile(file);
@@ -286,6 +399,43 @@ export default function CsvImportModal({
 
               {!isPreviewingCsv && csvPreviewRows.length > 0 && !importResult && (
                 <div className="space-y-3">
+                  {/* Collision Warning Banner */}
+                  {detectedCollisions.size > 0 && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5">
+                          <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-rose-900 text-xs block">
+                              Code Collision Detected ({detectedCollisions.size} Identifier Collision{detectedCollisions.size > 1 ? 's' : ''})
+                            </span>
+                            <span className="text-[11px] text-rose-700 block mt-0.5">
+                              The same key/identifier is assigned to conflicting records in this file or against the database. Overwriting without resolving will corrupt existing records.
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAutoFixCollisions}
+                          className="shrink-0 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>⚡ Auto-Fix Collisions</span>
+                        </button>
+                      </div>
+
+                      <div className="bg-white/80 rounded-lg p-2.5 border border-rose-200 text-[11px] text-rose-900 space-y-1 font-mono max-h-28 overflow-y-auto">
+                        {Array.from(detectedCollisions.entries()).map(([code, items]) => (
+                          <div key={code} className="flex items-center gap-2">
+                            <span className="font-bold px-1.5 py-0.5 bg-rose-100 rounded text-rose-800">{code}</span>
+                            <span className="text-rose-600">→</span>
+                            <span className="truncate">{items.join('  VS  ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Summary Badges Bar */}
                   <div className="grid grid-cols-4 gap-2 text-center font-mono">
                     <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
@@ -371,48 +521,64 @@ export default function CsvImportModal({
                             if (csvPreviewFilter === 'new') return !r.is_override;
                             return true;
                           })
-                          .map((row) => (
-                            <tr
-                              key={row.row_index}
-                              className={`hover:bg-slate-50/80 transition-colors ${
-                                row.is_override
-                                  ? conflictMode === 'overwrite'
-                                    ? 'bg-amber-50/40'
-                                    : 'bg-slate-50/40 opacity-70'
-                                  : ''
-                              }`}
-                            >
-                              <td className="py-2 px-3 text-center font-mono text-slate-400 text-[11px]">
-                                #{row.row_index}
-                              </td>
-                              <td className="py-2 px-3">
-                                {row.is_override ? (
-                                  conflictMode === 'overwrite' ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                      <span>⚡ Overwrite</span>
+                          .map((row) => {
+                            const isRowCollision = detectedCollisions.has(String(row.identifier || '').toUpperCase()) || row.has_collision;
+                            return (
+                                <tr
+                                  key={row.row_index}
+                                  className={`hover:bg-slate-50/80 transition-colors ${
+                                    isRowCollision
+                                      ? 'bg-rose-50/70 border-l-4 border-rose-500'
+                                      : row.is_override
+                                      ? conflictMode === 'overwrite'
+                                        ? 'bg-amber-50/40'
+                                        : 'bg-slate-50/40 opacity-70'
+                                      : ''
+                                  }`}
+                                >
+                                  <td className="py-2 px-3 text-center font-mono text-slate-400 text-[11px]">
+                                    #{row.row_index}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    {isRowCollision ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                        <span>Collision</span>
+                                      </span>
+                                    ) : row.is_override ? (
+                                      conflictMode === 'overwrite' ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                          <span>⚡ Overwrite</span>
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                          <span>○ Skip</span>
+                                        </span>
+                                      )
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        <span>+ New</span>
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono font-bold text-slate-800">
+                                    <div className="flex items-center gap-1.5">
+                                      <span>{row.identifier || '—'}</span>
+                                      {isRowCollision && (
+                                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-300">
+                                          Duplicate Key
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <span className="font-semibold text-slate-800 block truncate max-w-md">
+                                      {row.name || '—'}
                                     </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                      <span>○ Skip</span>
+                                    <span className={`text-[10px] block truncate max-w-md ${isRowCollision ? 'text-rose-600 font-semibold' : 'text-slate-500'}`}>
+                                      {row.details}
                                     </span>
-                                  )
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    <span>+ New</span>
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 font-mono font-bold text-slate-800">
-                                {row.identifier || '—'}
-                              </td>
-                              <td className="py-2 px-3">
-                                <span className="font-semibold text-slate-800 block truncate max-w-md">
-                                  {row.name || '—'}
-                                </span>
-                                <span className="text-[10px] text-slate-500 block truncate max-w-md">
-                                  {row.details}
-                                </span>
-                              </td>
+                                  </td>
                               <td className="py-2 px-3 text-right space-x-1 whitespace-nowrap">
                                 <button
                                   type="button"
@@ -437,7 +603,8 @@ export default function CsvImportModal({
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -575,7 +742,7 @@ export default function CsvImportModal({
                 {!importResult && (
                   <button
                     type="button"
-                    disabled={!importFile || isImporting || isPreviewingCsv || csvPreviewRows.length === 0}
+                    disabled={!importFile || isImporting || isPreviewingCsv || csvPreviewRows.length === 0 || detectedCollisions.size > 0}
                     onClick={handleExecuteCsvImport}
                     className="px-5 py-2 bg-primary hover:bg-primary-mid disabled:opacity-50 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center gap-1.5"
                   >
@@ -583,6 +750,11 @@ export default function CsvImportModal({
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         <span>Saving & Ingesting Data...</span>
+                      </>
+                    ) : detectedCollisions.size > 0 ? (
+                      <>
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-200" />
+                        <span>Resolve {detectedCollisions.size} Collision{detectedCollisions.size > 1 ? 's' : ''} to Save</span>
                       </>
                     ) : (
                       <>

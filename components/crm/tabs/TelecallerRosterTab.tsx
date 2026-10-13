@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
+import { crmApi } from '@/lib/api';
 import { TelecallerRosterItem } from '../types';
 
 interface TelecallerRosterTabProps {
@@ -24,6 +25,7 @@ interface TelecallerRosterTabProps {
 export const TelecallerRosterTab: React.FC<TelecallerRosterTabProps> = ({
   roster,
   isLoading,
+  onRefresh,
 }) => {
   const onlineCount = roster.filter((r) => r.is_online).length;
   const onCallCount = roster.filter((r) => r.is_online && r.current_state === 'on_call').length;
@@ -136,6 +138,7 @@ export const TelecallerRosterTab: React.FC<TelecallerRosterTabProps> = ({
               <th className="py-3 px-4">Calls Today</th>
               <th className="py-3 px-4">Talk Time Today</th>
               <th className="py-3 px-4">Conversions</th>
+              <th className="py-3 px-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
@@ -206,6 +209,26 @@ export const TelecallerRosterTab: React.FC<TelecallerRosterTabProps> = ({
 
                   <td className="py-3 px-4 font-mono font-bold text-emerald-600">
                     {item.conversions_today}
+                  </td>
+
+                  <td className="py-3 px-4 text-right">
+                    {item.is_revoked ? (
+                      <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200">
+                        Revoked
+                      </Badge>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Revoke device access for ${item.user_name}? This immediately kicks the phone session.`)) {
+                            await crmApi.revokeDevice(item.user_id);
+                            onRefresh();
+                          }
+                        }}
+                        className="px-2 py-1 text-[11px] font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 rounded transition-colors"
+                      >
+                        Revoke Device
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

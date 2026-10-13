@@ -49,6 +49,7 @@ import type {
   ClinicalHistoryProformaModalProps,
   ObstetricRow,
   MedicationRow,
+  CustomInvestigationRow,
 } from './proforma';
 
 export { generateProformaNarrative };
@@ -228,6 +229,27 @@ export default function ClinicalHistoryProformaModal({
   const [invHysteroLap, setInvHysteroLap] = useState(initialData?.invHysteroLap || '');
   const [invSemenAnalysis, setInvSemenAnalysis] = useState(initialData?.invSemenAnalysis || '');
   const [invDfi, setInvDfi] = useState(initialData?.invDfi || '');
+
+  // Separated manual custom investigation lines (No fixed FSH/LH, blank lines ready to fill)
+  const [femaleCustomInvestigations, setFemaleCustomInvestigations] = useState<CustomInvestigationRow[]>(
+    initialData?.femaleCustomInvestigations || [
+      { testName: initialData?.invFsh ? 'FSH' : '', result: initialData?.invFsh || '' },
+      { testName: initialData?.invLh ? 'LH' : '', result: initialData?.invLh || '' },
+    ]
+  );
+  const [maleCustomInvestigations, setMaleCustomInvestigations] = useState<CustomInvestigationRow[]>(
+    initialData?.maleCustomInvestigations || [
+      { testName: '', result: '' },
+    ]
+  );
+
+  // Separated male & female prescribed medications
+  const [femaleMedications, setFemaleMedications] = useState<MedicationRow[]>(
+    initialData?.femaleMedications || []
+  );
+  const [maleMedications, setMaleMedications] = useState<MedicationRow[]>(
+    initialData?.maleMedications || []
+  );
 
   // 6. Fertility Treatments (Past)
   const [fertilityTreatments, setFertilityTreatments] = useState(
@@ -492,6 +514,10 @@ export default function ClinicalHistoryProformaModal({
       gestationalAge,
       conceptionMode,
       currentPregnancyNotes,
+      femaleCustomInvestigations,
+      maleCustomInvestigations,
+      femaleMedications,
+      maleMedications,
     }),
     [
       activeTab,
@@ -602,6 +628,10 @@ export default function ClinicalHistoryProformaModal({
       gestationalAge,
       conceptionMode,
       currentPregnancyNotes,
+      femaleCustomInvestigations,
+      maleCustomInvestigations,
+      femaleMedications,
+      maleMedications,
     ]
   );
 
@@ -1032,6 +1062,10 @@ export default function ClinicalHistoryProformaModal({
               setFertilityTreatments={setFertilityTreatments}
               fertilityCounselingDone={fertilityCounselingDone}
               setFertilityCounselingDone={setFertilityCounselingDone}
+              femaleCustomInvestigations={femaleCustomInvestigations}
+              setFemaleCustomInvestigations={setFemaleCustomInvestigations}
+              maleCustomInvestigations={maleCustomInvestigations}
+              setMaleCustomInvestigations={setMaleCustomInvestigations}
             />
 
             <ProformaExamSection
@@ -1093,6 +1127,10 @@ export default function ClinicalHistoryProformaModal({
               setFollowUpPlan={setFollowUpPlan}
               finalDiagnosis={finalDiagnosis}
               setFinalDiagnosis={setFinalDiagnosis}
+              femaleMedications={femaleMedications}
+              setFemaleMedications={setFemaleMedications}
+              maleMedications={maleMedications}
+              setMaleMedications={setMaleMedications}
             />
 
             <ProformaSpecialtySections

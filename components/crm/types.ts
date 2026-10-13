@@ -98,12 +98,14 @@ export interface TelecallerRosterItem {
   user_id: string;
   user_name: string;
   email: string;
+  device_id?: string | null;
   device_model?: string | null;
   app_version?: string | null;
   sim_operator?: string | null;
   battery_level?: number | null;
   is_online: boolean;
-  current_state: 'idle' | 'ringing' | 'on_call' | 'wrap_up' | 'offline';
+  is_revoked?: boolean;
+  current_state: 'idle' | 'ringing' | 'on_call' | 'wrap_up' | 'offline' | 'revoked';
   current_lead_name?: string | null;
   current_lead_phone?: string | null;
   call_duration_seconds: number;

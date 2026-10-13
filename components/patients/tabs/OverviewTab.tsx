@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, CreditCard, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { PatientWalletCard } from '@/components/billing';
 
 interface OverviewTabProps {
@@ -13,6 +13,7 @@ interface OverviewTabProps {
   onSelectCycle: (cycle: any) => void;
   onOpenBillingTab: () => void;
   onWalletUpdated: () => void;
+  onEditAlerts?: () => void;
 }
 
 export default function OverviewTab({
@@ -24,11 +25,71 @@ export default function OverviewTab({
   onSelectCycle,
   onOpenBillingTab,
   onWalletUpdated,
+  onEditAlerts,
 }: OverviewTabProps) {
   const [isCyclesCardExpanded, setIsCyclesCardExpanded] = useState<boolean>(true);
+  const alerts = Array.isArray(patient?.alert_notes) ? patient.alert_notes : [];
 
   return (
     <div className="space-y-6 w-full">
+      {/* Clinical Alerts & Drug Allergies Card */}
+      <div
+        className={`border rounded-lg p-4 shadow-xs transition-all ${
+          alerts.length > 0
+            ? 'bg-amber-50/70 border-amber-200'
+            : 'bg-white border-slate-200'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {alerts.length > 0 ? (
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            ) : (
+              <ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" />
+            )}
+            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800">
+              Clinical Alerts &amp; Critical Allergies
+            </h3>
+            {alerts.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                {alerts.length} Active
+              </span>
+            )}
+          </div>
+
+          {onEditAlerts && (
+            <button
+              type="button"
+              onClick={onEditAlerts}
+              className="text-xs font-bold text-primary hover:text-primary-mid hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{alerts.length > 0 ? 'Edit Alerts' : 'Add Alert'}</span>
+            </button>
+          )}
+        </div>
+
+        <div className="mt-2.5">
+          {alerts.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {alerts.map((alert: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-white text-amber-900 border border-amber-300 shadow-2xs"
+                >
+                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  {alert}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">
+              No active clinical alerts or critical allergies recorded for this patient.
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Active Treatment Cycles Card */}
       <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b pb-3">

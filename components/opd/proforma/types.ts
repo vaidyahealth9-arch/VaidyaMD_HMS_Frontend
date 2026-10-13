@@ -8,11 +8,20 @@ export interface ObstetricRow {
   babySexWeight: string;
 }
 
+export interface CustomInvestigationRow {
+  testName: string;
+  result: string;
+  date?: string;
+}
+
 export interface MedicationRow {
   drug: string;
   dose: string;
+  route?: string;
+  frequency?: string;
   duration: string;
-  response: string;
+  instructions?: string;
+  response?: string;
 }
 
 export interface ClinicalHistoryProformaModalProps {

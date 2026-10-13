@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import MedicineAutocompleteInput from '../MedicineAutocompleteInput';
 
 interface ProformaMaleSectionProps {
   inline?: boolean;
@@ -348,12 +349,12 @@ export default function ProformaMaleSection({
                       <label className="text-[10px] text-slate-500 block mb-0.5">
                         Regular medication
                       </label>
-                      <input
-                        type="text"
+                      <MedicineAutocompleteInput
+                        id="male-regular-med"
                         value={maleRegularMed}
-                        onChange={(e) => setMaleRegularMed(e.target.value)}
-                        placeholder="None"
-                        className="vmd-input text-xs"
+                        onChange={(val) => setMaleRegularMed(val)}
+                        placeholder="None / search pharmacy medicine..."
+                        className="vmd-input text-xs w-full"
                       />
                     </div>
                     <div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   patientsApi,
@@ -70,6 +71,7 @@ export default function PatientProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const patientId = params.id as string;
 
   const tabFromUrl = searchParams.get('tab');
@@ -309,6 +311,7 @@ export default function PatientProfilePage() {
             }}
             onOpenBillingTab={() => handleSelectTab('billing')}
             onWalletUpdated={loadData}
+            onEditAlerts={() => setShowEditAlertsModal(true)}
           />
         )}
 
@@ -319,6 +322,7 @@ export default function PatientProfilePage() {
         {activeTab === 'workbench' && (
           <WorkbenchTab
             patientId={patientId}
+            patient={patient}
             appointment={activeAppointment}
             onBack={() => {
               handleSelectTab('overview');
@@ -486,6 +490,11 @@ export default function PatientProfilePage() {
         initialAlerts={patient?.alert_notes || []}
         onSuccess={(updatedAlerts) => {
           setPatient((prev: any) => ({ ...prev, alert_notes: updatedAlerts }));
+          queryClient.setQueryData(['patient', patientId], (old: any) =>
+            old ? { ...old, alert_notes: updatedAlerts } : old
+          );
+          queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+          loadData();
         }}
       />
 

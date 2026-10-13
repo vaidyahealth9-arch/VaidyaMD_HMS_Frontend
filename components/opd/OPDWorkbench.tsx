@@ -64,7 +64,19 @@ import {
   RX_TEMPLATES,
 } from './opdTemplates';
 
-export default function OPDWorkbench({ patientId, triageData, appointment, onBack }: { patientId?: string; triageData?: any; appointment?: any; onBack?: () => void }) {
+export default function OPDWorkbench({
+  patientId,
+  patient: propPatient,
+  triageData,
+  appointment,
+  onBack,
+}: {
+  patientId?: string;
+  patient?: any;
+  triageData?: any;
+  appointment?: any;
+  onBack?: () => void;
+}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const selectedPatientId = patientId || '';
@@ -109,12 +121,13 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
   }, [selectedPatientId]);
 
   // Fetch Selected Patient Details
-  const { data: patient } = useQuery({
+  const { data: queryPatient } = useQuery({
     queryKey: ['patient', selectedPatientId],
     queryFn: () => patientsApi.get(selectedPatientId),
     enabled: !!selectedPatientId,
   });
 
+  const patient = propPatient || queryPatient;
   const activeAlerts = localAlerts !== null ? localAlerts : (patient?.alert_notes || []);
 
   // Fetch custom templates from backend
@@ -985,6 +998,35 @@ export default function OPDWorkbench({ patientId, triageData, appointment, onBac
             <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 text-sm font-semibold flex items-center gap-2 animate-in fade-in">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
               <span>{saveSuccessMessage}</span>
+            </div>
+          )}
+
+          {/* Prominent Clinical Alerts / Allergies Warning Banner */}
+          {activeAlerts && activeAlerts.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between gap-3 text-xs text-amber-950 animate-in fade-in shadow-2xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900 uppercase tracking-wide">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Clinical Alerts &amp; Critical Allergies:</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeAlerts.map((a: string, i: number) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 rounded bg-white text-amber-900 border border-amber-300 font-bold text-[11px] shadow-2xs"
+                    >
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditAlertsModal(true)}
+                className="text-[11px] font-bold text-amber-800 hover:text-amber-950 hover:underline shrink-0 cursor-pointer"
+              >
+                Edit Alerts
+              </button>
             </div>
           )}
 

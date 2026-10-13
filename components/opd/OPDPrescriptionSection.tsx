@@ -22,6 +22,8 @@ import {
   FileText,
   Stethoscope,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { pharmacyApi } from '@/lib/api';
 import type { RxTemplateItem } from './TemplateManagementDialog';
 
 interface OPDPrescriptionSectionProps {
@@ -57,6 +59,27 @@ export default function OPDPrescriptionSection({
   setIsPlanSectionExpanded,
   onOpenSmartOrder,
 }: OPDPrescriptionSectionProps) {
+  const { data: batches = [] } = useQuery({
+    queryKey: ['pharmacy-inventory-batches-active'],
+    queryFn: () => pharmacyApi.listBatches({ active_only: true }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const availableMedicines = React.useMemo(() => {
+    if (!Array.isArray(batches)) return [];
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const b of batches) {
+      const name = (b.item_name || '').trim();
+      if (!name) continue;
+      if (!seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push(name);
+      }
+    }
+    return list;
+  }, [batches]);
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader
@@ -289,11 +312,9 @@ export default function OPDPrescriptionSection({
               ))}
 
               <datalist id="drugList">
-                <option value="Tab Paracetamol 500mg" />
-                <option value="Tab Metformin 500mg" />
-                <option value="Tab Folic Acid 5mg" />
-                <option value="Cap Doxycycline 100mg" />
-                <option value="Inj Progesterone 100mg" />
+                {availableMedicines.map((m) => (
+                  <option key={m} value={m} />
+                ))}
               </datalist>
 
               <button
