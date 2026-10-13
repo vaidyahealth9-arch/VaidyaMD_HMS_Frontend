@@ -134,4 +134,11 @@ export const crmApi = {
   getFleetKpis: () => {
     return request<TelecallerKPIItem[]>('/crm/fleet/kpis');
   },
+
+  revokeDevice: (userId: string) => {
+    return request<{ status: string; user_id: string; is_revoked: boolean }>(
+      `/crm/fleet/devices/${userId}/revoke`,
+      { method: 'POST' }
+    );
+  },
 };

@@ -241,17 +241,32 @@ export function generateProformaNarrative(data: any): string {
     if (mExam.length > 0) sections.push(['EXAMINATION (MALE):', ...mExam].join('\n'));
   }
 
-  // 14. Fertility Investigations
-  const invLines: string[] = [];
-  if (data.invAmh?.trim()) invLines.push(`• AMH: ${data.invAmh.trim()}`);
-  if (data.invFsh?.trim()) invLines.push(`• FSH: ${data.invFsh.trim()}`);
-  if (data.invLh?.trim()) invLines.push(`• LH: ${data.invLh.trim()}`);
-  if (data.invTsh?.trim()) invLines.push(`• TSH: ${data.invTsh.trim()}`);
-  if (data.invTubalPatency?.trim()) invLines.push(`• Tubal patency: ${data.invTubalPatency.trim()}`);
-  if (data.invHysteroLap?.trim()) invLines.push(`• Hysteroscopy / Laparoscopy: ${data.invHysteroLap.trim()}`);
-  if (data.invSemenAnalysis?.trim()) invLines.push(`• Semen analysis: ${data.invSemenAnalysis.trim()}`);
-  if (data.invDfi?.trim()) invLines.push(`• Sperm DFI: ${data.invDfi.trim()}`);
-  if (invLines.length > 0) sections.push(['FERTILITY INVESTIGATIONS:', ...invLines].join('\n'));
+  // 14. Fertility Investigations (Female & Male Separated)
+  const fInvLines: string[] = [];
+  if (data.invAmh?.trim()) fInvLines.push(`• AMH: ${data.invAmh.trim()}`);
+  if (data.invTsh?.trim()) fInvLines.push(`• TSH: ${data.invTsh.trim()}`);
+  if (data.invTubalPatency?.trim()) fInvLines.push(`• Tubal patency: ${data.invTubalPatency.trim()}`);
+  if (data.invHysteroLap?.trim()) fInvLines.push(`• Hysteroscopy / Laparoscopy: ${data.invHysteroLap.trim()}`);
+  if (Array.isArray(data.femaleCustomInvestigations)) {
+    data.femaleCustomInvestigations.forEach((row: any) => {
+      if (row.testName?.trim() || row.result?.trim()) {
+        fInvLines.push(`• ${row.testName?.trim() || 'Custom Test'}: ${row.result?.trim() || '—'}`);
+      }
+    });
+  }
+  if (fInvLines.length > 0) sections.push(['FEMALE INVESTIGATIONS:', ...fInvLines].join('\n'));
+
+  const mInvLines: string[] = [];
+  if (data.invSemenAnalysis?.trim()) mInvLines.push(`• Semen analysis: ${data.invSemenAnalysis.trim()}`);
+  if (data.invDfi?.trim()) mInvLines.push(`• Sperm DFI: ${data.invDfi.trim()}`);
+  if (Array.isArray(data.maleCustomInvestigations)) {
+    data.maleCustomInvestigations.forEach((row: any) => {
+      if (row.testName?.trim() || row.result?.trim()) {
+        mInvLines.push(`• ${row.testName?.trim() || 'Custom Test'}: ${row.result?.trim() || '—'}`);
+      }
+    });
+  }
+  if (mInvLines.length > 0) sections.push(['MALE INVESTIGATIONS:', ...mInvLines].join('\n'));
 
   // 15. Fertility Treatments (Past)
   if (data.fertilityTreatments?.trim()) {
@@ -322,6 +337,21 @@ export function generateProformaNarrative(data: any): string {
     advLines.push(`Review Plan: ${data.followUpPlan.trim()}`);
   }
   if (advLines.length > 0) sections.push(['ADVISED REGIMEN & PLAN:', ...advLines].join('\n'));
+
+  // Prescribed Medications (Separated by Female & Male)
+  if (Array.isArray(data.femaleMedications) && data.femaleMedications.some((m: any) => m.drug?.trim())) {
+    const fMeds = data.femaleMedications
+      .filter((m: any) => m.drug?.trim())
+      .map((m: any) => `• ${m.drug.trim()} ${m.dose ? `- ${m.dose}` : ''} ${m.route ? `(${m.route})` : ''} ${m.frequency ? `${m.frequency}` : ''} ${m.duration ? `for ${m.duration}` : ''} ${m.instructions ? `[${m.instructions}]` : ''}`.trim());
+    sections.push(['PRESCRIBED MEDICATIONS (FEMALE):', ...fMeds].join('\n'));
+  }
+
+  if (Array.isArray(data.maleMedications) && data.maleMedications.some((m: any) => m.drug?.trim())) {
+    const mMeds = data.maleMedications
+      .filter((m: any) => m.drug?.trim())
+      .map((m: any) => `• ${m.drug.trim()} ${m.dose ? `- ${m.dose}` : ''} ${m.route ? `(${m.route})` : ''} ${m.frequency ? `${m.frequency}` : ''} ${m.duration ? `for ${m.duration}` : ''} ${m.instructions ? `[${m.instructions}]` : ''}`.trim());
+    sections.push(['PRESCRIBED MEDICATIONS (MALE):', ...mMeds].join('\n'));
+  }
 
   // 19. Gynaecology & Obstetric Specifics
   if (data.activeTab === 'gynaecology') {
@@ -463,17 +493,32 @@ export function generatePresentHistoryNarrative(data: any): string {
     if (mHabits.length > 0) sections.push(['HABITS / LIFESTYLE (MALE):', ...mHabits].join('\n'));
   }
 
-  // Fertility Investigations (Past baseline)
-  const invLines: string[] = [];
-  if (data.invAmh?.trim()) invLines.push(`• AMH: ${data.invAmh.trim()}`);
-  if (data.invFsh?.trim()) invLines.push(`• FSH: ${data.invFsh.trim()}`);
-  if (data.invLh?.trim()) invLines.push(`• LH: ${data.invLh.trim()}`);
-  if (data.invTsh?.trim()) invLines.push(`• TSH: ${data.invTsh.trim()}`);
-  if (data.invTubalPatency?.trim()) invLines.push(`• Tubal patency: ${data.invTubalPatency.trim()}`);
-  if (data.invHysteroLap?.trim()) invLines.push(`• Hysteroscopy / Laparoscopy: ${data.invHysteroLap.trim()}`);
-  if (data.invSemenAnalysis?.trim()) invLines.push(`• Semen analysis: ${data.invSemenAnalysis.trim()}`);
-  if (data.invDfi?.trim()) invLines.push(`• Sperm DFI: ${data.invDfi.trim()}`);
-  if (invLines.length > 0) sections.push(['FERTILITY INVESTIGATIONS:', ...invLines].join('\n'));
+  // Fertility Investigations (Past baseline - Female & Male Separated)
+  const fPastInv: string[] = [];
+  if (data.invAmh?.trim()) fPastInv.push(`• AMH: ${data.invAmh.trim()}`);
+  if (data.invTsh?.trim()) fPastInv.push(`• TSH: ${data.invTsh.trim()}`);
+  if (data.invTubalPatency?.trim()) fPastInv.push(`• Tubal patency: ${data.invTubalPatency.trim()}`);
+  if (data.invHysteroLap?.trim()) fPastInv.push(`• Hysteroscopy / Laparoscopy: ${data.invHysteroLap.trim()}`);
+  if (Array.isArray(data.femaleCustomInvestigations)) {
+    data.femaleCustomInvestigations.forEach((row: any) => {
+      if (row.testName?.trim() || row.result?.trim()) {
+        fPastInv.push(`• ${row.testName?.trim() || 'Custom Test'}: ${row.result?.trim() || '—'}`);
+      }
+    });
+  }
+  if (fPastInv.length > 0) sections.push(['FEMALE INVESTIGATIONS:', ...fPastInv].join('\n'));
+
+  const mPastInv: string[] = [];
+  if (data.invSemenAnalysis?.trim()) mPastInv.push(`• Semen analysis: ${data.invSemenAnalysis.trim()}`);
+  if (data.invDfi?.trim()) mPastInv.push(`• Sperm DFI: ${data.invDfi.trim()}`);
+  if (Array.isArray(data.maleCustomInvestigations)) {
+    data.maleCustomInvestigations.forEach((row: any) => {
+      if (row.testName?.trim() || row.result?.trim()) {
+        mPastInv.push(`• ${row.testName?.trim() || 'Custom Test'}: ${row.result?.trim() || '—'}`);
+      }
+    });
+  }
+  if (mPastInv.length > 0) sections.push(['MALE INVESTIGATIONS:', ...mPastInv].join('\n'));
 
   // Fertility Treatments (Past)
   if (data.fertilityTreatments?.trim()) {

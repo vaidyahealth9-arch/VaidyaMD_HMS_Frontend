@@ -3,6 +3,7 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { ObstetricRow, toggleArrayItem } from './types';
+import MedicineAutocompleteInput from '../MedicineAutocompleteInput';
 
 interface ProformaFemaleSectionProps {
   inline?: boolean;
@@ -495,12 +496,12 @@ export default function ProformaFemaleSection({
                     <label className="text-[10px] text-slate-500 block mb-0.5">
                       Regular medication
                     </label>
-                    <input
-                      type="text"
+                    <MedicineAutocompleteInput
+                      id="female-regular-med"
                       value={femaleRegularMed}
-                      onChange={(e) => setFemaleRegularMed(e.target.value)}
-                      placeholder="None / Thyroxine 25mcg"
-                      className="vmd-input text-xs"
+                      onChange={(val) => setFemaleRegularMed(val)}
+                      placeholder="None / search pharmacy medicine..."
+                      className="vmd-input text-xs w-full"
                     />
                   </div>
                   <div>
