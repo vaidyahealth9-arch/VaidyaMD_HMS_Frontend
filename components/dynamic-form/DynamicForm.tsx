@@ -20,6 +20,9 @@ export interface FieldSchema {
   pattern?: string;
   role_access?: string[];
   role_badge?: string;
+  unit?: string;
+  formula?: string;
+  helper_text?: string;
 }
 
 export interface SectionSchema {
@@ -71,6 +74,9 @@ function normalizeFields(rawFields: any[]): FieldSchema[] {
       pattern: f.pattern,
       role_access: f.role_access,
       role_badge: f.role_badge,
+      unit: f.unit,
+      formula: f.formula,
+      helper_text: f.helper_text,
     };
   });
 }
@@ -181,21 +187,177 @@ function normalizeSchema(rawSchema: any): FormSchema {
   };
 }
 
+// --- Clinical Formula Calculation Engine ---
+export function evaluateClinicalFormulas(
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  const updated = { ...data };
+  let hasChanges = false;
+
+  // 1. EDD & GA by LMP
+  const lmpVal = (data.lmp_date || data.lmp) as string;
+  const scanDateVal = (data.scan_date || data.date_of_scan || new Date().toISOString().split('T')[0]) as string;
+
+  if (lmpVal && typeof lmpVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lmpVal)) {
+    const lmpDate = new Date(lmpVal);
+    if (!isNaN(lmpDate.getTime())) {
+      // EDD by LMP: LMP + 280 days
+      const eddDate = new Date(lmpDate.getTime() + 280 * 24 * 60 * 60 * 1000);
+      const eddStr = eddDate.toISOString().split('T')[0];
+      if (data.edd_lmp !== eddStr) {
+        updated.edd_lmp = eddStr;
+        hasChanges = true;
+      }
+
+      // GA by LMP: scanDate - lmpDate
+      if (scanDateVal && /^\d{4}-\d{2}-\d{2}$/.test(scanDateVal)) {
+        const scanDate = new Date(scanDateVal);
+        if (!isNaN(scanDate.getTime())) {
+          const diffMs = scanDate.getTime() - lmpDate.getTime();
+          const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+          if (diffDays >= 0) {
+            const weeks = Math.floor(diffDays / 7);
+            const days = diffDays % 7;
+            const gaFormatted = `${weeks}w ${days}d`;
+            if (data.ga_lmp !== gaFormatted) {
+              updated.ga_lmp = gaFormatted;
+              hasChanges = true;
+            }
+            if (data.ga_lmp_days !== diffDays) {
+              updated.ga_lmp_days = diffDays;
+              hasChanges = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Hadlock 4-parameter EFW:
+  // Inputs: BPD, HC, AC, FL in mm -> converted to cm (divide by 10)
+  // log10(EFW) = 1.3596 + 0.0064*(HC/10) + 0.00061*(BPD/10)*(AC/10) + 0.0424*(AC/10) + 0.174*(FL/10) - 0.00386*(AC/10)*(FL/10)
+  // EFW (g) = round(10^(log10(EFW)))
+  const bpd = parseFloat(String(data.bpd_mm || data.bpd || ''));
+  const hc = parseFloat(String(data.hc_mm || data.hc || ''));
+  const ac = parseFloat(String(data.ac_mm || data.ac || ''));
+  const fl = parseFloat(String(data.fl_mm || data.fl || ''));
+
+  if (!isNaN(bpd) && bpd > 0 && !isNaN(hc) && hc > 0 && !isNaN(ac) && ac > 0 && !isNaN(fl) && fl > 0) {
+    const bpdCm = bpd / 10;
+    const hcCm = hc / 10;
+    const acCm = ac / 10;
+    const flCm = fl / 10;
+
+    const log10Efw =
+      1.3596 +
+      0.0064 * hcCm +
+      0.00061 * bpdCm * acCm +
+      0.0424 * acCm +
+      0.174 * flCm -
+      0.00386 * acCm * flCm;
+
+    const efwVal = Math.round(Math.pow(10, log10Efw));
+    if (efwVal > 0 && efwVal < 8000) {
+      if (updated.efw_hadlock !== efwVal && updated.efw_hadlock !== String(efwVal)) {
+        updated.efw_hadlock = efwVal;
+        hasChanges = true;
+      }
+      if (!updated.efw_g || updated.efw_g !== efwVal) {
+        updated.efw_g = efwVal;
+        hasChanges = true;
+      }
+    }
+  }
+
+  // 3. Cerebroplacental Ratio (CPR) = MCA PI / UA PI
+  const mcaPi = parseFloat(String(data.middle_cerebral_artery_mca_pi || data.mca_pi || ''));
+  const uaPi = parseFloat(String(data.umbilical_artery_ua_pi || data.ua_pi || ''));
+
+  if (!isNaN(mcaPi) && mcaPi > 0 && !isNaN(uaPi) && uaPi > 0) {
+    const cpr = Math.round((mcaPi / uaPi) * 100) / 100;
+    if (updated.cerebroplacental_ratio_cpr !== cpr && updated.cerebroplacental_ratio_cpr !== String(cpr)) {
+      updated.cerebroplacental_ratio_cpr = cpr;
+      hasChanges = true;
+    }
+    if (updated.cpr !== cpr && updated.cpr !== String(cpr)) {
+      updated.cpr = cpr;
+      hasChanges = true;
+    }
+  }
+
+  // 4. Mean Uterine Artery PI = (Right PI + Left PI) / 2
+  const rtPi = parseFloat(String(data.right_uterine_artery_pi || data.rt_uterine_pi || ''));
+  const ltPi = parseFloat(String(data.left_uterine_artery_pi || data.lt_uterine_pi || ''));
+
+  if (!isNaN(rtPi) && rtPi > 0 && !isNaN(ltPi) && ltPi > 0) {
+    const meanPi = Math.round(((rtPi + ltPi) / 2) * 100) / 100;
+    if (updated.mean_uterine_artery_pi !== meanPi && updated.mean_uterine_artery_pi !== String(meanPi)) {
+      updated.mean_uterine_artery_pi = meanPi;
+      hasChanges = true;
+    }
+  }
+
+  // 5. Biophysical Profile (BPP) Total & Denominator
+  const bBreathing = data.bpp_breathing !== undefined && data.bpp_breathing !== '' ? parseFloat(String(data.bpp_breathing)) : null;
+  const bMovements = data.bpp_movements !== undefined && data.bpp_movements !== '' ? parseFloat(String(data.bpp_movements)) : null;
+  const bTone = data.bpp_tone !== undefined && data.bpp_tone !== '' ? parseFloat(String(data.bpp_tone)) : null;
+  const bFluid = data.bpp_fluid !== undefined && data.bpp_fluid !== '' ? parseFloat(String(data.bpp_fluid)) : null;
+  const bNstRaw = data.bpp_nst;
+
+  const usComponents = [bBreathing, bMovements, bTone, bFluid];
+  const allUsScored = usComponents.every((v) => v !== null && !isNaN(v));
+
+  if (allUsScored) {
+    let total = usComponents.reduce((acc, v) => (acc || 0) + (v || 0), 0) || 0;
+    let denom = 8;
+
+    const nstVal = bNstRaw !== undefined && bNstRaw !== '' && bNstRaw !== 'not_performed' ? parseFloat(String(bNstRaw)) : null;
+    if (nstVal !== null && !isNaN(nstVal)) {
+      total += nstVal;
+      denom = 10;
+    }
+
+    if (updated.bpp_total !== total && updated.bpp_total !== String(total)) {
+      updated.bpp_total = total;
+      hasChanges = true;
+    }
+    if (updated.bpp_denominator !== denom && updated.bpp_denominator !== String(denom)) {
+      updated.bpp_denominator = denom;
+      hasChanges = true;
+    }
+    const scoreFormatted = `${total}/${denom}`;
+    if (updated.bpp_score !== scoreFormatted) {
+      updated.bpp_score = scoreFormatted;
+      hasChanges = true;
+    }
+  }
+
+  return hasChanges ? updated : data;
+}
+
 // --- Field Components ---
 function TextField({ field, value, onChange, disabled }: { field: FieldSchema; value: string; onChange: (v: string) => void; disabled: boolean }) {
+  const isAuto = Boolean(field.formula);
   return (
-    <input
-      id={field.id}
-      type={field.type === 'number' ? 'number' : 'text'}
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={field.placeholder}
-      min={field.min}
-      max={field.max}
-      step={field.step}
-      readOnly={field.readOnly || disabled}
-      className="vmd-input"
-    />
+    <div className="relative flex items-center">
+      <input
+        id={field.id}
+        type={field.type === 'number' ? 'number' : 'text'}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        min={field.min}
+        max={field.max}
+        step={field.step}
+        readOnly={field.readOnly || disabled}
+        className={`vmd-input w-full ${field.unit ? 'pr-12' : ''} ${isAuto ? 'bg-slate-50 font-bold text-slate-800' : ''}`}
+      />
+      {field.unit && (
+        <span className="absolute right-3 text-xs font-bold text-slate-400 select-none pointer-events-none">
+          {field.unit}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -310,7 +472,7 @@ export default function DynamicForm({ schema: rawSchema, initialData = {}, userR
         }
       }
     }
-    return base;
+    return evaluateClinicalFormulas(base);
   }, [rawSchema, initialData]);
 
   const [formData, setFormData] = useState<Record<string, unknown>>(computedInitial);
@@ -320,7 +482,10 @@ export default function DynamicForm({ schema: rawSchema, initialData = {}, userR
   }, [computedInitial]);
 
   const updateField = (fieldId: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [fieldId]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [fieldId]: value };
+      return evaluateClinicalFormulas(next);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -340,11 +505,18 @@ export default function DynamicForm({ schema: rawSchema, initialData = {}, userR
             {field.label}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </label>
-          {field.role_badge && (
-            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-              {field.role_badge}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {field.formula && (
+              <span className="bg-sky-100 text-sky-800 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                Auto-calc
+              </span>
+            )}
+            {field.role_badge && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                {field.role_badge}
+              </span>
+            )}
+          </div>
         </div>
 
         {isDisabled ? (
@@ -362,6 +534,9 @@ export default function DynamicForm({ schema: rawSchema, initialData = {}, userR
           <DateField field={field} value={value as string} onChange={(v) => updateField(field.id, v)} disabled={isDisabled} />
         ) : (
           <TextField field={field} value={value as string} onChange={(v) => updateField(field.id, v)} disabled={isDisabled} />
+        )}
+        {field.helper_text && (
+          <p className="text-[11px] text-slate-400 leading-tight">{field.helper_text}</p>
         )}
       </div>
     );

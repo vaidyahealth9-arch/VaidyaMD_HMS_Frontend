@@ -12,6 +12,6 @@ export const appointmentsApi = {
     request<any>('/core/appointments/', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Record<string, unknown>) =>
     request<any>(`/core/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  triage: (id: string, data: { vitals: Record<string, any>; chief_complaint?: string; nurse_notes?: string }) =>
+  triage: (id: string, data: { vitals: Record<string, any>; chief_complaint?: string; nurse_notes?: string; provisional_diagnosis?: string }) =>
     request<any>(`/core/appointments/${id}/triage`, { method: 'PATCH', body: JSON.stringify(data) }),
 };

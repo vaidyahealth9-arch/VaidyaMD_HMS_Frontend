@@ -1,9 +1,9 @@
-// Unified Scan & Diagnostic Schemas Definitions for Female Scans & Male Andrology
+// Unified Scan & Diagnostic Schemas Definitions for Female Scans, Obstetric Scans & Male Andrology
 export interface ScanSchemaOption {
   value: string;
   label: string;
   shortLabel: string;
-  category: 'female' | 'male';
+  category: 'female' | 'obstetric' | 'male';
   aliases?: string[];
   badgeColor: string;
   badgeBg: string;
@@ -60,6 +60,49 @@ export const FEMALE_SCAN_OPTIONS: ScanSchemaOption[] = [
   },
 ];
 
+export const OBSTETRIC_SCAN_OPTIONS: ScanSchemaOption[] = [
+  {
+    value: 'nt_scan',
+    label: 'NT Scan / 1st Trimester Screening (11–13+6w)',
+    shortLabel: 'NT Scan',
+    category: 'obstetric',
+    aliases: ['nt', 'first_trimester_screening', 'nuchal_translucency'],
+    badgeColor: 'text-violet-700',
+    badgeBg: 'bg-violet-50',
+    badgeBorder: 'border-violet-200',
+  },
+  {
+    value: 'tiffa_scan',
+    label: 'TIFFA / Level-II Target Fetal Anatomy Scan (18–22w)',
+    shortLabel: 'TIFFA Scan',
+    category: 'obstetric',
+    aliases: ['tiffa', 'level2_scan', 'anomaly_scan', 'target_scan'],
+    badgeColor: 'text-indigo-700',
+    badgeBg: 'bg-indigo-50',
+    badgeBorder: 'border-indigo-200',
+  },
+  {
+    value: 'growth_scan',
+    label: 'Obstetric Growth & Fetal Well-being Scan (Hadlock EFW)',
+    shortLabel: 'Growth Scan',
+    category: 'obstetric',
+    aliases: ['growth', 'fetal_growth', 'growth_doppler'],
+    badgeColor: 'text-emerald-700',
+    badgeBg: 'bg-emerald-50',
+    badgeBorder: 'border-emerald-200',
+  },
+  {
+    value: 'doppler_bpp_scan',
+    label: 'Obstetric Doppler & Biophysical Profile (BPP)',
+    shortLabel: 'Doppler + BPP',
+    category: 'obstetric',
+    aliases: ['doppler_bpp', 'doppler_scan', 'bpp_scan', 'fetal_doppler'],
+    badgeColor: 'text-cyan-700',
+    badgeBg: 'bg-cyan-50',
+    badgeBorder: 'border-cyan-200',
+  },
+];
+
 export const MALE_SCAN_OPTIONS: ScanSchemaOption[] = [
   {
     value: 'casa_semen_analysis',
@@ -111,6 +154,7 @@ export const MALE_SCAN_OPTIONS: ScanSchemaOption[] = [
 
 export const ALL_SCAN_OPTIONS: ScanSchemaOption[] = [
   ...FEMALE_SCAN_OPTIONS,
+  ...OBSTETRIC_SCAN_OPTIONS,
   ...MALE_SCAN_OPTIONS,
 ];
 
@@ -126,6 +170,10 @@ export const normalizeScanType = (schemaType?: string): string => {
   if (s === 'sis') return 'sonohysterogram';
   if (s === 'pelvic_usg') return 'pelvic_organ_usg';
   if (s === 'semen_analysis_casa') return 'casa_semen_analysis';
+  if (s === 'nt' || s === 'first_trimester_screening') return 'nt_scan';
+  if (s === 'growth' || s === 'fetal_growth') return 'growth_scan';
+  if (s === 'tiffa' || s === 'level2_scan' || s === 'anomaly_scan') return 'tiffa_scan';
+  if (s === 'doppler_scan' || s === 'bpp_scan' || s === 'doppler_bpp') return 'doppler_bpp_scan';
   return s;
 };
 
@@ -143,6 +191,19 @@ export const isMaleScanType = (schemaType?: string): boolean => {
   ].includes(norm);
 };
 
+/**
+ * Checks if a given schema/record is obstetric ultrasound
+ */
+export const isObstetricScanType = (schemaType?: string): boolean => {
+  const norm = normalizeScanType(schemaType);
+  return [
+    'nt_scan',
+    'growth_scan',
+    'tiffa_scan',
+    'doppler_bpp_scan',
+  ].includes(norm);
+};
+
 export const getScanSchemaInfo = (schemaType?: string): ScanSchemaOption => {
   const norm = normalizeScanType(schemaType);
   const found = ALL_SCAN_OPTIONS.find(
@@ -151,14 +212,15 @@ export const getScanSchemaInfo = (schemaType?: string): ScanSchemaOption => {
   if (found) return found;
 
   const isMale = isMaleScanType(schemaType);
+  const isObs = isObstetricScanType(schemaType);
   return {
     value: schemaType || 'custom_scan',
     label: (schemaType || 'Diagnostic Scan').replace(/_/g, ' ').toUpperCase(),
     shortLabel: (schemaType || 'Scan').replace(/_/g, ' '),
-    category: isMale ? 'male' : 'female',
-    badgeColor: isMale ? 'text-blue-700' : 'text-slate-700',
-    badgeBg: isMale ? 'bg-blue-50' : 'bg-slate-100',
-    badgeBorder: isMale ? 'border-blue-200' : 'border-slate-200',
+    category: isMale ? 'male' : isObs ? 'obstetric' : 'female',
+    badgeColor: isMale ? 'text-blue-700' : isObs ? 'text-violet-700' : 'text-slate-700',
+    badgeBg: isMale ? 'bg-blue-50' : isObs ? 'bg-violet-50' : 'bg-slate-100',
+    badgeBorder: isMale ? 'border-blue-200' : isObs ? 'border-violet-200' : 'border-slate-200',
   };
 };
 
@@ -225,6 +287,81 @@ export const getScanKeyHighlights = (rec: any): { label: string; value: string }
     }
     if (d.endometrial_thickness_mm) {
       highlights.push({ label: 'ET', value: `${d.endometrial_thickness_mm} mm` });
+    }
+  }
+
+  // Obstetric Ultrasound Highlights
+  else if (schema === 'nt_scan') {
+    if (d.crl_mm) {
+      highlights.push({ label: 'CRL', value: `${d.crl_mm} mm` });
+    }
+    if (d.nt_mm) {
+      highlights.push({ label: 'NT', value: `${d.nt_mm} mm` });
+    }
+    if (d.nasal_bone) {
+      highlights.push({ label: 'Nasal Bone', value: String(d.nasal_bone) });
+    }
+    if (d.ga_crl || d.ga_lmp) {
+      highlights.push({ label: 'GA', value: String(d.ga_crl || d.ga_lmp) });
+    }
+    if (d.risk_estimate) {
+      highlights.push({ label: 'Risk', value: String(d.risk_estimate).replace(/_/g, ' ') });
+    }
+  } else if (schema === 'growth_scan') {
+    if (d.efw_g || d.efw_hadlock) {
+      highlights.push({ label: 'Hadlock EFW', value: `${d.efw_g || d.efw_hadlock} g` });
+    }
+    if (d.efw_percentile) {
+      highlights.push({ label: 'Centile', value: String(d.efw_percentile) });
+    }
+    if (d.ac_mm) {
+      highlights.push({ label: 'AC', value: `${d.ac_mm} mm` });
+    }
+    if (d.afi_cm) {
+      highlights.push({ label: 'AFI', value: `${d.afi_cm} cm` });
+    } else if (d.dvp_cm) {
+      highlights.push({ label: 'DVP', value: `${d.dvp_cm} cm` });
+    }
+    if (d.fetal_presentation) {
+      highlights.push({ label: 'Pres', value: String(d.fetal_presentation) });
+    }
+  } else if (schema === 'tiffa_scan') {
+    if (d.ga_lmp || d.ga_prior_scan) {
+      highlights.push({ label: 'GA', value: String(d.ga_lmp || d.ga_prior_scan) });
+    }
+    if (d.efw_g) {
+      highlights.push({ label: 'EFW', value: `${d.efw_g} g` });
+    }
+    if (d.fetal_heart_rate_bpm) {
+      highlights.push({ label: 'FHR', value: `${d.fetal_heart_rate_bpm} bpm` });
+    }
+    if (d.four_chamber_view) {
+      highlights.push({ label: '4-Chamber', value: String(d.four_chamber_view) });
+    }
+    if (d.soft_markers_detected) {
+      const sm = Array.isArray(d.soft_markers_detected)
+        ? d.soft_markers_detected.join(', ')
+        : String(d.soft_markers_detected);
+      highlights.push({ label: 'Markers', value: sm.slice(0, 16) });
+    }
+  } else if (schema === 'doppler_bpp_scan') {
+    if (d.bpp_score || d.bpp_total !== undefined) {
+      highlights.push({
+        label: 'BPP',
+        value: String(d.bpp_score || `${d.bpp_total}/${d.bpp_denominator || 8}`),
+      });
+    }
+    if (d.cerebroplacental_ratio_cpr || d.cpr) {
+      highlights.push({ label: 'CPR', value: String(d.cerebroplacental_ratio_cpr || d.cpr) });
+    }
+    if (d.umbilical_artery_ua_pi || d.ua_pi) {
+      highlights.push({ label: 'UA PI', value: String(d.umbilical_artery_ua_pi || d.ua_pi) });
+    }
+    if (d.middle_cerebral_artery_mca_pi || d.mca_pi) {
+      highlights.push({ label: 'MCA PI', value: String(d.middle_cerebral_artery_mca_pi || d.mca_pi) });
+    }
+    if (d.mean_uterine_artery_pi) {
+      highlights.push({ label: 'Mean UtA PI', value: String(d.mean_uterine_artery_pi) });
     }
   }
 

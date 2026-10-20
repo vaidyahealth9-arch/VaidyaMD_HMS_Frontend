@@ -33,6 +33,12 @@ export interface Invoice {
   patient_id: string;
   patient_name?: string;
   patient_vid?: string;
+  patient_mrn?: string;
+  patient_age?: number | string;
+  patient_gender?: string;
+  patient_sex?: string;
+  patient_address?: string;
+  patient_phone?: string;
   appointment_source: string;
   source_module?: string;
   source_reference_id?: string;
@@ -67,6 +73,7 @@ export interface BillingPatient {
   gender?: 'male' | 'female' | 'other';
   age?: number;
   blood_group?: string;
+  address?: string;
   partner_name?: string;
   partner_id?: string;
   photo_url?: string;

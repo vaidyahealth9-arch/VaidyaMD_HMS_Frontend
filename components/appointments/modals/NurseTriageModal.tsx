@@ -25,18 +25,21 @@ export default function NurseTriageModal({
     weight: '',
     spo2: '',
     chief_complaint: '',
+    provisional_diagnosis: '',
   });
   const [isSavingTriage, setIsSavingTriage] = useState(false);
 
   useEffect(() => {
     if (triageApt) {
+      const triageMeta = triageApt.metadata?.triage || triageApt.metadata_?.triage;
       setTriageForm({
-        bp: triageApt.vitals?.bp || '',
-        hr: triageApt.vitals?.hr || '',
-        temp: triageApt.vitals?.temp || '',
-        weight: triageApt.vitals?.weight || '',
-        spo2: triageApt.vitals?.spo2 || '',
-        chief_complaint: triageApt.chief_complaint || triageApt.reason || '',
+        bp: triageApt.vitals?.bp || triageMeta?.vitals?.bp || '',
+        hr: triageApt.vitals?.hr || triageMeta?.vitals?.hr || '',
+        temp: triageApt.vitals?.temp || triageMeta?.vitals?.temp || '',
+        weight: triageApt.vitals?.weight || triageMeta?.vitals?.weight || '',
+        spo2: triageApt.vitals?.spo2 || triageMeta?.vitals?.spo2 || '',
+        chief_complaint: triageApt.chief_complaint || triageApt.reason || triageMeta?.chief_complaint || '',
+        provisional_diagnosis: triageApt.provisional_diagnosis || triageApt.diagnosis || triageMeta?.provisional_diagnosis || '',
       });
     }
   }, [triageApt]);
@@ -57,6 +60,7 @@ export default function NurseTriageModal({
           spo2: triageForm.spo2,
         },
         chief_complaint: triageForm.chief_complaint,
+        provisional_diagnosis: triageForm.provisional_diagnosis,
       });
       toast.success('Triage Saved', `Recorded clinical vitals for ${triageApt.patient_name}`);
       onSuccess();
@@ -131,10 +135,21 @@ export default function NurseTriageModal({
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Chief Complaint</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Patient presents for..."
                   value={triageForm.chief_complaint}
                   onChange={(e) => setTriageForm({ ...triageForm, chief_complaint: e.target.value })}
+                  className="vmd-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Provisional Diagnosis / Nursing Impression</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Primary Infertility, PCOS, Review..."
+                  value={triageForm.provisional_diagnosis}
+                  onChange={(e) => setTriageForm({ ...triageForm, provisional_diagnosis: e.target.value })}
                   className="vmd-input text-xs"
                 />
               </div>

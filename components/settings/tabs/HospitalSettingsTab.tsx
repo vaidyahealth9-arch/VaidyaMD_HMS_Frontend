@@ -502,6 +502,79 @@ export default function HospitalSettingsTab({
                     />
                   </div>
 
+                  {/* ── Patient Demographics Visibility on Invoices & Bills ── */}
+                  <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <FileText className="w-4 h-4 text-primary" />
+                        <span>Patient Demographics on Bills & Prints</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">Controls print visibility across all departments</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={liveReceiptHeader.show_patient_age_gender ?? true}
+                          onChange={(e) =>
+                            setLiveReceiptHeader({
+                              ...liveReceiptHeader,
+                              show_patient_age_gender: e.target.checked,
+                            })
+                          }
+                          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                        />
+                        <span className="font-semibold text-slate-700">Patient Age & Sex</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={liveReceiptHeader.show_patient_address ?? true}
+                          onChange={(e) =>
+                            setLiveReceiptHeader({
+                              ...liveReceiptHeader,
+                              show_patient_address: e.target.checked,
+                            })
+                          }
+                          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                        />
+                        <span className="font-semibold text-slate-700">Patient Physical Address</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={liveReceiptHeader.show_patient_phone ?? true}
+                          onChange={(e) =>
+                            setLiveReceiptHeader({
+                              ...liveReceiptHeader,
+                              show_patient_phone: e.target.checked,
+                            })
+                          }
+                          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                        />
+                        <span className="font-semibold text-slate-700">Patient Phone Number</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={liveReceiptHeader.show_patient_vid ?? true}
+                          onChange={(e) =>
+                            setLiveReceiptHeader({
+                              ...liveReceiptHeader,
+                              show_patient_vid: e.target.checked,
+                            })
+                          }
+                          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                        />
+                        <span className="font-semibold text-slate-700">VID / MRN Number</span>
+                      </label>
+                    </div>
+                  </div>
+
                   {/* ── Print Header Lines & Color Customization ── */}
                   <div className="pt-3 border-t border-slate-200 space-y-3">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
@@ -805,12 +878,31 @@ export default function HospitalSettingsTab({
                 <div>
                   <span className="text-slate-400 block text-[9px] uppercase font-bold">Patient</span>
                   <span className="font-bold text-slate-800">Priya Sharma</span>
-                  <span className="text-slate-500 block">29Y / Female</span>
+                  {(liveReceiptHeader.show_patient_age_gender ?? true) && (
+                    <span className="text-slate-500 block">29Y / Female</span>
+                  )}
+                  {(liveReceiptHeader.show_patient_phone ?? true) && (
+                    <span className="text-slate-500 block font-mono text-[9px] mt-0.5">Ph: +91 98765 43210</span>
+                  )}
+                  {(liveReceiptHeader.show_patient_address ?? true) && (
+                    <span className="text-slate-600 block text-[9px] italic mt-0.5 truncate max-w-[150px]" title="Flat 402, Lotus Greens, Banjara Hills, Hyderabad">
+                      Addr: Banjara Hills, Hyd
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[9px] uppercase font-bold">VID / MRN</span>
-                  <span className="font-bold font-mono text-slate-800">HYD01-2024-0012</span>
-                  <span className="text-slate-500 block">Blood: A+</span>
+                  {(liveReceiptHeader.show_patient_vid ?? true) ? (
+                    <>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold">VID / MRN</span>
+                      <span className="font-bold font-mono text-slate-800">HYD01-2024-0012</span>
+                      <span className="text-slate-500 block">Blood: A+</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Blood Group</span>
+                      <span className="text-slate-800 font-bold block">A+ Positive</span>
+                    </>
+                  )}
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[9px] uppercase font-bold">Consultant</span>

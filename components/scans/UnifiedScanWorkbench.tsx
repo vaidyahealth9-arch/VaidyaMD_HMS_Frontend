@@ -19,10 +19,12 @@ import { fertilityApi, andrologyApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
 import {
   FEMALE_SCAN_OPTIONS,
+  OBSTETRIC_SCAN_OPTIONS,
   MALE_SCAN_OPTIONS,
   ALL_SCAN_OPTIONS,
   normalizeScanType,
   isMaleScanType,
+  isObstetricScanType,
   getScanSchemaInfo,
 } from './scanSchemas';
 import ScanHistorySidebar from './ScanHistorySidebar';
@@ -47,12 +49,18 @@ export default function UnifiedScanWorkbench({
 }: UnifiedScanWorkbenchProps) {
   const patientId = patient?.id;
   const initialIsMale = isMaleScanType(initialSchemaType);
+  const initialIsObs = isObstetricScanType(initialSchemaType);
 
-  const [activeCategory, setActiveCategory] = useState<'female' | 'male'>(
-    initialIsMale ? 'male' : 'female'
+  const [activeCategory, setActiveCategory] = useState<'female' | 'obstetric' | 'male'>(
+    initialIsMale ? 'male' : initialIsObs ? 'obstetric' : 'female'
   );
   const [activeSchemaType, setActiveSchemaType] = useState<string>(
-    normalizeScanType(initialSchemaType) || (initialIsMale ? 'casa_semen_analysis' : 'follicular_scan')
+    normalizeScanType(initialSchemaType) ||
+      (initialIsMale
+        ? 'casa_semen_analysis'
+        : initialIsObs
+        ? 'growth_scan'
+        : 'follicular_scan')
   );
   const [activeSchema, setActiveSchema] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -232,9 +240,12 @@ export default function UnifiedScanWorkbench({
     setSelectedRecordId(record.id);
     const recType = normalizeScanType(record.schema_type);
     const isMale = isMaleScanType(recType);
+    const isObs = isObstetricScanType(recType);
     if (isMale && activeCategory !== 'male') {
       setActiveCategory('male');
-    } else if (!isMale && activeCategory !== 'female') {
+    } else if (isObs && activeCategory !== 'obstetric') {
+      setActiveCategory('obstetric');
+    } else if (!isMale && !isObs && activeCategory !== 'female') {
       setActiveCategory('female');
     }
     if (recType && recType !== activeSchemaType) {
@@ -282,7 +293,22 @@ export default function UnifiedScanWorkbench({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>♀ Female Scans &amp; Diagnostics</span>
+              <span>♀ Gynaec &amp; Pelvic Scans</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveCategory('obstetric');
+                setActiveSchemaType('growth_scan');
+                setSelectedRecordId(null);
+              }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeCategory === 'obstetric'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🤰 Obstetric Ultrasound</span>
             </button>
             <button
               type="button"
@@ -297,16 +323,20 @@ export default function UnifiedScanWorkbench({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>♂ Male Diagnostics &amp; Andrology</span>
+              <span>♂ Male Diagnostics</span>
             </button>
           </div>
         </div>
 
-        {/* Scan/Protocol Dropdown & New Session Button (Appearing for BOTH Male & Female) */}
+        {/* Scan/Protocol Dropdown & New Session Button */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-bold text-slate-500">
-              {activeCategory === 'male' ? 'Andrology Protocol:' : 'Scan / Protocol:'}
+              {activeCategory === 'male'
+                ? 'Andrology Protocol:'
+                : activeCategory === 'obstetric'
+                ? 'Obstetric Scan:'
+                : 'Scan / Protocol:'}
             </span>
             <select
               value={activeSchemaType}
@@ -316,7 +346,12 @@ export default function UnifiedScanWorkbench({
               }}
               className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 focus:bg-white focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer shadow-2xs"
             >
-              {(activeCategory === 'male' ? MALE_SCAN_OPTIONS : FEMALE_SCAN_OPTIONS).map((opt) => (
+              {(activeCategory === 'male'
+                ? MALE_SCAN_OPTIONS
+                : activeCategory === 'obstetric'
+                ? OBSTETRIC_SCAN_OPTIONS
+                : FEMALE_SCAN_OPTIONS
+              ).map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -333,7 +368,11 @@ export default function UnifiedScanWorkbench({
           >
             <Plus className="w-3.5 h-3.5 text-emerald-600" />
             <span>
-              {activeCategory === 'male' ? 'New Andrology Session' : 'New Scan Session'}
+              {activeCategory === 'male'
+                ? 'New Andrology Session'
+                : activeCategory === 'obstetric'
+                ? 'New Obstetric Scan'
+                : 'New Scan Session'}
             </span>
           </button>
         </div>

@@ -7,7 +7,7 @@ interface ReceiptModalProps {
   invoice: Invoice | null;
   isOpen: boolean;
   onClose: () => void;
-  defaultLayout?: 'a4' | 'thermal';
+  defaultLayout?: 'a4' | 'a5' | 'thermal';
 }
 
 /**

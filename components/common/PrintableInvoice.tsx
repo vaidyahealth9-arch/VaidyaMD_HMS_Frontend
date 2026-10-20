@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatDate } from '@/lib/utils';
 import PrintableModal from './PrintableModal';
 import PrintableReportHeader from './PrintableReportHeader';
 import PrintableReportFooter from './PrintableReportFooter';
 import A4Sheet from './A4Sheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { patientsApi } from '@/lib/api';
 
 interface InvoiceItem {
   description: string;
@@ -24,10 +25,17 @@ interface InvoiceItem {
 
 interface PrintableInvoiceProps {
   invoice: {
+    id?: string;
     invoice_number: string;
+    patient_id?: string;
     patient_name?: string;
     patient_vid?: string;
     patient_mrn?: string;
+    patient_age?: number | string;
+    patient_gender?: string;
+    patient_sex?: string;
+    patient_address?: string;
+    patient_phone?: string;
     created_at: string;
     appointment_source?: string;
     source_module?: string;
@@ -68,6 +76,36 @@ function PayBadge({ due, paid }: { due: number; paid: number }) {
 
 export default function PrintableInvoice({ invoice, onClose, defaultLayout }: PrintableInvoiceProps) {
   const { currentBranch, user } = useAuth() || {};
+  const branchCfg = (currentBranch?.receipt_header as any) || {};
+
+  const [showAgeGender, setShowAgeGender] = useState<boolean>(branchCfg.show_patient_age_gender ?? true);
+  const [showAddress, setShowAddress] = useState<boolean>(branchCfg.show_patient_address ?? true);
+  const [showPhone, setShowPhone] = useState<boolean>(branchCfg.show_patient_phone ?? true);
+  const [showVid, setShowVid] = useState<boolean>(branchCfg.show_patient_vid ?? true);
+
+  const [fetchedPatient, setFetchedPatient] = useState<any>(null);
+
+  useEffect(() => {
+    const hasDemographics = Boolean(
+      invoice.patient_address || invoice.patient_age || invoice.patient_gender || invoice.patient_phone
+    );
+    if (!hasDemographics && invoice.patient_id) {
+      patientsApi
+        .get(invoice.patient_id)
+        .then((p: any) => {
+          if (p) setFetchedPatient(p);
+        })
+        .catch(() => {});
+    }
+  }, [invoice.patient_id, invoice.patient_address, invoice.patient_age, invoice.patient_gender, invoice.patient_phone]);
+
+  const patientName = invoice.patient_name || fetchedPatient?.name || 'Walk-in Patient';
+  const patientVid = invoice.patient_vid || invoice.patient_mrn || fetchedPatient?.vid || fetchedPatient?.mrn || '—';
+  const patientAge = invoice.patient_age ?? fetchedPatient?.age;
+  const patientGender = invoice.patient_gender || invoice.patient_sex || fetchedPatient?.gender;
+  const patientPhone = invoice.patient_phone || fetchedPatient?.phone;
+  const patientAddress = invoice.patient_address || fetchedPatient?.address;
+
   const hasFewItems = Boolean(invoice.items && invoice.items.length <= 4);
   const initialLayout = defaultLayout || (hasFewItems ? 'a5' : 'a4');
   const [layout, setLayout] = useState<'a4' | 'a5' | 'thermal'>(initialLayout);
@@ -152,44 +190,85 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
             `}</style>
           )}
 
-          {/* Layout switcher bar */}
-          <div className="flex items-center justify-between px-4 py-2 bg-slate-100 rounded-lg no-print">
+          {/* Layout switcher bar & demographic print options */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-slate-100 rounded-lg no-print">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-600">Print Format:</span>
+              <div className="flex gap-1.5 p-0.5 bg-slate-200/80 rounded-md">
+                <button
+                  type="button"
+                  onClick={() => setLayout('a4')}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    layout === 'a4' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  📄 A4 Letterhead
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayout('a5')}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    layout === 'a5' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  📋 A5 Slip (Landscape)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayout('thermal')}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    layout === 'thermal' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🧾 80mm POS Slip
+                </button>
+              </div>
               {hasFewItems && (
                 <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-bold">
-                  🌱 A5 Suggested (Saves Paper)
+                  🌱 A5 Suggested
                 </span>
               )}
             </div>
-            <div className="flex gap-1.5 p-0.5 bg-slate-200/80 rounded-md">
-              <button
-                type="button"
-                onClick={() => setLayout('a4')}
-                className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
-                  layout === 'a4' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                📄 A4 Letterhead
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayout('a5')}
-                className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
-                  layout === 'a5' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                📋 A5 Slip (Landscape)
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayout('thermal')}
-                className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
-                  layout === 'thermal' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                🧾 80mm POS Slip
-              </button>
+
+            {/* Quick Demographics Print Toggles */}
+            <div className="flex items-center gap-2.5 text-xs text-slate-600 bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Include:</span>
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showAgeGender}
+                  onChange={(e) => setShowAgeGender(e.target.checked)}
+                  className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] font-medium text-slate-700">Age/Sex</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showAddress}
+                  onChange={(e) => setShowAddress(e.target.checked)}
+                  className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] font-medium text-slate-700">Address</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showPhone}
+                  onChange={(e) => setShowPhone(e.target.checked)}
+                  className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] font-medium text-slate-700">Phone</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showVid}
+                  onChange={(e) => setShowVid(e.target.checked)}
+                  className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] font-medium text-slate-700">VID</span>
+              </label>
             </div>
           </div>
 
@@ -220,13 +299,33 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                 </div>
                 <div className="flex justify-between">
                   <span>Patient:</span>
-                  <span className="font-bold truncate max-w-[170px]">{invoice.patient_name || 'Walk-in'}</span>
+                  <span className="font-bold truncate max-w-[170px]">{patientName}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>VID/MRN:</span>
-                  <span>{invoice.patient_vid || invoice.patient_mrn || '—'}</span>
-                </div>
-                <div className="flex justify-between">
+                {showVid && (
+                  <div className="flex justify-between">
+                    <span>VID/MRN:</span>
+                    <span>{patientVid}</span>
+                  </div>
+                )}
+                {showAgeGender && (patientAge || patientGender) && (
+                  <div className="flex justify-between">
+                    <span>Age/Sex:</span>
+                    <span>{[patientAge ? `${patientAge} Y` : null, patientGender].filter(Boolean).join(' / ')}</span>
+                  </div>
+                )}
+                {showPhone && patientPhone && (
+                  <div className="flex justify-between">
+                    <span>Phone:</span>
+                    <span>{patientPhone}</span>
+                  </div>
+                )}
+                {showAddress && patientAddress && (
+                  <div className="pt-0.5 text-[10px] text-slate-700 leading-tight">
+                    <span className="font-semibold">Addr: </span>
+                    <span className="break-words">{patientAddress}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-0.5">
                   <span>Dept/Source:</span>
                   <span className="uppercase">{invoice.appointment_source || 'OPD'}</span>
                 </div>
@@ -332,26 +431,63 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
             >
               <div className={`flex-1 flex flex-col justify-between ${layout === 'a5' ? 'py-1 px-4 print:px-[6mm] space-y-1.5 text-[10px]' : 'py-2.5 px-6 sm:px-8 print:px-[12mm] space-y-4'}`}>
                 <div className={layout === 'a5' ? 'space-y-1.5' : 'space-y-4'}>
-                  <div className={`grid grid-cols-2 gap-3 rounded-md ${layout === 'a5' ? 'p-1.5 text-[9.5px]' : 'p-2.5'}`} style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}>
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#9ca3af' }}>Patient Information</p>
-                      <p className={`font-semibold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: '#111827' }}>{invoice.patient_name || 'Patient'}</p>
-                      <p className="font-mono text-xs mt-0.5" style={{ color: '#4b5563' }}>VID / MRN: {invoice.patient_vid || invoice.patient_mrn || '—'}</p>
+                  <div
+                    className={`grid grid-cols-2 gap-3 rounded-md ${
+                      layout === 'a5' ? 'p-2 text-[9.5px]' : 'p-3'
+                    }`}
+                    style={{ background: '#F7F8FA', border: '0.5px solid #E3E8EE' }}
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                        Patient Information
+                      </p>
+                      <p className={`font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'} text-slate-900`}>
+                        {patientName}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-600">
+                        {showVid && (
+                          <span className="font-mono font-medium">
+                            <strong className="text-slate-500 font-semibold">VID/MRN:</strong> {patientVid}
+                          </span>
+                        )}
+                        {showAgeGender && (patientAge || patientGender) && (
+                          <span>
+                            <strong className="text-slate-500 font-semibold">Age/Sex:</strong>{' '}
+                            {[patientAge ? `${patientAge} Y` : null, patientGender].filter(Boolean).join(' / ')}
+                          </span>
+                        )}
+                      </div>
+                      {showPhone && patientPhone && (
+                        <p className="text-[10px] text-slate-600">
+                          <strong className="text-slate-500 font-semibold">Phone:</strong> {patientPhone}
+                        </p>
+                      )}
+                      {showAddress && patientAddress && (
+                        <p className="text-[10px] text-slate-700 leading-snug pt-0.5">
+                          <strong className="text-slate-500 font-semibold">Address:</strong> {patientAddress}
+                        </p>
+                      )}
                       {invoice.reason_for_attendance && (
-                        <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>
+                        <p className="text-[10px] text-slate-500 italic pt-0.5">
                           <strong>Reason:</strong> {invoice.reason_for_attendance}
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#9ca3af' }}>Invoice Details</p>
-                      <p className={`font-mono font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: '#0B4F6C' }}>{invoice.invoice_number}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: '#4b5563' }}>Date: {formatDate(invoice.created_at)}</p>
-                      <p className="text-[10px]" style={{ color: '#4b5563' }}>
-                        Dept / Source: <strong style={{ color: '#111827' }}>{invoice.appointment_source || 'OPD'}</strong>
+                    <div className="text-right space-y-0.5">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                        Invoice Details
+                      </p>
+                      <p className={`font-mono font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: '#0B4F6C' }}>
+                        {invoice.invoice_number}
+                      </p>
+                      <p className="text-[10px] text-slate-600">
+                        Date: {formatDate(invoice.created_at)}
+                      </p>
+                      <p className="text-[10px] text-slate-600">
+                        Dept / Source: <strong className="text-slate-900 uppercase">{invoice.appointment_source || 'OPD'}</strong>
                       </p>
                       {invoice.payment_method && (
-                        <p className="text-[10px]" style={{ color: '#4b5563' }}>
+                        <p className="text-[10px] text-slate-600">
                           Payment Mode: <strong style={{ color: '#0B4F6C' }} className="uppercase">{invoice.payment_method}</strong>
                         </p>
                       )}

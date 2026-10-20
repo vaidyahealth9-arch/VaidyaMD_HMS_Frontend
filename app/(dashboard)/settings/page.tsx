@@ -81,6 +81,10 @@ export default function SettingsMasterPage() {
     watermark_url: '',
     watermark_opacity: 0.08,
     disclaimer: 'Valid for statutory compliance and official healthcare documentation.',
+    show_patient_age_gender: true,
+    show_patient_address: true,
+    show_patient_phone: true,
+    show_patient_vid: true,
   });
 
   const [staffUsers, setStaffUsers] = useState<any[]>([]);
