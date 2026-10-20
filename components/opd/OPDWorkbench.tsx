@@ -231,21 +231,23 @@ export default function OPDWorkbench({
   // Compute effective triage data across all sources (Appointment, Props, or Past Nurse Triage Records)
   const effectiveTriage = useMemo(() => {
     // 1. Explicit triageData prop
-    if (triageData?.vitals || triageData?.chief_complaint) {
+    if (triageData?.vitals || triageData?.chief_complaint || triageData?.provisional_diagnosis || triageData?.diagnosis) {
       return {
         vitals: triageData.vitals,
         chief_complaint: triageData.chief_complaint,
         nurse_notes: triageData.nurse_notes,
+        provisional_diagnosis: triageData.provisional_diagnosis || triageData.diagnosis,
         source: 'Appointment Triage',
       };
     }
     // 2. Appointment triage metadata
     const apptTriage = currentAppointment?.metadata?.triage || currentAppointment?.metadata_?.triage;
-    if (apptTriage?.vitals || apptTriage?.chief_complaint) {
+    if (apptTriage?.vitals || apptTriage?.chief_complaint || apptTriage?.provisional_diagnosis || apptTriage?.diagnosis) {
       return {
         vitals: apptTriage.vitals,
         chief_complaint: apptTriage.chief_complaint,
         nurse_notes: apptTriage.nurse_notes,
+        provisional_diagnosis: apptTriage.provisional_diagnosis || apptTriage.diagnosis,
         source: 'Appointment Triage',
       };
     }
@@ -270,6 +272,7 @@ export default function OPDWorkbench({
         },
         chief_complaint: triageRecord.data?.chief_complaints || triageRecord.data?.chief_complaint,
         nurse_notes: triageRecord.data?.nurse_notes,
+        provisional_diagnosis: triageRecord.data?.provisional_diagnosis || triageRecord.data?.diagnosis,
         cvs_findings: triageRecord.data?.cvs_findings,
         cns_findings: triageRecord.data?.cns_findings,
         rs_findings: triageRecord.data?.rs_findings,
@@ -343,6 +346,9 @@ export default function OPDWorkbench({
       }
       if (effectiveTriage.nurse_notes) {
         setValue('nurse_notes', effectiveTriage.nurse_notes);
+      }
+      if (effectiveTriage.provisional_diagnosis) {
+        setValue('provisional_diagnosis', effectiveTriage.provisional_diagnosis);
       }
       if (effectiveTriage.cvs_findings) setValue('cvs_findings', effectiveTriage.cvs_findings);
       if (effectiveTriage.cns_findings) setValue('cns_findings', effectiveTriage.cns_findings);
@@ -529,7 +535,8 @@ export default function OPDWorkbench({
     if (d.previous_history) setValue('previous_history', d.previous_history);
     if (d.present_history) setValue('present_history', d.present_history);
     if (d.examination) setValue('examination', d.examination);
-    if (d.provisional_diagnosis) setValue('provisional_diagnosis', d.provisional_diagnosis);
+    if (d.provisional_diagnosis || d.diagnosis) setValue('provisional_diagnosis', d.provisional_diagnosis || d.diagnosis);
+    if (d.nurse_notes) setValue('nurse_notes', d.nurse_notes);
     if (d.investigations_to_be_advised) setValue('investigations_to_be_advised', d.investigations_to_be_advised);
     if (d.treatment_notes) setValue('treatment_notes', d.treatment_notes);
     if (d.plan) setValue('plan', d.plan);
@@ -716,6 +723,7 @@ export default function OPDWorkbench({
            vitals: vitalsPayload,
            chief_complaint: formData.chief_complaints,
            nurse_notes: formData.nurse_notes,
+           provisional_diagnosis: formData.provisional_diagnosis,
          });
        }
 
@@ -729,6 +737,8 @@ export default function OPDWorkbench({
            ...formData,
            record_type: 'nurse_triage',
            vitals: vitalsPayload,
+           provisional_diagnosis: formData.provisional_diagnosis,
+           diagnosis: formData.provisional_diagnosis,
            status: 'triage_completed',
          },
        });
@@ -741,7 +751,7 @@ export default function OPDWorkbench({
       queryClient.invalidateQueries({ queryKey: ['opd-history', selectedPatientId] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['patient-appointments', selectedPatientId] });
-      setSaveSuccessMessage('Nurse triage vitals recorded successfully for Doctor OPD Consultation!');
+      setSaveSuccessMessage('Nurse triage vitals & provisional diagnosis recorded successfully for Doctor OPD Consultation!');
       setTimeout(() => setSaveSuccessMessage(null), 5000);
     },
   });
@@ -945,7 +955,7 @@ export default function OPDWorkbench({
         spo2: rec.data?.spo2 ? `${rec.data.spo2}%` : undefined,
         rr: rec.data?.respiratory_rate ? `${rec.data.respiratory_rate} /min` : undefined,
       },
-      diagnosis: rec.data?.provisional_diagnosis || (rec.data?.examination ? undefined : 'Fertility Review'),
+      diagnosis: rec.data?.provisional_diagnosis || rec.data?.diagnosis || (rec.data?.examination ? undefined : 'Fertility Review'),
       differentialDiagnosis: rec.data?.differential_diagnosis,
       investigations: rec.data?.investigations_to_be_advised || rec.data?.investigations_ordered || rec.data?.previous_investigations,
       medications: meds,
@@ -1046,7 +1056,7 @@ export default function OPDWorkbench({
                 isPending={saveNurseTriageMutation.isPending}
               />
 
-              {/* Nurse Triage Save Action */}
+              {/* Nurse Triage Save & Preview Actions */}
               <div className="flex items-center justify-start gap-3 pt-4 border-t border-slate-200">
                 <Button
                   type="submit"
@@ -1054,7 +1064,16 @@ export default function OPDWorkbench({
                   className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 h-10 rounded-md shadow-sm gap-2"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{saveNurseTriageMutation.isPending ? 'Saving Triage...' : 'Save Nurse Triage Vitals'}</span>
+                  <span>{saveNurseTriageMutation.isPending ? 'Saving Triage...' : 'Save Nurse Triage & Diagnosis'}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenPrintPreview()}
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold px-4 h-10 rounded-md shadow-2xs gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-slate-500" />
+                  <span>Print / Preview Assessment Sheet</span>
                 </Button>
               </div>
             </form>

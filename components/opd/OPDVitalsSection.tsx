@@ -181,6 +181,24 @@ export default function OPDVitalsSection({
             </div>
           </div>
 
+          {/* Triage Provisional Diagnosis / Clinical Impression */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-700">
+                Provisional Diagnosis / Nursing Clinical Impression
+              </label>
+              <span className="text-[10px] text-slate-400 font-medium">Editable in both Nurse Triage &amp; Doctor View</span>
+            </div>
+            <Input
+              {...register('provisional_diagnosis')}
+              placeholder="e.g. Primary Infertility, PCOS, Dysmenorrhea, Pregnancy Review..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-md h-9 text-xs font-medium text-slate-900 focus:bg-white"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">
+              Diagnosis entered here will update the Outpatient Consultation &amp; Clinical Assessment sheet.
+            </p>
+          </div>
+
           {/* Quick Systemic Findings */}
           <div className="pt-2 border-t border-slate-100">
             <h4 className="text-xs font-bold text-slate-700 mb-2">Preliminary Systemic Findings (Optional)</h4>

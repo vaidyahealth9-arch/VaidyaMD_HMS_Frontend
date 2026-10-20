@@ -15,16 +15,18 @@ import {
 } from 'lucide-react';
 import {
   FEMALE_SCAN_OPTIONS,
+  OBSTETRIC_SCAN_OPTIONS,
   MALE_SCAN_OPTIONS,
   normalizeScanType,
   isMaleScanType,
+  isObstetricScanType,
   getScanSchemaInfo,
   getScanKeyHighlights,
 } from './scanSchemas';
 
 export interface ScanHistorySidebarProps {
   records: any[];
-  category?: 'female' | 'male';
+  category?: 'female' | 'obstetric' | 'male';
   selectedRecordId: string | null;
   onSelectForEdit: (record: any) => void;
   onViewRecord: (record: any) => void;
@@ -55,13 +57,21 @@ export default function ScanHistorySidebar({
   }, [category]);
 
   // Schema options applicable to the active category
-  const schemaOptions = category === 'male' ? MALE_SCAN_OPTIONS : FEMALE_SCAN_OPTIONS;
+  const schemaOptions =
+    category === 'male'
+      ? MALE_SCAN_OPTIONS
+      : category === 'obstetric'
+      ? OBSTETRIC_SCAN_OPTIONS
+      : FEMALE_SCAN_OPTIONS;
 
-  // Filter records strictly by active category (Male vs Female)
+  // Filter records strictly by active category (Male vs Obstetric vs Female)
   const categoryRecords = useMemo(() => {
     return records.filter((r) => {
       const isMale = isMaleScanType(r.schema_type);
-      return category === 'male' ? isMale : !isMale;
+      const isObs = isObstetricScanType(r.schema_type);
+      if (category === 'male') return isMale;
+      if (category === 'obstetric') return isObs;
+      return !isMale && !isObs;
     });
   }, [records, category]);
 
@@ -128,6 +138,8 @@ export default function ScanHistorySidebar({
             className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold border ${
               category === 'male'
                 ? 'bg-blue-50 border-blue-200 text-blue-700'
+                : category === 'obstetric'
+                ? 'bg-violet-50 border-violet-200 text-violet-700'
                 : 'bg-rose-50 border-rose-200 text-rose-700'
             }`}
           >
@@ -135,11 +147,17 @@ export default function ScanHistorySidebar({
           </div>
           <div>
             <h3 className="font-bold text-xs text-slate-900 tracking-wide uppercase">
-              {category === 'male' ? 'Male Diagnostics & CASA' : 'Female Ultrasound Scans'}
+              {category === 'male'
+                ? 'Male Diagnostics & CASA'
+                : category === 'obstetric'
+                ? 'Obstetric Ultrasound Scans'
+                : 'Female Ultrasound Scans'}
             </h3>
             <p className="text-[10px] text-slate-400">
               {category === 'male'
                 ? 'Chronological andrology & semen records'
+                : category === 'obstetric'
+                ? 'Chronological antenatal obstetric scans'
                 : 'Chronological ultrasound scan visits'}
             </p>
           </div>

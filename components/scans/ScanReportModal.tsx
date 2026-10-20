@@ -53,6 +53,13 @@ export default function ScanReportModal({
         'cycle_day',
         'impression',
         'recommendations',
+        'lmp_date',
+        'lmp',
+        'edd_lmp',
+        'ga_lmp',
+        'ga_lmp_days',
+        'obstetric_history',
+        'referring_clinician',
       ].includes(key)
     ) {
       return false;
@@ -65,6 +72,21 @@ export default function ScanReportModal({
   });
 
   const isMale = schemaInfo.category === 'male';
+  const isObstetric = schemaInfo.category === 'obstetric';
+
+  const metaFields = isObstetric
+    ? [
+        { label: 'Investigation', value: schemaInfo.shortLabel },
+        { label: 'GA by Dating', value: String(data.ga_lmp || data.ga_crl || data.ga_prior_scan || '—') },
+        { label: 'EDD', value: String(data.edd_lmp || data.edd_prior_scan || '—') },
+        { label: 'Session ID', value: record.id?.slice(0, 8)?.toUpperCase() || 'OBS-1' },
+      ]
+    : [
+        { label: 'Investigation', value: schemaInfo.shortLabel },
+        { label: 'Cycle Day', value: data.cycle_day ? `Day ${data.cycle_day}` : '—' },
+        { label: 'Session ID', value: record.id?.slice(0, 8)?.toUpperCase() || 'OBS-1' },
+        { label: 'Status', value: 'Authorized & Certified' },
+      ];
 
   return (
     <PrintableModal
@@ -77,9 +99,13 @@ export default function ScanReportModal({
         title: schemaInfo.label,
         subtitle: isMale
           ? 'Andrology Laboratory & Male Reproductive Diagnostics Division'
+          : isObstetric
+          ? 'Fetal Medicine & Antenatal Ultrasound Imaging Division'
           : 'Diagnostic Ultrasound & Clinical Imaging Division',
         department: isMale
           ? 'Department of Andrology & Reproductive Biology'
+          : isObstetric
+          ? 'Department of Fetal Medicine & Perinatal Ultrasonography'
           : 'Department of Reproductive Medicine & Ultrasonography',
         patient: patient || {
           name: record.patient_name || 'Patient',
@@ -87,29 +113,47 @@ export default function ScanReportModal({
         },
         partner: partner,
         doctor: {
-          name: record.doctor_name || record.created_by_name || (isMale ? 'Consultant Andrologist' : 'Consultant Sonologist'),
+          name:
+            record.doctor_name ||
+            record.created_by_name ||
+            (isMale
+              ? 'Consultant Andrologist'
+              : isObstetric
+              ? 'Consultant Fetal Medicine Specialist'
+              : 'Consultant Sonologist'),
           qualification: isMale
             ? 'MD (Pathology), Clinical Embryologist & Andrologist'
+            : isObstetric
+            ? 'MD, DNB (OBGYN), Fellowship in Fetal Medicine'
             : 'MD (OBGYN), Fellowship in Reproductive Ultrasound',
-          department: isMale ? 'Andrology & Fetal Medicine' : 'Fetal & Reproductive Medicine',
+          department: isMale
+            ? 'Andrology & Fetal Medicine'
+            : isObstetric
+            ? 'Fetal Medicine & Obstetrics'
+            : 'Fetal & Reproductive Medicine',
         },
         date: scanDate,
-        metaFields: [
-          { label: 'Investigation', value: schemaInfo.shortLabel },
-          { label: 'Cycle Day', value: data.cycle_day ? `Day ${data.cycle_day}` : '—' },
-          { label: 'Session ID', value: record.id?.slice(0, 8)?.toUpperCase() || 'OBS-1' },
-          { label: 'Status', value: 'Authorized & Certified' },
-        ],
+        metaFields,
       }}
       footerProps={{
         signatoryName:
           record.doctor_name ||
           record.created_by_name ||
-          (isMale ? 'Consultant Andrologist & Embryologist' : 'Consultant Sonologist & Infertility Specialist'),
+          (isMale
+            ? 'Consultant Andrologist & Embryologist'
+            : isObstetric
+            ? 'Consultant Fetal Medicine Specialist'
+            : 'Consultant Sonologist & Infertility Specialist'),
         signatoryTitle: isMale
           ? 'Consultant Andrologist / Embryologist'
+          : isObstetric
+          ? 'Consultant Fetal Medicine Specialist'
           : 'Consultant Sonologist & Infertility Specialist',
-        signatoryQualification: isMale ? 'MD, PhD (Andrology)' : 'MD, DNB (OBGYN), F.ART',
+        signatoryQualification: isMale
+          ? 'MD, PhD (Andrology)'
+          : isObstetric
+          ? 'MD, DNB (OBGYN), Fellowship in Fetal Medicine'
+          : 'MD, DNB (OBGYN), F.ART',
         showSignatory: true,
         showComputerGeneratedNotice: true,
       }}
@@ -143,13 +187,42 @@ export default function ScanReportModal({
           </div>
 
           {/* Clinical Indications & Patient History (Clean Text — No Opaque Box Patches) */}
-          {(data.clinical_history || data.indication || data.cycle_day) && (
+          {/* Clinical Indications & Antenatal Patient History */}
+          {(data.clinical_history || data.indication || data.cycle_day || data.lmp_date || data.lmp || data.edd_lmp || data.ga_lmp || data.obstetric_history) && (
             <div className="space-y-1.5 py-1 bg-transparent">
               <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-slate-600" />
-                <span>Clinical Indication &amp; Patient History</span>
+                <span>
+                  {isObstetric
+                    ? 'Antenatal Clinical Profile & Obstetric Dating'
+                    : 'Clinical Indication & Patient History'}
+                </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-xs pt-1">
+                {data.obstetric_history && (
+                  <p>
+                    <span className="text-slate-500 font-medium">Obstetric History:</span>{' '}
+                    <strong className="text-slate-900 ml-1">{data.obstetric_history}</strong>
+                  </p>
+                )}
+                {(data.lmp_date || data.lmp) && (
+                  <p>
+                    <span className="text-slate-500 font-medium">LMP:</span>{' '}
+                    <strong className="text-slate-900 ml-1">{data.lmp_date || data.lmp}</strong>
+                  </p>
+                )}
+                {data.edd_lmp && (
+                  <p>
+                    <span className="text-slate-500 font-medium">EDD (by LMP):</span>{' '}
+                    <strong className="text-slate-900 ml-1">{data.edd_lmp}</strong>
+                  </p>
+                )}
+                {data.ga_lmp && (
+                  <p>
+                    <span className="text-slate-500 font-medium">GA (by LMP):</span>{' '}
+                    <strong className="text-slate-900 ml-1">{data.ga_lmp}</strong>
+                  </p>
+                )}
                 {data.cycle_day && (
                   <p>
                     <span className="text-slate-500 font-medium">Cycle Day:</span>{' '}
@@ -157,7 +230,7 @@ export default function ScanReportModal({
                   </p>
                 )}
                 {data.indication && (
-                  <p>
+                  <p className={isObstetric ? 'col-span-full' : ''}>
                     <span className="text-slate-500 font-medium">Indication:</span>{' '}
                     <strong className="text-slate-900 ml-1">{data.indication}</strong>
                   </p>
@@ -177,7 +250,11 @@ export default function ScanReportModal({
             <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 flex items-center gap-1.5">
               <Activity className="w-3.5 h-3.5 text-slate-600" />
               <span>
-                {isMale ? 'Andrology Lab Parameters & Semen Profile' : 'Biometric Observations & Ultrasound Findings'}
+                {isMale
+                  ? 'Andrology Lab Parameters & Semen Profile'
+                  : isObstetric
+                  ? 'Ultrasound Biometry, Doppler & Anatomical Survey'
+                  : 'Biometric Observations & Ultrasound Findings'}
               </span>
             </h4>
 

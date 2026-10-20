@@ -282,8 +282,12 @@ export default function UniversalBillingModal({
           invoice_number: dispenseRes.invoice_number,
           patient_id: selectedPatientId,
           patient_name: dispenseRes.patient_name,
-          patient_mrn: dispenseRes.patient_mrn,
-          patient_vid: dispenseRes.patient_mrn,
+          patient_mrn: dispenseRes.patient_mrn || dispenseRes.patient_vid,
+          patient_vid: dispenseRes.patient_vid || dispenseRes.patient_mrn,
+          patient_age: dispenseRes.patient_age,
+          patient_gender: dispenseRes.patient_gender,
+          patient_address: dispenseRes.patient_address,
+          patient_phone: dispenseRes.patient_phone,
           appointment_source: 'Pharmacy',
           source_module: 'pharmacy',
           reason_for_attendance: reasonForAttendance || 'Point of Sale Pharmacy Dispense',
@@ -325,15 +329,27 @@ export default function UniversalBillingModal({
         });
       }
 
+      const matchedPat = patients.find((p) => p.id === selectedPatientId);
+      const enrichedInvoice: Invoice = {
+        ...(invoice as Invoice),
+        patient_name: invoice.patient_name || matchedPat?.name,
+        patient_vid: invoice.patient_vid || matchedPat?.vid,
+        patient_mrn: invoice.patient_mrn || matchedPat?.mrn || matchedPat?.vid,
+        patient_age: invoice.patient_age ?? matchedPat?.age,
+        patient_gender: invoice.patient_gender || matchedPat?.gender,
+        patient_address: invoice.patient_address || matchedPat?.address,
+        patient_phone: invoice.patient_phone || matchedPat?.phone,
+      };
+
       toast.success(
         'Invoice Created',
         `Invoice #${invoice.invoice_number} generated successfully for ₹${grandTotal.toLocaleString()}.`
       );
 
       if (onSuccess) {
-        onSuccess(invoice as Invoice);
+        onSuccess(enrichedInvoice);
       }
-      setCreatedInvoiceForReceipt(invoice as Invoice);
+      setCreatedInvoiceForReceipt(enrichedInvoice);
     } catch (err: any) {
       toast.error('Invoice Creation Failed', err.message || 'Could not create invoice');
     } finally {
