@@ -45,6 +45,7 @@ interface PrintableInvoiceProps {
     subtotal?: string | number;
     total_amount: string | number;
     discount?: string | number;
+    round_off?: string | number;
     wallet_amount_used?: string | number;
     paid_amount: string | number;
     pending_due?: string | number;
@@ -56,7 +57,14 @@ interface PrintableInvoiceProps {
   defaultLayout?: 'a4' | 'a5' | 'thermal';
 }
 
-const n = (v: string | number | undefined) => parseFloat((v || 0) as any) || 0;
+const n = (v: string | number | undefined) => Math.round(parseFloat((v || 0) as any) || 0);
+const fmtDec = (v: string | number | undefined) => {
+  const num = parseFloat((v || 0) as any) || 0;
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
 
 const getUnitPrice = (it: any): number => {
   const p = it.unit_price ?? it.unitPrice ?? it.rate ?? it.price;
@@ -112,6 +120,15 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
 
   const due = n(invoice.pending_due !== undefined ? invoice.pending_due : Math.max(0, n(invoice.total_amount) - n(invoice.paid_amount)));
   const paid = n(invoice.paid_amount);
+
+  // Exact monetary calculations: keep paise for items/subtotals, display clean rounded net bill with explicit round-off
+  const rawSubtotal = parseFloat((invoice.subtotal !== undefined ? invoice.subtotal : invoice.total_amount) as any) || 0;
+  const rawDiscount = parseFloat((invoice.discount || 0) as any) || 0;
+  const rawTax = parseFloat(((invoice as any).tax || 0) as any) || 0;
+  const invoiceTotal = n(invoice.total_amount);
+  const storedRoundOff = invoice.round_off !== undefined && invoice.round_off !== null ? parseFloat(invoice.round_off as any) : undefined;
+  const calcRoundOff = storedRoundOff !== undefined ? storedRoundOff : Number((invoiceTotal - (rawSubtotal - rawDiscount + rawTax)).toFixed(2));
+  const hasRoundOff = Math.abs(calcRoundOff) > 0.001;
 
   // Dynamic department branding
   const rawSource = (invoice.source_module || invoice.appointment_source || invoice.department || '').toLowerCase();
@@ -341,17 +358,17 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                 <div className="space-y-2 pt-1.5">
                   {invoice.items?.map((it, i) => {
                     const unitRate = getUnitPrice(it);
-                    const qty = it.quantity || 1;
-                    const tot = n(it.total || qty * unitRate);
+                    const qty = it.quantity || (it as any).quantity_dispensed || 1;
+                    const tot = parseFloat((it.total ?? (qty * unitRate)) as any) || 0;
                     return (
                       <div key={i} className="text-[11px] space-y-0.5">
                         <div className="flex justify-between items-start">
                           <span className="w-3/5 font-semibold truncate pr-1">{it.description || it.item_name || 'Item'}</span>
                           <span className="w-1/6 text-center text-slate-700 font-mono">{qty}</span>
-                          <span className="w-1/4 text-right font-bold">₹{tot.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="w-1/4 text-right font-bold">₹{fmtDec(tot)}</span>
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono pl-0.5">
-                          Rate: ₹{unitRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / unit
+                          Rate: ₹{fmtDec(unitRate)} / unit
                         </div>
                       </div>
                     );
@@ -363,32 +380,38 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
               <div className="py-2.5 text-[11px] space-y-1 border-b border-dashed border-slate-400">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>₹{n(invoice.subtotal || invoice.total_amount).toLocaleString()}</span>
+                  <span>₹{fmtDec(rawSubtotal)}</span>
                 </div>
-                {n(invoice.discount) > 0 && (
+                {rawDiscount > 0 && (
                   <div className="flex justify-between text-red-600">
                     <span>Discount:</span>
-                    <span>−₹{n(invoice.discount).toLocaleString()}</span>
+                    <span>−₹{fmtDec(rawDiscount)}</span>
                   </div>
                 )}
                 {n(invoice.wallet_amount_used) > 0 && (
                   <div className="flex justify-between text-emerald-700">
                     <span>Wallet Deduct:</span>
-                    <span>−₹{n(invoice.wallet_amount_used).toLocaleString()}</span>
+                    <span>−₹{n(invoice.wallet_amount_used).toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                {hasRoundOff && (
+                  <div className="flex justify-between text-slate-600 italic">
+                    <span>Round Off:</span>
+                    <span>{calcRoundOff >= 0 ? `+₹${fmtDec(calcRoundOff)}` : `−₹${fmtDec(Math.abs(calcRoundOff))}`}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-extrabold text-[13px] pt-1 border-t border-slate-300">
                   <span>Net Amount:</span>
-                  <span>₹{n(invoice.total_amount).toLocaleString()}</span>
+                  <span>₹{invoiceTotal.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between font-bold text-emerald-700">
                   <span>Paid:</span>
-                  <span>₹{paid.toLocaleString()}</span>
+                  <span>₹{paid.toLocaleString('en-IN')}</span>
                 </div>
                 {due > 0 && (
                   <div className="flex justify-between font-bold text-red-600">
                     <span>Balance Due:</span>
-                    <span>₹{due.toLocaleString()}</span>
+                    <span>₹{due.toLocaleString('en-IN')}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-[10px] text-slate-500 pt-0.5">
@@ -505,14 +528,19 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                       </tr>
                     </thead>
                     <tbody>
-                      {invoice.items?.map((it, i) => (
-                        <tr key={i} style={{ borderBottom: '0.5px solid #f3f4f6' }}>
-                          <td className={`font-medium ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>{it.description || it.item_name || 'Medication Dispensed'}</td>
-                          <td className={`text-center ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#6b7280' }}>{it.quantity}</td>
-                          <td className={`text-right font-mono ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#374151' }}>₹{getUnitPrice(it).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className={`text-right font-mono font-semibold ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>₹{n(it.total).toLocaleString()}</td>
-                        </tr>
-                      ))}
+                      {invoice.items?.map((it, i) => {
+                        const unitRate = getUnitPrice(it);
+                        const qty = it.quantity ?? (it as any).quantity_dispensed ?? 1;
+                        const tot = parseFloat((it.total ?? (qty * unitRate)) as any) || 0;
+                        return (
+                          <tr key={i} style={{ borderBottom: '0.5px solid #f3f4f6' }}>
+                            <td className={`font-medium ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>{it.description || it.item_name || 'Medication Dispensed'}</td>
+                            <td className={`text-center ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#6b7280' }}>{qty}</td>
+                            <td className={`text-right font-mono ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#374151' }}>₹{fmtDec(unitRate)}</td>
+                            <td className={`text-right font-mono font-semibold ${layout === 'a5' ? 'p-1 text-[9.5px]' : 'p-2.5'}`} style={{ color: '#111827' }}>₹{fmtDec(tot)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
 
@@ -520,12 +548,12 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                   <div className={`${layout === 'a5' ? 'pt-1.5 space-y-0.5 text-[9.5px]' : 'pt-3 space-y-1 text-xs'}`} style={{ borderTop: '1px solid #e5e7eb' }}>
                     <div className="flex justify-between" style={{ color: '#6b7280' }}>
                       <span>Subtotal / Gross Amount:</span>
-                      <span className="font-mono font-medium">₹{n(invoice.subtotal || invoice.total_amount).toLocaleString()}</span>
+                      <span className="font-mono font-medium">₹{fmtDec(rawSubtotal)}</span>
                     </div>
-                    {n(invoice.discount) > 0 && (
+                    {rawDiscount > 0 && (
                       <div className="flex justify-between font-semibold" style={{ color: '#B91C1C' }}>
                         <span>Concession / Discount:</span>
-                        <span className="font-mono">− ₹{n(invoice.discount).toLocaleString()}</span>
+                        <span className="font-mono">− ₹{fmtDec(rawDiscount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between" style={{ color: '#9ca3af', fontSize: layout === 'a5' ? '8.5px' : '10px' }}>
@@ -535,20 +563,26 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                     {n(invoice.wallet_amount_used) > 0 && (
                       <div className="flex justify-between font-semibold" style={{ color: '#0D7A55' }}>
                         <span>Deducted from Advance Wallet:</span>
-                        <span className="font-mono">− ₹{n(invoice.wallet_amount_used).toLocaleString()}</span>
+                        <span className="font-mono">− ₹{n(invoice.wallet_amount_used).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {hasRoundOff && (
+                      <div className="flex justify-between font-medium italic" style={{ color: '#4b5563' }}>
+                        <span>Round Off Adjustment:</span>
+                        <span className="font-mono">{calcRoundOff >= 0 ? `+ ₹${fmtDec(calcRoundOff)}` : `− ₹${fmtDec(Math.abs(calcRoundOff))}`}</span>
                       </div>
                     )}
                     <div className={`flex justify-between font-bold pt-1 ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ borderTop: '1px solid #d1d5db', color: '#111827' }}>
                       <span>Net Total Billable:</span>
-                      <span className="font-mono" style={{ color: '#0B4F6C' }}>₹{n(invoice.total_amount).toLocaleString()}</span>
+                      <span className="font-mono" style={{ color: '#0B4F6C' }}>₹{invoiceTotal.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between font-semibold" style={{ color: '#0D7A55' }}>
                       <span>Total Amount Paid {invoice.payment_method ? `(${invoice.payment_method})` : ''}:</span>
-                      <span className="font-mono">₹{paid.toLocaleString()}</span>
+                      <span className="font-mono">₹{paid.toLocaleString('en-IN')}</span>
                     </div>
                     <div className={`flex justify-between font-bold ${layout === 'a5' ? 'text-xs' : 'text-sm'}`} style={{ color: due > 0 ? '#B91C1C' : '#0D7A55' }}>
                       <span>Balance Due:</span>
-                      <span className="font-mono">₹{due.toLocaleString()}</span>
+                      <span className="font-mono">₹{due.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>

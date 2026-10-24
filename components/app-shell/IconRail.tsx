@@ -40,17 +40,20 @@ const navItems = [
   { id: 'pharmacy',         href: '/pharmacy',                  icon: Pill,            label: 'Pharmacy & Stock',   roles: ['admin','pharma','pharmacist','doctor'] },
   { id: 'lims',             href: '/lims',                      icon: FlaskConical,    label: 'LIMS & HL7 Lab',     roles: ['admin','doctor','andrologist','embryologist'] },
   { id: 'billing',          href: '/billing',                   icon: ReceiptText,     label: 'Billing & Cashier',  roles: ['admin','receptionist','accounts','pharma','pharmacist','doctor'] },
+  { id: 'referrals',        href: '/referrals',                 icon: HeartHandshake,  label: 'Doctor Referrals',   roles: ['admin','doctor','receptionist','accounts'], badge: 'Pro' },
 ];
 
 export default function IconRail() {
   const pathname = usePathname();
-  const { user, activeRole, currentBranch } = useAuth();
+  const { user, activeRole, currentBranch, can } = useAuth();
   const { isExpanded, toggleSidebar } = useSidebar();
 
   const currentRole = (activeRole || user?.role || 'admin').toLowerCase();
-  const visibleItems = navItems.filter((item) =>
-    currentRole === 'admin' || item.roles.map((r) => r.toLowerCase()).includes(currentRole)
-  );
+  const visibleItems = navItems.filter((item) => {
+    if (currentRole === 'admin') return true;
+    const permKey = item.id === 'treatment-board' ? 'treatment_cycles' : item.id;
+    return can(permKey);
+  });
   const activeItem   = visibleItems.find((item) => pathname.startsWith(item.href));
 
   return (
@@ -182,8 +185,8 @@ export default function IconRail() {
 
       {/* Bottom: Settings + User Section */}
       <div className="w-full p-2 flex flex-col gap-1.5 mt-auto border-t border-white/10">
-        {/* Admin Master Settings */}
-        {user?.role === 'admin' && (
+        {/* Master Settings Link */}
+        {can('settings') && (
           isExpanded ? (
             <Link
               href="/settings"

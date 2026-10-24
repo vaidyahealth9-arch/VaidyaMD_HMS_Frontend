@@ -32,7 +32,7 @@ export const pharmacyApi = {
   parseOcrInvoice: (payload?: { base64_image?: string; invoice_hint?: string; file_name?: string; vendor_name?: string } | Record<string, any>) =>
     request<any>('/core/pharmacy/ocr/invoice', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
-  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; notes?: string; discount?: number; amount_paid?: number; payment_method?: string; payment_ref?: string; wallet_amount_used?: number; upi_pay_mode?: string; split_payments?: any[] }) =>
+  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; notes?: string; discount?: number; round_off?: number; amount_paid?: number; payment_method?: string; payment_ref?: string; wallet_amount_used?: number; upi_pay_mode?: string; split_payments?: any[] }) =>
     request<any>('/core/pharmacy/dispense', { method: 'POST', body: JSON.stringify(data) }),
 
   listVendors: () =>

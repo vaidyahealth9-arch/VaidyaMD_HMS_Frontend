@@ -46,6 +46,7 @@ export interface Invoice {
   subtotal?: number;
   discount?: number;
   tax?: number;
+  round_off?: number;
   total_amount: number;
   paid_amount: number;
   wallet_amount_used?: number;

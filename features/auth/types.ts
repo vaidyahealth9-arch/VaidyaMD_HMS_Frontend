@@ -28,6 +28,7 @@ export interface User {
   registration_number?: string;
   is_active: boolean;
   branch_id?: string;
+  permission_profile_id?: string;
   tenant_id?: string;
   hospital_name?: string;
   hospital_logo_url?: string;

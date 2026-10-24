@@ -178,8 +178,10 @@ export default function UniversalBillingModal({
   // Calculations
   const subtotal = items.reduce((s, it) => s + (it.total || 0), 0);
   const discountAmt =
-    discountType === 'percentage' ? Math.round((subtotal * discountValue) / 100) : discountValue;
-  const grandTotal = Math.max(0, subtotal - discountAmt);
+    discountType === 'percentage' ? (subtotal * discountValue) / 100 : Number(discountValue || 0);
+  const rawTotal = Math.max(0, subtotal - discountAmt);
+  const grandTotal = Math.round(rawTotal);
+  const roundOff = Number((grandTotal - rawTotal).toFixed(2));
   const netDueAfterWallet = Math.max(0, grandTotal - walletDeduction);
 
   const handleApplyFullWallet = () => {
@@ -218,7 +220,7 @@ export default function UniversalBillingModal({
         description: it.description.trim(),
         quantity: it.quantity || 1,
         unit_price: it.unit_price || 0,
-        total: it.total || (it.quantity || 1) * (it.unit_price || 0),
+        total: it.total !== undefined ? it.total : (it.quantity || 1) * (it.unit_price || 0),
         service_code: it.service_code || undefined,
         patient_package_id: it.patient_package_id || undefined,
         package_item_id: it.package_item_id || undefined,
@@ -230,7 +232,7 @@ export default function UniversalBillingModal({
         if (walletDeduction > 0) {
           splitPayload.push({
             payment_method: 'wallet',
-            amount: walletDeduction,
+            amount: Math.round(walletDeduction),
             notes: 'Advance wallet deduction',
           });
         }
@@ -239,7 +241,7 @@ export default function UniversalBillingModal({
             splitPayload.push({
               payment_method: st.payment_method,
               upi_pay_mode: st.upi_pay_mode || undefined,
-              amount: st.amount,
+              amount: Math.round(st.amount),
               reference: st.reference || undefined,
               notes: st.notes || undefined,
             });
@@ -247,12 +249,13 @@ export default function UniversalBillingModal({
         }
       }
 
-      const effectivePaid =
+      const effectivePaid = Math.round(
         paymentStatus === 'paid'
           ? grandTotal
           : immediatePaid > 0
           ? immediatePaid + walletDeduction
-          : walletDeduction;
+          : walletDeduction
+      );
 
       let combinedNotes = reasonForAttendance ? `Attendance: ${reasonForAttendance}` : '';
       if (paymentRef.trim()) {
@@ -268,6 +271,7 @@ export default function UniversalBillingModal({
             quantity: it.quantity,
           })),
           discount: discountAmt,
+          round_off: roundOff,
           wallet_amount_used: walletDeduction,
           amount_paid: effectivePaid,
           payment_method: useSplitPayment ? 'split' : paymentMode,
@@ -300,6 +304,7 @@ export default function UniversalBillingModal({
           })),
           subtotal: dispenseRes.subtotal,
           discount: dispenseRes.discount,
+          round_off: dispenseRes.round_off,
           total_amount: dispenseRes.total_amount,
           paid_amount: dispenseRes.paid_amount,
           payment_method: dispenseRes.payment_method,
@@ -318,6 +323,7 @@ export default function UniversalBillingModal({
           discount: discountAmt,
           discount_type: discountType,
           discount_value: discountValue,
+          round_off: roundOff,
           payment_status: paymentStatus,
           payment_method: useSplitPayment ? 'split' : paymentMode,
           upi_pay_mode: paymentMode === 'upi' ? upiPayMode : undefined,
@@ -501,6 +507,15 @@ export default function UniversalBillingModal({
                 <div className="flex items-center justify-between text-xs text-amber-700">
                   <span>Discount Applied:</span>
                   <span className="font-mono font-bold">-₹{discountAmt.toLocaleString()}</span>
+                </div>
+              )}
+
+              {roundOff !== 0 && (
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>Round Off:</span>
+                  <span className="font-mono font-medium">
+                    {roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}
+                  </span>
                 </div>
               )}
 

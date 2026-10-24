@@ -5,14 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format a number as Indian Rupees */
-export function formatCurrency(amount: number | string): string {
+/** Format a number as Indian Rupees (displays paise if fractional, or clean whole rupees if integer) */
+export function formatCurrency(amount: number | string, forceDecimals?: boolean): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const val = Number(num) || 0;
+  const hasDecimals = forceDecimals ?? (Math.abs(val - Math.round(val)) > 0.001);
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(num);
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+  }).format(val);
 }
 
 /** Format a date for display */

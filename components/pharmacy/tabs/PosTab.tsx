@@ -83,7 +83,9 @@ export default function PosTab({
   }, []);
 
   const cartTotal = posCart.reduce((acc, curr) => acc + curr.quantity * curr.unit_price, 0);
-  const netPayable = Math.max(0, cartTotal - posDiscount);
+  const rawNet = Math.max(0, cartTotal - (Number(posDiscount) || 0));
+  const netPayable = Math.round(rawNet);
+  const roundOff = Number((netPayable - rawNet).toFixed(2));
   const remainingAfterWallet = Math.max(0, netPayable - posWalletDeduct);
 
   const dispenseMutation = useMutation({
@@ -96,7 +98,8 @@ export default function PosTab({
         items: posCart.map((i) => ({ item_code: i.item_code, quantity: i.quantity })),
         doctor_id: user?.id,
         notes: 'Dispensed via Point of Sale counter',
-        discount: posDiscount,
+        discount: Number(posDiscount) || 0,
+        round_off: roundOff,
         wallet_amount_used: posWalletDeduct,
         amount_paid: posAmountPaid === '' ? remainingAfterWallet : Number(posAmountPaid),
         payment_method: posPaymentMode,
@@ -531,6 +534,14 @@ export default function PosTab({
                         className="h-7 text-xs w-24 text-right"
                       />
                     </div>
+                    {roundOff !== 0 && (
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>Round Off:</span>
+                        <span className="font-mono font-medium">
+                          {roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm font-bold border-t border-slate-100 pt-2">
                       <span className="text-slate-900">Total Billed:</span>
                       <span className="text-[rgb(var(--clr-primary))]">{formatCurrency(netPayable)}</span>

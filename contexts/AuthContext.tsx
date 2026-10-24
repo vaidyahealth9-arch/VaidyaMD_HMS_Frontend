@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi, branchesApi, permissionProfilesApi } from '@/lib/api';
 import { wsClient } from '@/lib/websocket';
+import { getDefaultPermissionsForRole } from '@/components/settings/types';
 
 export interface VaidyaMdUser {
   id: string;
@@ -142,24 +143,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const profiles: any = await permissionProfilesApi.list();
       if (Array.isArray(profiles)) {
-        const matching = profiles.find((p: any) => p.name.toLowerCase().includes(u.role.toLowerCase()));
+        // Match profile by user's role
+        const matching = profiles.find(
+          (p: any) =>
+            (p.role && String(p.role).toLowerCase() === String(u.role).toLowerCase()) ||
+            (p.name && String(p.name).toLowerCase().includes(String(u.role).toLowerCase()))
+        );
         if (matching && matching.menu_permissions) {
           setMenuPermissions(matching.menu_permissions);
           return;
         }
       }
     } catch (e) {}
-    // Default fallback
-    setMenuPermissions({});
+    // Fallback to canonical role defaults
+    setMenuPermissions(getDefaultPermissionsForRole(u.role));
   };
 
   const can = (moduleKey: string): boolean => {
     if (!user) return false;
     if (user.role === 'admin' || menuPermissions.all) return true;
     if (moduleKey in menuPermissions) {
-      return menuPermissions[moduleKey];
+      return Boolean(menuPermissions[moduleKey]);
     }
-    return true; // Default allow for standard general routes
+    const defaults = getDefaultPermissionsForRole(user.role);
+    if (moduleKey in defaults) {
+      return defaults[moduleKey];
+    }
+    return true; // Default allow for unspecified routes
   };
 
   const login = async (email: string, password: string): Promise<VaidyaMdUser> => {
