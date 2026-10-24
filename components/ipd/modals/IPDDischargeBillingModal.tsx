@@ -90,8 +90,10 @@ export default function IPDDischargeBillingModal({
   if (!admissionId) return null;
 
   const subtotal = items.reduce((sum, it) => sum + it.total_price, 0);
-  const netPayable = Math.max(0, subtotal - discount);
-  const remainingDue = Math.max(0, netPayable - walletDeduct);
+  const rawNet = Math.max(0, subtotal - (Number(discount) || 0));
+  const netPayable = Math.round(rawNet);
+  const roundOff = Number((netPayable - rawNet).toFixed(2));
+  const remainingDue = Math.max(0, netPayable - (Number(walletDeduct) || 0));
 
   const handleAddItem = () => {
     if (!newItemDesc.trim() || newItemPrice <= 0) {
@@ -120,13 +122,13 @@ export default function IPDDischargeBillingModal({
     mutationFn: async () => {
       if (!summary) throw new Error('Discharge summary not available');
 
-      const effectivePaid = paidAmount === '' ? remainingDue : Number(paidAmount);
+      const effectivePaid = Math.round(paidAmount === '' ? remainingDue : Number(paidAmount));
       const splitPayments = [];
 
       if (walletDeduct > 0) {
         splitPayments.push({
           payment_method: 'wallet',
-          amount: walletDeduct,
+          amount: Math.round(walletDeduct),
           reference: 'IPD Discharge Wallet Advance Settlement',
         });
       }
@@ -156,6 +158,7 @@ export default function IPDDischargeBillingModal({
         discount,
         discount_reason: discountReason || undefined,
         tax: 0,
+        round_off: roundOff,
         paid_amount: effectivePaid,
         payment_method: splitPayments.length > 0 ? 'split' : paymentMode.toLowerCase(),
         payment_status: remainingDue - effectivePaid <= 0 ? 'paid' : effectivePaid > 0 ? 'partially_paid' : 'pending',
@@ -394,6 +397,15 @@ export default function IPDDischargeBillingModal({
                     />
                   </div>
                 </div>
+
+                {roundOff !== 0 && (
+                  <div className="flex justify-between items-center text-xs text-slate-500">
+                    <span>Round Off:</span>
+                    <span className="font-mono font-medium">
+                      {roundOff > 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center text-sm font-bold border-t border-slate-200 pt-2 text-slate-900">
                   <span>Net Billed Amount:</span>

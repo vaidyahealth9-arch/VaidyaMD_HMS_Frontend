@@ -234,11 +234,27 @@ export default function CosGynDashboard() {
   ]);
 
   const handleOpenBookingModal = (treatmentId?: string, prefillDate?: string, prefillTime?: string, prefillEquip?: string) => {
-    const tId = treatmentId || (treatments.length > 0 ? treatments[0].id : '');
+    let tId = treatmentId;
+    if (!tId && prefillEquip === 'Tesla Chair') {
+      const teslaTreat = treatments.find((t: any) => t.name?.toLowerCase().includes('tesla') && !t.name?.toLowerCase().includes('jet') && (t.tesla_chair_sessions === 1 || t.name?.toLowerCase().includes('single')));
+      tId = teslaTreat ? teslaTreat.id : 'custom_tesla';
+    } else if (!tId && prefillEquip === 'Jet Plasma') {
+      const jetTreat = treatments.find((t: any) => t.name?.toLowerCase().includes('jet plasma') && !t.name?.toLowerCase().includes('tesla') && (t.jet_plasma_sessions === 1 || t.name?.toLowerCase().includes('single')));
+      tId = jetTreat ? jetTreat.id : 'custom_jet';
+    } else if (!tId) {
+      tId = treatments.length > 0 ? treatments[0].id : '';
+    }
     setSelectedTreatmentId(tId);
 
     const targetTreat = treatments.find((t: any) => t.id === tId);
-    const p = targetTreat?.price || 0;
+    let p = targetTreat?.price || 0;
+    if (tId === 'custom_tesla' || (targetTreat?.name?.toLowerCase().includes('tesla') && !targetTreat?.name?.toLowerCase().includes('jet') && (targetTreat?.tesla_chair_sessions === 1 || targetTreat?.name?.toLowerCase().includes('single')))) {
+      p = Math.max(p, 8000);
+    } else if (tId === 'custom_jet' || (targetTreat?.name?.toLowerCase().includes('jet') && !targetTreat?.name?.toLowerCase().includes('tesla') && (targetTreat?.jet_plasma_sessions === 1 || targetTreat?.name?.toLowerCase().includes('single')))) {
+      p = Math.max(p, 10000);
+    } else if (tId === 'custom_combo') {
+      p = Math.max(p, 13500);
+    }
     setBookingPackagePrice(p);
     setBookingBillingChoice('bill_later');
     setBookingDiscount(0);
@@ -363,7 +379,7 @@ export default function CosGynDashboard() {
         patient_name: session.patient_name,
         patient_mrn: session.patient_id?.slice(0, 8),
         treatment_name: session.treatment_name,
-        total_amount: 4000,
+        total_amount: session.total_amount ? Math.round(session.total_amount) : 8000,
         sessions: relatedSessions.length > 0 ? relatedSessions : [session],
       };
     }
@@ -507,11 +523,11 @@ export default function CosGynDashboard() {
       customTreatmentName = 'Single Session: Jet Plasma & Tesla Chair';
     }
 
-    const finalAmount = bookingPackagePrice || selectedTreatment?.price || 0;
+    const finalAmount = Math.round(bookingPackagePrice || selectedTreatment?.price || 0);
     const shouldBill = bookingBillingChoice === 'bill_now';
-    const netReceivable = Math.max(0, finalAmount - (Number(bookingDiscount) || 0));
+    const netReceivable = Math.round(Math.max(0, finalAmount - (Number(bookingDiscount) || 0)));
     const paidAmt = shouldBill
-      ? (bookingPaidAmount !== null ? Number(bookingPaidAmount) : netReceivable)
+      ? (bookingPaidAmount !== null ? Math.round(Number(bookingPaidAmount)) : netReceivable)
       : 0;
 
     const fullNotes = [

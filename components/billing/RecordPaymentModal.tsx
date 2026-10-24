@@ -69,9 +69,9 @@ export default function RecordPaymentModal({
   ]);
 
   // Pre-fill amount when invoice changes
-  const pendingDue = invoice ? Number(invoice.pending_due) : 0;
-  const numDiscount = parseFloat(discountAmount) || 0;
-  const netPayable = Math.max(0, pendingDue - numDiscount);
+  const pendingDue = invoice ? Math.round(Number(invoice.pending_due)) : 0;
+  const numDiscount = Math.round(parseFloat(discountAmount) || 0);
+  const netPayable = Math.round(Math.max(0, pendingDue - numDiscount));
 
   // Load patient wallet balance whenever modal opens
   useEffect(() => {
@@ -142,18 +142,20 @@ export default function RecordPaymentModal({
 
   const handleSubmit = async () => {
     if (!invoice) return;
-    const discount = parseFloat(discountAmount) || 0;
+    const discount = Math.round(parseFloat(discountAmount) || 0);
 
-    let amount = parseFloat(payAmount) || 0;
+    let amount = Math.round(parseFloat(payAmount) || 0);
     let splitPayload: any[] | undefined = undefined;
 
     if (isSplitMode) {
-      amount = totalSplitAmount;
+      amount = Math.round(totalSplitAmount);
       if (amount <= 0 && discount <= 0) {
         toast.error('Invalid Amount', 'Enter at least one payment tender amount.');
         return;
       }
-      splitPayload = splitTenders.filter((t) => Number(t.amount) > 0);
+      splitPayload = splitTenders
+        .filter((t) => Number(t.amount) > 0)
+        .map((t) => ({ ...t, amount: Math.round(Number(t.amount)) }));
     } else {
       if (amount <= 0 && discount <= 0) {
         toast.error('Invalid Amount', 'Enter a payment or discount amount.');

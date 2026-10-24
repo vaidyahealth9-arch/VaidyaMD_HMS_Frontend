@@ -82,6 +82,7 @@ export * from '@/features/billing/types';
 export * from '@/features/fertility/types';
 export * from '@/features/cosgyn/types';
 export * from '@/features/ipd/types';
+export * from '@/features/referrals/types';
 
 // ==========================================
 // 1. Core Auth, Branches, Users, Permissions, Templates
@@ -171,3 +172,8 @@ export { counselingApi, type CounselingNote } from '@/features/counseling/api';
 // 14. CRM & Telecaller Dialer
 // ==========================================
 export { crmApi } from '@/features/crm/api';
+
+// ==========================================
+// 15. Doctor Referrals & Commission Plugin
+// ==========================================
+export { referralsApi } from '@/features/referrals/api';

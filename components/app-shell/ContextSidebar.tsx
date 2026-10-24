@@ -113,6 +113,15 @@ const sidebarConfig: Record<string, { label?: string; items: { id: string; href:
       ],
     },
   ],
+  '/referrals': [
+    {
+      label: 'Doctor Referrals & Payouts',
+      items: [
+        { id: 'referrals-overview', href: '/referrals', icon: LayoutDashboard, label: 'Executive Overview' },
+        { id: 'referrals-doctors', href: '/referrals/doctors', icon: HeartHandshake, label: 'Doctor Directory & Payouts' },
+      ],
+    },
+  ],
   '/pharmacy': [
     {
       label: 'Dispensary',

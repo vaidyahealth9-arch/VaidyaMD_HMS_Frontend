@@ -22,33 +22,70 @@ export const VAIDYAMD_ROLES = [
   { id: 'counsellor', name: 'Clinical Fertility Counsellor', desc: 'Pre-ART psychological counseling, couple consent walkthroughs, and emotional support notes' },
 ];
 
-// Canonical Menu Permissions List
-export const menuKeys = [
-  { key: 'patients', label: 'Patient Directory' },
-  { key: 'patient_register', label: 'Patient / Couple Registration' },
-  { key: 'patient_360', label: 'Couple 360 EMR Portal' },
-  { key: 'treatment_cycles', label: 'Treatment Cycles & Protocol Engine' },
-  { key: 'ivf_lab', label: 'IVF Lab' },
-  { key: 'cryopreservation', label: 'Cryobank Tank Coordinates' },
-  { key: 'billing', label: 'Billing & Invoices' },
-  { key: 'wallet', label: 'Patient Advance Wallet' },
-  { key: 'analytics', label: 'Analytics & Financial Reports' },
-  { key: 'pharmacy', label: 'Pharmacy Dispensary' },
-  { key: 'ipd', label: 'IPD Bedboard & Nursing' },
+// Canonical Menu Permissions List with Categorization
+export interface MenuPermissionKey {
+  key: string;
+  label: string;
+  category: 'clinical' | 'lab' | 'inpatient_pharma' | 'financial_referrals' | 'admin';
+  description?: string;
+}
+
+export const menuKeys: MenuPermissionKey[] = [
+  // Clinical & Encounters
+  { key: 'patients', label: 'Patient Directory', category: 'clinical', description: 'Patient records & clinical directory' },
+  { key: 'patient_register', label: 'Patient / Couple Registration', category: 'clinical', description: 'New patient, partner, and donor registrations' },
+  { key: 'patient_360', label: 'Couple 360 EMR Portal', category: 'clinical', description: 'Comprehensive couple charts, vitals & history' },
+  { key: 'appointments', label: 'Appointments & Scheduling', category: 'clinical', description: 'Doctor appointment book, day slots & token flow' },
+  { key: 'treatment_cycles', label: 'Treatment Cycles & Protocol Engine', category: 'clinical', description: 'Stimulation sheet, cycle monitoring & protocols' },
+  { key: 'cosgyn', label: 'Cosmetic Gynecology', category: 'clinical', description: 'CosGyn procedures, laser & body sessions' },
+  { key: 'counseling', label: 'Clinical Fertility Counseling', category: 'clinical', description: 'Psychological counseling & consent notes' },
+
+  // Laboratory & Diagnostics
+  { key: 'ivf_lab', label: 'IVF Lab & Dish Preparation', category: 'lab', description: 'OPU, ICSI, fertilization & embryo grading' },
+  { key: 'cryopreservation', label: 'Cryobank Tank Coordinates', category: 'lab', description: 'Liquid nitrogen tanks, canisters & straws' },
+  { key: 'lims', label: 'LIMS & HL7 Diagnostic Lab', category: 'lab', description: 'Clinical biochemistry, pathology & hormones' },
+
+  // Inpatient & Pharmacy
+  { key: 'ipd', label: 'IPD Bedboard & Nursing', category: 'inpatient_pharma', description: 'Wards, bed allocation & nursing chart' },
+  { key: 'pharmacy', label: 'Pharmacy Dispensary & Stock', category: 'inpatient_pharma', description: 'Drug batches, dispensing & stock management' },
+
+  // Financial & Referrals
+  { key: 'billing', label: 'Billing & Cashier Invoices', category: 'financial_referrals', description: 'Treatment invoices, receipts & discharge bills' },
+  { key: 'wallet', label: 'Patient Advance Wallet', category: 'financial_referrals', description: 'Security deposits, advances & balance refunds' },
+  { key: 'referrals', label: 'Doctor Referrals & Commissions', category: 'financial_referrals', description: 'Referring partner directory, tracking & payout settlement' },
+  { key: 'analytics', label: 'Analytics & Financial Reports', category: 'financial_referrals', description: 'Revenue graphs, cycle conversion & business KPIs' },
+
+  // Administrative Master
+  { key: 'settings', label: 'Master Settings & Admin Setup', category: 'admin', description: 'Hospital branch setup, tariff catalog & RBAC' },
 ];
 
 export const getDefaultPermissionsForRole = (roleId: string): Record<string, boolean> => ({
+  // Clinical
   patients: true,
-  patient_register: ['admin', 'doctor', 'nurse', 'receptionist'].includes(roleId),
-  patient_360: ['admin', 'doctor', 'nurse', 'embryologist', 'andrologist', 'counsellor'].includes(roleId),
+  patient_register: ['admin', 'doctor', 'nurse', 'receptionist', 'manager'].includes(roleId),
+  patient_360: ['admin', 'doctor', 'nurse', 'embryologist', 'andrologist', 'counsellor', 'scanning'].includes(roleId),
+  appointments: ['admin', 'doctor', 'nurse', 'receptionist', 'accounts', 'counsellor', 'manager'].includes(roleId),
   treatment_cycles: ['admin', 'doctor', 'nurse', 'embryologist'].includes(roleId),
+  cosgyn: ['admin', 'doctor', 'nurse', 'receptionist', 'accounts'].includes(roleId),
+  counseling: ['admin', 'doctor', 'counsellor', 'nurse'].includes(roleId),
+
+  // Lab
   ivf_lab: ['admin', 'doctor', 'embryologist', 'andrologist'].includes(roleId),
   cryopreservation: ['admin', 'embryologist', 'doctor'].includes(roleId),
-  billing: ['admin', 'accounts', 'receptionist', 'manager'].includes(roleId),
-  wallet: ['admin', 'accounts'].includes(roleId),
+  lims: ['admin', 'doctor', 'andrologist', 'embryologist'].includes(roleId),
+
+  // Inpatient & Pharmacy
+  ipd: ['admin', 'nurse', 'doctor', 'receptionist', 'accounts'].includes(roleId),
+  pharmacy: ['admin', 'pharma', 'nurse', 'doctor'].includes(roleId),
+
+  // Financial & Referrals
+  billing: ['admin', 'accounts', 'receptionist', 'manager', 'pharma', 'doctor'].includes(roleId),
+  wallet: ['admin', 'accounts', 'manager'].includes(roleId),
+  referrals: ['admin', 'doctor', 'accounts', 'manager', 'receptionist'].includes(roleId),
   analytics: ['admin', 'manager', 'accounts'].includes(roleId),
-  pharmacy: ['admin', 'pharma', 'nurse'].includes(roleId),
-  ipd: ['admin', 'nurse', 'doctor'].includes(roleId),
+
+  // Admin Master
+  settings: ['admin'].includes(roleId),
 });
 
 export const findProfileForRole = (roleId: string, profileList: any[]) => {

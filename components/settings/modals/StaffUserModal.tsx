@@ -177,19 +177,19 @@ export default function StaffUserModal({
           </div>
 
           {/* Section 3: Role, Registration, Phone */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1">Role *</label>
               <select
                 value={staffForm.role}
                 onChange={(e) => handleRoleChange(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white font-medium focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white font-medium focus:ring-1 focus:ring-primary focus:border-primary outline-hidden text-xs"
               >
-                <option value="doctor">Doctor / Treating Consultant</option>
+                <option value="doctor">Doctor / Consultant</option>
                 <option value="embryologist">Embryologist</option>
                 <option value="andrologist">Andrologist</option>
                 <option value="nurse">Nurse / Coordinator</option>
-                <option value="scanning">Ultrasonologist / Sonography</option>
+                <option value="scanning">Ultrasonologist</option>
                 <option value="pharma">Pharmacist</option>
                 <option value="receptionist">Receptionist</option>
                 <option value="counsellor">Counsellor</option>
@@ -205,7 +205,7 @@ export default function StaffUserModal({
                 value={staffForm.reg_number}
                 onChange={(e) => setStaffForm({ ...staffForm, reg_number: e.target.value })}
                 placeholder="TSMC/FMR/10576"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono text-[11px] focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
               />
             </div>
             <div>
@@ -215,7 +215,7 @@ export default function StaffUserModal({
                 value={staffForm.phone}
                 onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
                 placeholder="+91-9876543210"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden text-xs"
               />
             </div>
           </div>

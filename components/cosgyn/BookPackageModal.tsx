@@ -298,30 +298,51 @@ export default function BookPackageModal({
                 setSelectedTreatmentId(id);
                 const t = treatments.find((item: any) => item.id === id);
                 if (t) {
-                  setBookingPackagePrice(t.price);
+                  const isSingleTesla = t.name?.toLowerCase().includes('tesla') && !t.name?.toLowerCase().includes('jet') && (t.tesla_chair_sessions === 1 || t.name?.toLowerCase().includes('single'));
+                  setBookingPackagePrice(isSingleTesla ? Math.max(Math.round(t.price), 8000) : Math.round(t.price));
                 } else if (id === 'custom_jet') {
-                  setBookingPackagePrice(10000);
+                  const match = treatments.find((item: any) => item.name?.toLowerCase().includes('jet plasma') && !item.name?.toLowerCase().includes('tesla') && (item.jet_plasma_sessions === 1 || item.name?.toLowerCase().includes('single')));
+                  setBookingPackagePrice(Math.round(match ? Math.max(match.price, 10000) : 10000));
                 } else if (id === 'custom_tesla') {
-                  setBookingPackagePrice(4000);
+                  const match = treatments.find((item: any) => item.name?.toLowerCase().includes('tesla') && !item.name?.toLowerCase().includes('jet plasma') && (item.tesla_chair_sessions === 1 || item.name?.toLowerCase().includes('single')));
+                  setBookingPackagePrice(Math.round(match ? Math.max(match.price, 8000) : 8000));
                 } else if (id === 'custom_combo') {
-                  setBookingPackagePrice(13500);
+                  const match = treatments.find((item: any) => item.name?.toLowerCase().includes('jet plasma') && item.name?.toLowerCase().includes('tesla'));
+                  setBookingPackagePrice(Math.round(match ? Math.max(match.price, 13500) : 13500));
                 }
               }}
               className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer"
               required
             >
               <option value="">-- Choose Protocol --</option>
-              <optgroup label="Single Standalone Sessions">
-                <option value="custom_jet">Single Session: Jet Plasma</option>
-                <option value="custom_tesla">Single Session: Tesla Chair</option>
-                <option value="custom_combo">Single Session: Jet Plasma + Tesla Chair</option>
-              </optgroup>
+              {(() => {
+                const rawJetPrice = treatments.find((item: any) => item.name?.toLowerCase().includes('jet plasma') && !item.name?.toLowerCase().includes('tesla') && (item.jet_plasma_sessions === 1 || item.name?.toLowerCase().includes('single')))?.price;
+                const singleJetPrice = rawJetPrice ? Math.max(Number(rawJetPrice), 10000) : 10000;
+
+                const rawTeslaPrice = treatments.find((item: any) => item.name?.toLowerCase().includes('tesla') && !item.name?.toLowerCase().includes('jet plasma') && (item.tesla_chair_sessions === 1 || item.name?.toLowerCase().includes('single')))?.price;
+                const singleTeslaPrice = rawTeslaPrice ? Math.max(Number(rawTeslaPrice), 8000) : 8000;
+
+                const rawComboPrice = treatments.find((item: any) => item.name?.toLowerCase().includes('jet plasma') && item.name?.toLowerCase().includes('tesla'))?.price;
+                const singleComboPrice = rawComboPrice ? Math.max(Number(rawComboPrice), 13500) : 13500;
+
+                return (
+                  <optgroup label="Single Standalone Sessions">
+                    <option value="custom_jet">Single Session: Jet Plasma — {formatCurrency(singleJetPrice)}</option>
+                    <option value="custom_tesla">Single Session: Tesla Chair — {formatCurrency(singleTeslaPrice)}</option>
+                    <option value="custom_combo">Single Session: Jet Plasma + Tesla Chair — {formatCurrency(singleComboPrice)}</option>
+                  </optgroup>
+                );
+              })()}
               <optgroup label="Pre-configured Packages">
-                {treatments.map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} — {formatCurrency(t.price)}
-                  </option>
-                ))}
+                {treatments.map((t: any) => {
+                  const isSingleTesla = t.name?.toLowerCase().includes('tesla') && !t.name?.toLowerCase().includes('jet') && (t.tesla_chair_sessions === 1 || t.name?.toLowerCase().includes('single'));
+                  const p = isSingleTesla ? Math.max(Number(t.price) || 0, 8000) : t.price;
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {t.name} — {formatCurrency(p)}
+                    </option>
+                  );
+                })}
               </optgroup>
             </select>
           </div>
@@ -368,7 +389,7 @@ export default function BookPackageModal({
                   <span>🪑 Tesla Chair: 1 session</span>
                 </div>
               </div>
-              <span className="font-extrabold text-purple-700 text-sm font-mono">{formatCurrency(bookingPackagePrice || 4000)}</span>
+              <span className="font-extrabold text-purple-700 text-sm font-mono">{formatCurrency(bookingPackagePrice || 8000)}</span>
             </div>
           ) : null}
 
