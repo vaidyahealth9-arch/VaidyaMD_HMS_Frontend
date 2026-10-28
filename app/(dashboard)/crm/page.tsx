@@ -10,6 +10,7 @@ import { Button } from '@/shared/ui/button';
 import { 
   DialerQueueTab, 
   LeadsListTab, 
+  CallHistoryTab,
   CRMDashboardTab,
   TelecallerRosterTab,
   TelecallerAnalyticsTab,
@@ -18,14 +19,15 @@ import {
   ImportLeadsModal,
   ConnectPhoneModal,
   Lead,
+  CallLog,
   DialerQueueItem,
   CRMAnalytics,
   TelecallerRosterItem,
   TelecallerKPIItem
 } from '@/components/crm';
-import { PhoneCall, Users, BarChart3, Radio, Trophy, RefreshCw, Smartphone, UploadCloud, UserPlus } from 'lucide-react';
+import { PhoneCall, Users, BarChart3, Radio, Trophy, RefreshCw, Smartphone, UploadCloud, UserPlus, Headphones } from 'lucide-react';
 
-type TabKey = 'dialer' | 'leads' | 'roster' | 'kpis' | 'dashboard';
+type TabKey = 'dialer' | 'leads' | 'calls' | 'roster' | 'kpis' | 'dashboard';
 
 export default function CRMPage() {
   const { currentBranch } = useAuth();
@@ -35,6 +37,7 @@ export default function CRMPage() {
   const [queueItem, setQueueItem] = useState<DialerQueueItem | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [totalLeads, setTotalLeads] = useState(0);
+  const [calls, setCalls] = useState<CallLog[]>([]);
   const [analytics, setAnalytics] = useState<CRMAnalytics | null>(null);
   const [roster, setRoster] = useState<TelecallerRosterItem[]>([]);
   const [kpis, setKpis] = useState<TelecallerKPIItem[]>([]);
@@ -58,10 +61,10 @@ export default function CRMPage() {
     }
   }, []);
 
-  const loadLeads = useCallback(async (search?: string) => {
+  const loadLeads = useCallback(async (search?: string, status?: any) => {
     try {
       setIsLoading(true);
-      const res = await crmApi.listLeads({ search, limit: 50 });
+      const res = await crmApi.listLeads({ search, status, limit: 50 });
       setLeads(res.items);
       setTotalLeads(res.total);
     } catch (err) {
@@ -80,11 +83,20 @@ export default function CRMPage() {
     }
   }, []);
 
+  const loadFleetKpis = useCallback(async (params?: { date_from?: string; date_to?: string; preset?: string }) => {
+    try {
+      const data = await crmApi.getFleetKpis(params);
+      setKpis(data);
+    } catch (err) {
+      console.error('Failed to load fleet KPIs', err);
+    }
+  }, []);
+
   const loadFleetData = useCallback(async () => {
     try {
       const [rosterRes, kpisRes] = await Promise.all([
         crmApi.getFleetRoster(),
-        crmApi.getFleetKpis(),
+        crmApi.getFleetKpis({ preset: 'all_time' }),
       ]);
       setRoster(rosterRes);
       setKpis(kpisRes);
@@ -93,23 +105,34 @@ export default function CRMPage() {
     }
   }, []);
 
+  const loadCalls = useCallback(async () => {
+    try {
+      const data = await crmApi.listCalls({ limit: 50 });
+      setCalls(data);
+    } catch (err) {
+      console.error('Failed to load call logs', err);
+    }
+  }, []);
+
   const refreshAll = useCallback(() => {
     void loadQueue();
     void loadLeads();
+    void loadCalls();
     void loadAnalytics();
     void loadFleetData();
-  }, [loadQueue, loadLeads, loadAnalytics, loadFleetData]);
+  }, [loadQueue, loadLeads, loadCalls, loadAnalytics, loadFleetData]);
 
   useEffect(() => {
     refreshAll();
   }, [currentBranch, refreshAll]);
 
   // Actions
-  const handleCallInitiated = async (leadId: string, phone: string) => {
+  const handleCallInitiated = async (leadId: string, phone: string, leadName?: string) => {
     try {
-      const log = await crmApi.startCall(leadId, phone);
+      const name = leadName || (queueItem?.lead?.id === leadId ? queueItem?.lead?.name : null) || 'Lead';
+      setActiveCallLeadName(name);
+      const log = await crmApi.startCall(leadId, phone, 'web');
       setActiveCallId(log.id);
-      setActiveCallLeadName(queueItem?.lead.name || 'Lead');
       setIsDispositionModalOpen(true);
     } catch (err) {
       console.error('Error starting call', err);
@@ -148,8 +171,9 @@ export default function CRMPage() {
   const tabs = [
     { id: 'dialer', label: 'Dialer Queue', icon: PhoneCall },
     { id: 'leads', label: 'All Leads', icon: Users, badge: totalLeads > 0 ? totalLeads : undefined },
+    { id: 'calls', label: 'Call History & Recordings', icon: Headphones, badge: calls.length > 0 ? calls.length : undefined },
     { id: 'roster', label: 'Fleet Roster', icon: Radio, badge: roster.length > 0 ? roster.length : undefined },
-    { id: 'kpis', label: 'Team KPIs', icon: Trophy },
+    { id: 'kpis', label: 'Telecaller Performance', icon: Trophy },
     { id: 'dashboard', label: 'Pipeline Analytics', icon: BarChart3 },
   ];
 
@@ -213,9 +237,12 @@ export default function CRMPage() {
       {activeTab === 'dialer' && (
         <DialerQueueTab
           queueItem={queueItem}
-          onCallInitiated={handleCallInitiated}
+          onCallInitiated={(id, phone) => handleCallInitiated(id, phone, queueItem?.lead.name)}
           onSkipNext={loadQueue}
           isLoading={isLoading}
+          roster={roster}
+          activeCallId={activeCallId}
+          onEndCall={() => setIsDispositionModalOpen(true)}
         />
       )}
 
@@ -225,10 +252,17 @@ export default function CRMPage() {
           total={totalLeads}
           isLoading={isLoading}
           onCallLead={(lead) => {
-            setActiveCallLeadName(lead.name);
-            handleCallInitiated(lead.id, lead.phone);
+            handleCallInitiated(lead.id, lead.phone, lead.name);
           }}
-          onFilterChange={(filters) => loadLeads(filters.search)}
+          onFilterChange={(filters) => loadLeads(filters.search, filters.status)}
+        />
+      )}
+
+      {activeTab === 'calls' && (
+        <CallHistoryTab
+          calls={calls}
+          isLoading={isLoading}
+          onRefresh={loadCalls}
         />
       )}
 
@@ -244,6 +278,8 @@ export default function CRMPage() {
         <TelecallerAnalyticsTab
           kpis={kpis}
           isLoading={isLoading}
+          onFilterChange={loadFleetKpis}
+          onRefresh={() => loadFleetKpis()}
         />
       )}
 

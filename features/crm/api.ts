@@ -14,10 +14,11 @@ import {
 
 export const crmApi = {
   // Leads
-  listLeads: (params?: { status?: LeadStatus; source?: LeadSource; search?: string; limit?: number; offset?: number }) => {
+  listLeads: (params?: { status?: LeadStatus; source?: LeadSource; city?: string; search?: string; limit?: number; offset?: number }) => {
     const q = new URLSearchParams();
     if (params?.status) q.append('status', params.status);
     if (params?.source) q.append('source', params.source);
+    if (params?.city) q.append('city', params.city);
     if (params?.search) q.append('search', params.search);
     if (params?.limit) q.append('limit', String(params.limit));
     if (params?.offset) q.append('offset', String(params.offset));
@@ -63,10 +64,11 @@ export const crmApi = {
     return request<DialerQueueItem | null>('/crm/dialer/next-lead');
   },
 
-  startCall: (leadId: string, phone: string) => {
+  startCall: (leadId: string, phone: string, initiatedFrom: 'web' | 'mobile' = 'web') => {
     const formData = new FormData();
     formData.append('lead_id', leadId);
     formData.append('phone', phone);
+    formData.append('initiated_from', initiatedFrom);
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
     return fetch(`${getApiBase()}/crm/calls/start`, {
@@ -91,6 +93,20 @@ export const crmApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  listCalls: (params?: { lead_id?: string; telecaller_id?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.lead_id) q.append('lead_id', params.lead_id);
+    if (params?.telecaller_id) q.append('telecaller_id', params.telecaller_id);
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.offset) q.append('offset', String(params.offset));
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<CallLog[]>(`/crm/calls${queryStr}`);
+  },
+
+  getRecordingAudioUrl: (callId: string) => {
+    return `${getApiBase()}/crm/calls/${callId}/recording`;
   },
 
   // Analytics
@@ -123,7 +139,7 @@ export const crmApi = {
   },
 
   getApkDownloadUrl: () => {
-    return `${getApiBase()}/crm/app/download`;
+    return process.env.NEXT_PUBLIC_TELECALLER_APK_URL || `${getApiBase()}/crm/app/download`;
   },
 
   // Fleet Presence & Admin KPIs
@@ -131,8 +147,13 @@ export const crmApi = {
     return request<TelecallerRosterItem[]>('/crm/fleet/roster');
   },
 
-  getFleetKpis: () => {
-    return request<TelecallerKPIItem[]>('/crm/fleet/kpis');
+  getFleetKpis: (params?: { date_from?: string; date_to?: string; preset?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.date_from) q.append('date_from', params.date_from);
+    if (params?.date_to) q.append('date_to', params.date_to);
+    if (params?.preset) q.append('preset', params.preset);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return request<TelecallerKPIItem[]>(`/crm/fleet/kpis${queryStr}`);
   },
 
   revokeDevice: (userId: string) => {

@@ -61,12 +61,15 @@ export interface CallLog {
   tenant_id: string;
   branch_id?: string | null;
   lead_id: string;
+  lead_name?: string | null;
   telecaller_id: string;
+  telecaller_name?: string | null;
   phone_dialed: string;
   call_started_at: string;
   call_ended_at?: string | null;
   duration_seconds: number;
   recording_file_path?: string | null;
+  recording_url?: string | null;
   transcript_text?: string | null;
   transcript_status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
   whisper_model_used?: string | null;
@@ -118,6 +121,7 @@ export interface TelecallerRosterItem {
 export interface TelecallerKPIItem {
   user_id: string;
   user_name: string;
+  email?: string;
   total_calls: number;
   answered_calls: number;
   total_duration_seconds: number;
@@ -125,4 +129,9 @@ export interface TelecallerKPIItem {
   conversions: number;
   conversion_rate_percentage: number;
   overdue_follow_ups: number;
+  callback_count: number;
+  not_interested_count: number;
+  dnd_invalid_count: number;
+  wrong_number_count: number;
+  skipped_count: number;
 }

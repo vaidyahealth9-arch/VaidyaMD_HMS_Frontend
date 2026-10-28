@@ -1,9 +1,9 @@
 import { request, toQueryString } from '@/lib/api';
 
 export const pharmacyApi = {
-  listIndents: (params?: { status?: string }) =>
+  listIndents: (params?: { status?: string; indent_type?: string }) =>
     request<any[]>(`/core/pharmacy/indents${toQueryString(params)}`),
-  createIndent: (data: { requesting_department: string; requested_by_id?: string; urgency?: string; items: any[]; notes?: string }) =>
+  createIndent: (data: { requesting_department: string; requested_by_id?: string; urgency?: string; items: any[]; notes?: string; indent_type?: string; target_branch_id?: string; branch_id?: string }) =>
     request<any>('/core/pharmacy/indents', { method: 'POST', body: JSON.stringify(data) }),
   updateIndentStatus: (id: string, status: string) =>
     request<any>(`/core/pharmacy/indents/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -32,7 +32,7 @@ export const pharmacyApi = {
   parseOcrInvoice: (payload?: { base64_image?: string; invoice_hint?: string; file_name?: string; vendor_name?: string } | Record<string, any>) =>
     request<any>('/core/pharmacy/ocr/invoice', { method: 'POST', body: JSON.stringify(payload || {}) }),
 
-  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; notes?: string; discount?: number; round_off?: number; amount_paid?: number; payment_method?: string; payment_ref?: string; wallet_amount_used?: number; upi_pay_mode?: string; split_payments?: any[] }) =>
+  dispenseFEFO: (data: { patient_id: string; items: Array<{ item_code: string; quantity: number }>; doctor_id?: string; indent_id?: string; notes?: string; discount?: number; round_off?: number; amount_paid?: number; payment_method?: string; payment_ref?: string; wallet_amount_used?: number; upi_pay_mode?: string; split_payments?: any[] }) =>
     request<any>('/core/pharmacy/dispense', { method: 'POST', body: JSON.stringify(data) }),
 
   listVendors: () =>

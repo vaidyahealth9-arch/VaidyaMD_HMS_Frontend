@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi } from '@/lib/api';
+import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi, pharmacyApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Stethoscope,
@@ -670,7 +670,7 @@ export default function OPDWorkbench({
        console.error('Failed to save consultation', err);
        toast.error('Failed to Save Consultation', err?.message || 'Server error saving clinical record');
      },
-     onSuccess: async (savedRecord: any) => {
+     onSuccess: async (savedRecord: any, variables: any) => {
        if (savedRecord?.id) {
          setActiveConsultationRecordId(savedRecord.id);
        }
@@ -688,6 +688,48 @@ export default function OPDWorkbench({
            queryClient.invalidateQueries({ queryKey: ['appointments'] });
          } catch (err) {
            console.error('Failed to complete linked appointment:', err);
+         }
+       }
+
+       // Dispatch OPD prescription directly into Pharmacy Pending Dispense Queue (fire-and-forget)
+       const medsToIndent = (variables?.medications || []).filter((m: any) => m && (m.drug_name || '').trim());
+       if (medsToIndent.length > 0 && selectedPatientId) {
+         try {
+           const patientName = patient?.name || patient?.full_name || 'OPD Patient';
+           const patientVid = patient?.vid || patient?.uhid || selectedPatientId;
+           const doctorName = user?.name || (user as any)?.full_name || 'Consulting Doctor';
+
+           await pharmacyApi.createIndent({
+             requesting_department: 'OPD',
+             requested_by_id: user?.id,
+             urgency: 'Routine',
+             indent_type: 'OPD_RX',
+             notes: `OPD Rx: ${patientName} (${patientVid}) - Dr. ${doctorName}`,
+             items: medsToIndent.map((m: any) => {
+               const rawDur = String(m.duration || '');
+               const durMatch = rawDur.match(/\d+/);
+               const calcQty = durMatch ? parseInt(durMatch[0], 10) : 1;
+               return {
+                 item_name: m.drug_name,
+                 item_code: m.item_code || m.drug_name,
+                 dose: m.dose || '',
+                 frequency: m.frequency || 'OD',
+                 duration: m.duration || '',
+                 instructions: m.instructions || '',
+                 quantity: calcQty,
+                 quantity_requested: calcQty,
+                 patient_id: selectedPatientId,
+                 patient_name: patientName,
+                 patient_vid: patientVid,
+                 opd_record_id: savedRecord?.id,
+                 doctor_name: doctorName,
+                 doctor_id: user?.id,
+               };
+             }),
+           });
+           queryClient.invalidateQueries({ queryKey: ['pharmacy-indents'] });
+         } catch (err) {
+           console.warn('Could not auto-raise pharmacy indent for OPD prescription:', err);
          }
        }
 

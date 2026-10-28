@@ -266,6 +266,7 @@ export default function UniversalBillingModal({
       if (source === 'pharmacy' && normalizedItems.some((it) => it.service_code)) {
         const dispenseRes = await pharmacyApi.dispenseFEFO({
           patient_id: selectedPatientId,
+          indent_id: sourceReferenceId || undefined,
           items: normalizedItems.map((it) => ({
             item_code: it.service_code || it.description,
             quantity: it.quantity,

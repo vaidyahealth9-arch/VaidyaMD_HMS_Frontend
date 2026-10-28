@@ -37,6 +37,12 @@ interface PosTabProps {
   }>;
   setPosCart: React.Dispatch<React.SetStateAction<any[]>>;
   onDispenseSuccess: (invoice: any) => void;
+  posPatientId?: string;
+  setPosPatientId?: React.Dispatch<React.SetStateAction<string>>;
+  activeIndentId?: string | null;
+  setActiveIndentId?: React.Dispatch<React.SetStateAction<string | null>>;
+  activeIndentDetails?: any | null;
+  onClearActiveIndent?: () => void;
 }
 
 export default function PosTab({
@@ -45,13 +51,21 @@ export default function PosTab({
   posCart,
   setPosCart,
   onDispenseSuccess,
+  posPatientId: controlledPatientId,
+  setPosPatientId: controlledSetPatientId,
+  activeIndentId,
+  setActiveIndentId,
+  activeIndentDetails,
+  onClearActiveIndent,
 }: PosTabProps) {
   const { user, can } = useAuth();
   const { openBilling } = useBillingModal();
   const queryClient = useQueryClient();
 
   const [posSearch, setPosSearch] = useState('');
-  const [posPatientId, setPosPatientId] = useState<string>('');
+  const [internalPatientId, setInternalPatientId] = useState<string>('');
+  const posPatientId = controlledPatientId !== undefined ? controlledPatientId : internalPatientId;
+  const setPosPatientId = controlledSetPatientId !== undefined ? controlledSetPatientId : setInternalPatientId;
   const [posPatientSearch, setPosPatientSearch] = useState<string>('');
   const [isPosPatientDropdownOpen, setIsPosPatientDropdownOpen] = useState<boolean>(false);
   const posPatientDropdownRef = useRef<HTMLDivElement>(null);
@@ -95,9 +109,12 @@ export default function PosTab({
       }
       return pharmacyApi.dispenseFEFO({
         patient_id: effectivePatientId,
+        indent_id: activeIndentId || undefined,
         items: posCart.map((i) => ({ item_code: i.item_code, quantity: i.quantity })),
         doctor_id: user?.id,
-        notes: 'Dispensed via Point of Sale counter',
+        notes: activeIndentDetails
+          ? `Dispensed for OPD Rx ${activeIndentDetails.indent_number}`
+          : 'Dispensed via Point of Sale counter',
         discount: Number(posDiscount) || 0,
         round_off: roundOff,
         wallet_amount_used: posWalletDeduct,
@@ -108,6 +125,7 @@ export default function PosTab({
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-indents'] });
       queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
       if (effectivePatientId) {
@@ -119,6 +137,8 @@ export default function PosTab({
       setPosAmountPaid('');
       setPosPaymentMode('Cash');
       setPosPaymentRef('');
+      setActiveIndentId?.(null);
+      onClearActiveIndent?.();
       onDispenseSuccess(data);
     },
     onError: (err: any) => {
@@ -143,7 +163,10 @@ export default function PosTab({
       patientId: effectivePatientId,
       lockedPatient: true,
       sourceModule: 'pharmacy',
-      defaultReason: 'Point of Sale Pharmacy Dispense',
+      sourceReferenceId: activeIndentId || undefined,
+      defaultReason: activeIndentDetails
+        ? `OPD Rx Dispense - Indent #${activeIndentDetails.indent_number || ''}`
+        : 'Point of Sale Pharmacy Dispense',
       defaultItems: posCart.map((i) => ({
         description: `${i.item_name}${i.batch_number ? ` (Batch: ${i.batch_number})` : ''}`,
         quantity: i.quantity,
@@ -155,6 +178,7 @@ export default function PosTab({
       defaultDiscount: posDiscount,
       onSuccess: (invoice) => {
         queryClient.invalidateQueries({ queryKey: ['pharmacy-batches'] });
+        queryClient.invalidateQueries({ queryKey: ['pharmacy-indents'] });
         queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
         queryClient.invalidateQueries({ queryKey: ['pharmacy-invoices'] });
         if (effectivePatientId) {
@@ -164,6 +188,8 @@ export default function PosTab({
         setPosDiscount(0);
         setPosWalletDeduct(0);
         setPosAmountPaid('');
+        setActiveIndentId?.(null);
+        onClearActiveIndent?.();
         onDispenseSuccess(invoice);
       },
     });
@@ -200,6 +226,42 @@ export default function PosTab({
 
   return (
     <div className="space-y-4 pt-2">
+          {activeIndentDetails && (
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between shadow-xs animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                  <Receipt className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-indigo-950">
+                      Dispensing OPD Prescription #{activeIndentDetails.indent_number}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] bg-white border-indigo-300 text-indigo-700 font-mono">
+                      {activeIndentDetails.items?.[0]?.patient_name || 'Patient'}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-indigo-700 mt-0.5">
+                    Prescribed by Dr. {activeIndentDetails.items?.[0]?.doctor_name || 'OPD Physician'}. Review items below, add any additional items, and proceed to Unified Billing.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setActiveIndentId?.(null);
+                  onClearActiveIndent?.();
+                  setPosCart([]);
+                }}
+                className="text-xs text-indigo-600 hover:text-indigo-900 hover:bg-indigo-100 h-7 px-2.5 shrink-0"
+              >
+                Clear / Normal POS
+              </Button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left: Patient Select & Quick Add Drug */}
             <div className="lg:col-span-2 space-y-4">
