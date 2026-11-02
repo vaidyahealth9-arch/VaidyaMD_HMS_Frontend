@@ -65,20 +65,68 @@ export default function OPDPrescriptionSection({
     staleTime: 5 * 60 * 1000,
   });
 
-  const availableMedicines = React.useMemo(() => {
+  const [openSearchIndex, setOpenSearchIndex] = React.useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState<Record<number, string>>({});
+  const searchContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setOpenSearchIndex(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const medicineDirectory = React.useMemo(() => {
     if (!Array.isArray(batches)) return [];
-    const seen = new Set<string>();
-    const list: string[] = [];
-    for (const b of batches) {
+    const map = new Map<string, {
+      itemName: string;
+      itemCode: string;
+      genericName: string;
+      category: string;
+      totalAvailable: number;
+      rackLocation: string;
+    }>();
+
+    for (const b of batches as any[]) {
       const name = (b.item_name || '').trim();
       if (!name) continue;
-      if (!seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase());
-        list.push(name);
+      const key = name.toLowerCase();
+      const qty = Number(b.quantity_available || 0);
+      const existing = map.get(key);
+      if (existing) {
+        existing.totalAvailable += qty;
+      } else {
+        map.set(key, {
+          itemName: name,
+          itemCode: b.item_code || '',
+          genericName: b.generic_name || '',
+          category: b.category || '',
+          totalAvailable: qty,
+          rackLocation: b.rack_location || '',
+        });
       }
     }
-    return list;
+    return Array.from(map.values()).sort((a, b) => a.itemName.localeCompare(b.itemName));
   }, [batches]);
+
+  const medicineStockMap = React.useMemo(() => {
+    const map = new Map<string, { totalAvailable: number; itemCode: string; rackLocation: string }>();
+    medicineDirectory.forEach((m) => {
+      map.set(m.itemName.toLowerCase(), {
+        totalAvailable: m.totalAvailable,
+        itemCode: m.itemCode,
+        rackLocation: m.rackLocation,
+      });
+    });
+    return map;
+  }, [medicineDirectory]);
+
+  const availableMedicines = React.useMemo(() => {
+    return medicineDirectory.map((m) => m.itemName);
+  }, [medicineDirectory]);
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -250,72 +298,202 @@ export default function OPDPrescriptionSection({
             </div>
 
             {/* Structured Medication Array */}
-            <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
-              {medFields.map((field, index) => (
-                <div key={field.id} className="flex gap-2 items-start relative flex-wrap sm:flex-nowrap">
-                  <div className="flex-1 min-w-[130px]">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
-                    <Input
-                      {...register(`medications.${index}.drug_name`)}
-                      list="drugList"
-                      placeholder="e.g. Tab Paracetamol"
-                      className="h-8 text-xs mt-1 bg-white"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
-                    <Input
-                      {...register(`medications.${index}.dose`)}
-                      placeholder="500mg"
-                      className="h-8 text-xs mt-1 bg-white"
-                    />
-                  </div>
-                  <div className="w-28">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
-                    <select
-                      {...register(`medications.${index}.frequency`)}
-                      className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-                    >
-                      <option value="">Select...</option>
-                      <option value="OD">OD (Once daily)</option>
-                      <option value="BD">BD (Twice daily)</option>
-                      <option value="TDS">TDS (Thrice daily)</option>
-                      <option value="QID">QID (Four times daily)</option>
-                      <option value="SOS">SOS (As needed)</option>
-                      <option value="Stat">Stat (Immediately)</option>
-                    </select>
-                  </div>
-                  <div className="w-24">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
-                    <Input
-                      {...register(`medications.${index}.duration`)}
-                      placeholder="e.g. 5 days"
-                      className="h-8 text-xs mt-1 bg-white"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[130px]">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
-                    <Input
-                      {...register(`medications.${index}.instructions`)}
-                      placeholder="After food"
-                      className="h-8 text-xs mt-1 bg-white"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeMed(index)}
-                    className="mt-6 p-1.5 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+            <div ref={searchContainerRef} className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              {medFields.map((field, index) => {
+                const drugNameVal = watch(`medications.${index}.drug_name`) || '';
+                const stockInfo = medicineStockMap.get(drugNameVal.trim().toLowerCase());
+                const rowQuery = (searchQuery[index] ?? drugNameVal).toLowerCase().trim();
 
-              <datalist id="drugList">
-                {availableMedicines.map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
+                const filteredMeds = rowQuery
+                  ? medicineDirectory
+                      .filter(
+                        (m) =>
+                          m.itemName.toLowerCase().includes(rowQuery) ||
+                          m.genericName.toLowerCase().includes(rowQuery) ||
+                          m.category.toLowerCase().includes(rowQuery)
+                      )
+                      .slice(0, 10)
+                  : medicineDirectory.slice(0, 8);
+
+                return (
+                  <div key={field.id} className="flex gap-2 items-start relative flex-wrap sm:flex-nowrap pb-2 border-b border-slate-100 last:border-b-0">
+                    <div className="flex-1 min-w-[150px] relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
+                        {stockInfo && (
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                              stockInfo.totalAvailable > 10
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : stockInfo.totalAvailable > 0
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-rose-50 text-rose-600 border-rose-200'
+                            }`}
+                          >
+                            {stockInfo.totalAvailable > 10
+                              ? `In Stock: ${stockInfo.totalAvailable}`
+                              : stockInfo.totalAvailable > 0
+                              ? `Low: ${stockInfo.totalAvailable}`
+                              : 'Out of Stock'}
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        value={drugNameVal}
+                        onChange={(e) => {
+                          setValue(`medications.${index}.drug_name`, e.target.value);
+                          setSearchQuery((prev) => ({ ...prev, [index]: e.target.value }));
+                          setOpenSearchIndex(index);
+                        }}
+                        onFocus={() => {
+                          setOpenSearchIndex(index);
+                          setSearchQuery((prev) => ({ ...prev, [index]: drugNameVal }));
+                        }}
+                        placeholder="Type drug or generic name..."
+                        className="h-8 text-xs mt-1 bg-white font-medium"
+                      />
+
+                      {/* Dropdown Suggestions with Stock Badges */}
+                      {openSearchIndex === index && (
+                        <div className="absolute z-50 left-0 top-full mt-1 w-80 max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                          <div className="px-2.5 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                            <span>Formulary &amp; Stock</span>
+                            <span className="text-[9px] text-slate-400 font-normal">Click to apply</span>
+                          </div>
+                          <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                            {filteredMeds.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-slate-400">
+                                No inventory match found.
+                                <p className="text-[10px] text-slate-400 mt-0.5">Will be prescribed as external/custom drug.</p>
+                              </div>
+                            ) : (
+                              filteredMeds.map((med) => {
+                                const inStock = med.totalAvailable > 0;
+                                const isLow = inStock && med.totalAvailable <= 10;
+                                return (
+                                  <button
+                                    key={med.itemName}
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      setValue(`medications.${index}.drug_name`, med.itemName);
+                                      setValue(`medications.${index}.item_code`, med.itemCode);
+                                      setOpenSearchIndex(null);
+                                    }}
+                                    className="w-full text-left p-2 hover:bg-slate-50 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-semibold text-xs text-slate-800 truncate">{med.itemName}</div>
+                                      {med.genericName && (
+                                        <div className="text-[10px] text-slate-400 truncate">{med.genericName}</div>
+                                      )}
+                                    </div>
+                                    <div className="shrink-0">
+                                      {inStock ? (
+                                        <span
+                                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                            isLow
+                                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          }`}
+                                        >
+                                          {isLow ? `Low: ${med.totalAvailable}` : `In Stock: ${med.totalAvailable}`}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                          Out of Stock
+                                        </span>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Real-time Availability Subtext */}
+                      {drugNameVal.trim() && (
+                        <div className="mt-1">
+                          {stockInfo ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-medium">
+                              {stockInfo.totalAvailable > 10 ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  In Stock: <strong>{stockInfo.totalAvailable}</strong> available
+                                  {stockInfo.rackLocation ? ` (${stockInfo.rackLocation})` : ''}
+                                </span>
+                              ) : stockInfo.totalAvailable > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-amber-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Low Stock: <strong>{stockInfo.totalAvailable}</strong> left
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-rose-600">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                  Out of Stock in Pharmacy
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 italic">
+                              Custom / Non-inventory drug
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="w-20">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
+                      <Input
+                        {...register(`medications.${index}.dose`)}
+                        placeholder="500mg"
+                        className="h-8 text-xs mt-1 bg-white"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
+                      <select
+                        {...register(`medications.${index}.frequency`)}
+                        className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                      >
+                        <option value="">Select...</option>
+                        <option value="OD">OD (Once daily)</option>
+                        <option value="BD">BD (Twice daily)</option>
+                        <option value="TDS">TDS (Thrice daily)</option>
+                        <option value="QID">QID (Four times daily)</option>
+                        <option value="SOS">SOS (As needed)</option>
+                        <option value="Stat">Stat (Immediately)</option>
+                      </select>
+                    </div>
+                    <div className="w-24">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
+                      <Input
+                        {...register(`medications.${index}.duration`)}
+                        placeholder="e.g. 5 days"
+                        className="h-8 text-xs mt-1 bg-white"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[130px]">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
+                      <Input
+                        {...register(`medications.${index}.instructions`)}
+                        placeholder="After food"
+                        className="h-8 text-xs mt-1 bg-white"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeMed(index)}
+                      className="mt-6 p-1.5 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
 
               <button
                 type="button"

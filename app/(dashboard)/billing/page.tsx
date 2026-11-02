@@ -8,6 +8,7 @@ import {
   FileText,
   Package,
   Plus,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import PageLayout from '@/components/common/PageLayout';
@@ -17,6 +18,7 @@ import StatCard from '@/components/common/StatCard';
 import {
   InvoicesTab,
   PackagesTab,
+  DoctorRevenueTab,
   RecordPaymentModal,
   ReceiptModal,
   NewInvoiceSheet,
@@ -32,7 +34,7 @@ export default function BillingPage() {
   const [packages, setPackages] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'invoices' | 'packages'>(
+  const [activeTab, setActiveTab] = useState<'invoices' | 'packages' | 'doctor-revenue'>(
     tabParam === 'packages' ? 'packages' : 'invoices'
   );
 
@@ -52,7 +54,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'packages' || tab === 'invoices') {
+    if (tab === 'packages' || tab === 'invoices' || tab === 'doctor-revenue') {
       setActiveTab(tab);
     }
     const status = searchParams.get('status');
@@ -164,9 +166,10 @@ export default function BillingPage() {
         tabs={[
           { id: 'invoices', label: 'Invoices & Receipts', icon: FileText, badge: invoices.length },
           { id: 'packages', label: 'Treatment Packages', icon: Package, badge: packages.length },
+          { id: 'doctor-revenue', label: 'Doctor Revenue Settlement', icon: Users },
         ]}
         activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as 'invoices' | 'packages')}
+        onChange={(id) => setActiveTab(id as 'invoices' | 'packages' | 'doctor-revenue')}
       />
 
       {/* Invoices Tab */}
@@ -188,6 +191,11 @@ export default function BillingPage() {
           packages={packages}
           onSelectPackage={handleSelectPackage}
         />
+      )}
+
+      {/* Doctor Revenue Settlement Tab */}
+      {activeTab === 'doctor-revenue' && (
+        <DoctorRevenueTab />
       )}
 
       {/* Modals & Slide-overs */}

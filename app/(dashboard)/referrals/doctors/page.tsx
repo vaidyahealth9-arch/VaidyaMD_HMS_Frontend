@@ -75,6 +75,12 @@ export default function DoctorDirectoryPage() {
   const [patientSearch, setPatientSearch] = useState('');
   const [expandedPatientIds, setExpandedPatientIds] = useState<Record<string, boolean>>({});
 
+  // Reset expanded patients and search when doctor selection changes
+  useEffect(() => {
+    setExpandedPatientIds({});
+    setPatientSearch('');
+  }, [selectedDoctorName]);
+
   // Modals
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [settlePreselectedInvoiceId, setSettlePreselectedInvoiceId] = useState<string | null>(null);
@@ -630,14 +636,41 @@ export default function DoctorDirectoryPage() {
                       <User className="w-3.5 h-3.5 text-primary" />
                       Referred Patients ({doctorDetail.patients.length}) &amp; Bill Invoices
                     </h3>
-                    <div className="w-56">
-                      <Input
-                        type="text"
-                        placeholder="Filter patients or VID..."
-                        value={patientSearch}
-                        onChange={(e) => setPatientSearch(e.target.value)}
-                        className="h-7 text-xs bg-white border-slate-200"
-                      />
+                    <div className="flex items-center gap-2">
+                      {doctorDetail.patients.length > 0 && (
+                        <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 text-[10px] font-medium text-slate-600 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allExpanded: Record<string, boolean> = {};
+                              doctorDetail.patients.forEach((p) => {
+                                allExpanded[p.patient_id] = true;
+                              });
+                              setExpandedPatientIds(allExpanded);
+                            }}
+                            className="px-2 py-0.5 rounded hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                          >
+                            Expand All
+                          </button>
+                          <span className="text-slate-200">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPatientIds({})}
+                            className="px-2 py-0.5 rounded hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                          >
+                            Collapse All
+                          </button>
+                        </div>
+                      )}
+                      <div className="w-52">
+                        <Input
+                          type="text"
+                          placeholder="Filter patients or VID..."
+                          value={patientSearch}
+                          onChange={(e) => setPatientSearch(e.target.value)}
+                          className="h-7 text-xs bg-white border-slate-200"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -647,7 +680,7 @@ export default function DoctorDirectoryPage() {
                     </div>
                   ) : (
                     filteredPatients.map((pat) => {
-                      const isExpanded = expandedPatientIds[pat.patient_id] ?? true;
+                      const isExpanded = Boolean(expandedPatientIds[pat.patient_id]);
 
                       return (
                         <div

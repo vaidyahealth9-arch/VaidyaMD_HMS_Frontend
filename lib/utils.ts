@@ -18,26 +18,51 @@ export function formatCurrency(amount: number | string, forceDecimals?: boolean)
   }).format(val);
 }
 
+/** Parse a date string safely into a Date object, treating naive ISO strings from UTC backend as UTC */
+export function parseUtcDate(date: string | Date | null | undefined): Date | null {
+  if (!date) return null;
+  if (date instanceof Date) return date;
+  if (typeof date === 'string') {
+    const trimmed = date.trim();
+    if (!trimmed) return null;
+    // YYYY-MM-DD date only
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    // Datetime without explicit timezone indicator (naive UTC from server)
+    const normalized = trimmed.replace(' ', 'T');
+    if (!normalized.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(normalized)) {
+      return new Date(normalized + 'Z');
+    }
+    return new Date(normalized);
+  }
+  return new Date(date);
+}
+
 /** Format a date for display */
 export function formatDate(date: string | Date | null | undefined): string {
-  if (!date) return '—';
+  const parsed = parseUtcDate(date);
+  if (!parsed || isNaN(parsed.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(date));
+  }).format(parsed);
 }
 
 /** Format a datetime for display */
 export function formatDateTime(date: string | Date | null | undefined): string {
-  if (!date) return '—';
+  const parsed = parseUtcDate(date);
+  if (!parsed || isNaN(parsed.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date));
+    hour12: true,
+  }).format(parsed);
 }
 
 /** Get initials from a name */

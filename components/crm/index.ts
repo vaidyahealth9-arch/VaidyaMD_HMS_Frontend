@@ -3,6 +3,7 @@ export * from './CRMHeader';
 export * from './tabs/DialerQueueTab';
 export * from './tabs/LeadsListTab';
 export * from './tabs/CRMDashboardTab';
+export * from './tabs/CallHistoryTab';
 export * from './tabs/TelecallerRosterTab';
 export * from './tabs/TelecallerAnalyticsTab';
 export * from './modals/CallDispositionModal';

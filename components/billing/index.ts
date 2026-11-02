@@ -11,5 +11,6 @@ export type { OpenBillingOptions } from '@/contexts/BillingContext';
 export { default as PatientWalletCard, UniversalWalletCard } from './PatientWalletCard';
 export { default as InvoicesTab } from './tabs/InvoicesTab';
 export { default as PackagesTab } from './tabs/PackagesTab';
+export { default as DoctorRevenueTab } from './tabs/DoctorRevenueTab';
 export type { DataTableColumn } from '@/components/common/DataTable';
 

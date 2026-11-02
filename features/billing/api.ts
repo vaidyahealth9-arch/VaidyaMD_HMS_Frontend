@@ -31,6 +31,8 @@ export const walletApi = {
 };
 
 export const billingApi = {
+  getDoctorRevenueReport: (params?: { doctor_id?: string; start_date?: string; end_date?: string }) =>
+    request<any>(`/core/billing/reports/doctor-revenue${toQueryString(params)}`),
   listInvoices: (params?: { status?: string; patient_id?: string; appointment_source?: string }) =>
     request<any[]>(`/core/billing/invoices${toQueryString(params)}`),
   getInvoice: (id: string) => request<any>(`/core/billing/invoices/${id}`),

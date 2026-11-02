@@ -4,9 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/shared/ui/dialog';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
-import { Smartphone, Download, QrCode, ShieldCheck, RefreshCw, Copy, Check, AlertCircle } from 'lucide-react';
-import { crmApi } from '@/lib/api';
-import { getApiBase } from '@/lib/api';
+import { Smartphone, Download, QrCode, ShieldCheck, RefreshCw, Copy, Check, AlertCircle, ArrowRight, Camera } from 'lucide-react';
+import { crmApi, getApiBase } from '@/lib/api';
 
 interface ConnectPhoneModalProps {
   isOpen: boolean;
@@ -24,7 +23,8 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [activeStep, setActiveStep] = useState<'pair' | 'download'>('pair');
+  // Default to 'download' as Step 1 per user request
+  const [activeStep, setActiveStep] = useState<'download' | 'pair'>('download');
   const [qrProviderIndex, setQrProviderIndex] = useState(0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -59,28 +59,20 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
     }
   };
 
-  // QR Payload for Android app
-  const pairPayloadStr = pairingData
-    ? JSON.stringify({
-        action: 'vaidyamd_telecaller_pair',
-        server_url: apiBase,
-        auth_token: pairingData.pair_token,
-        token: pairingData.pair_token,
-        user_name: pairingData.user_name,
-        hospital_id: pairingData.hospital_id,
-        branch_id: pairingData.branch_id,
-      })
+  // Macro-Density Pair URI: Uses compact URI format instead of bloated JSON to yield large, easily-scannable blocks
+  const deepLinkUrl = pairingData
+    ? `vaidyamd://pair?token=${encodeURIComponent(pairingData.pair_token)}&server=${encodeURIComponent(apiBase)}`
     : '';
 
-  // Multi-provider QR code URLs with automatic fallback
+  // Multi-provider QR code URLs with Low Error Correction (ecc=L) for maximum module size ("Macro" squares)
   const qrProviders = [
-    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(pairPayloadStr)}`,
-    `https://quickchart.io/qr?size=200&margin=2&text=${encodeURIComponent(pairPayloadStr)}`,
+    `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=4&ecc=L&data=${encodeURIComponent(deepLinkUrl)}`,
+    `https://quickchart.io/qr?size=260&margin=2&ecLevel=L&text=${encodeURIComponent(deepLinkUrl)}`,
   ];
 
-  const currentPairQrUrl = pairPayloadStr ? qrProviders[qrProviderIndex % qrProviders.length] : '';
+  const currentPairQrUrl = deepLinkUrl ? qrProviders[qrProviderIndex % qrProviders.length] : '';
 
-  const downloadQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(
+  const downloadQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=4&ecc=L&data=${encodeURIComponent(
     downloadUrl
   )}`;
 
@@ -103,19 +95,8 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
           </div>
         </DialogHeader>
 
-        {/* Tab switcher: Step 1 (Pair) vs Step 2 (Download APK) */}
+        {/* Tab switcher: Step 1 (Download APK) vs Step 2 (Scan to Pair) */}
         <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold gap-1 mt-1 border border-slate-200">
-          <button
-            onClick={() => setActiveStep('pair')}
-            className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              activeStep === 'pair'
-                ? 'bg-white text-primary shadow-xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <QrCode className="w-3.5 h-3.5" />
-            Step 1: Scan to Pair Phone
-          </button>
           <button
             onClick={() => setActiveStep('download')}
             className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
@@ -125,11 +106,73 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            Step 2: Download APK (Optional)
+            Step 1: Download App
+          </button>
+          <button
+            onClick={() => setActiveStep('pair')}
+            className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              activeStep === 'pair'
+                ? 'bg-white text-primary shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            Step 2: Scan to Pair
           </button>
         </div>
 
-        {/* Step 1: Scan to Pair */}
+        {/* Step 1: Download & Install Companion APK */}
+        {activeStep === 'download' && (
+          <div className="space-y-4 pt-1 text-xs">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center text-center">
+              <div className="w-[180px] h-[180px] bg-white p-2 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={downloadQrCodeUrl}
+                  alt="Download APK QR Code"
+                  width={160}
+                  height={160}
+                  className="rounded"
+                />
+              </div>
+              <p className="font-semibold text-slate-800 mt-3 text-xs">
+                Scan with your phone camera to download APK directly
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Ensure phone is connected to the hospital Wi-Fi.
+              </p>
+
+              <div className="flex items-center gap-2 mt-3">
+                <a
+                  href={downloadUrl}
+                  download="vaidyamd-telecaller-v1.3.0.apk"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold text-xs shadow-xs transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download APK Directly (v1.3.0)
+                </a>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setActiveStep('pair')}
+                  className="text-xs bg-white text-slate-700 hover:bg-slate-100 border-slate-200 font-semibold"
+                >
+                  Already installed? Pair <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-[11px] text-emerald-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <span>
+                <strong>Zero-Cost & Private:</strong> Uses your Android SIM card plan. No per-minute cloud telephony subscriptions or Twilio charges.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Scan to Pair Phone */}
         {activeStep === 'pair' && (
           <div className="space-y-4 pt-1 text-xs">
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center text-center">
@@ -152,14 +195,14 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
                   </Button>
                 </div>
               ) : (
-                <div className="w-[190px] h-[190px] bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
+                <div className="w-[230px] h-[230px] bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
                   {currentPairQrUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={currentPairQrUrl}
                       alt="Pairing QR Code"
-                      width={170}
-                      height={170}
+                      width={210}
+                      height={210}
                       className="rounded"
                       onError={() => {
                         if (qrProviderIndex < qrProviders.length - 1) {
@@ -173,11 +216,12 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
                 </div>
               )}
 
-              <p className="font-bold text-slate-800 text-xs mt-3">
-                Open VaidyaMD Telecaller App & Scan QR Code
+              <p className="font-bold text-slate-800 text-xs mt-3 flex items-center justify-center gap-1.5">
+                <Camera className="w-4 h-4 text-primary" />
+                Scan with Telecaller App or Phone Camera
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs">
-                Zero manual typing. Automatically configures telecaller authentication and server bridge.
+                In the app: go to <strong>Stats/Settings ➔ Scan QR to Pair</strong>. Automatically sets up authentication and WebSocket sync.
               </p>
 
               {pairingData && (
@@ -247,46 +291,6 @@ export const ConnectPhoneModal: React.FC<ConnectPhoneModalProps> = ({ isOpen, on
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Step 2: Download & Install Companion APK */}
-        {activeStep === 'download' && (
-          <div className="space-y-4 pt-1 text-xs">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center text-center">
-              <div className="w-[180px] h-[180px] bg-white p-2 rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={downloadQrCodeUrl}
-                  alt="Download APK QR Code"
-                  width={160}
-                  height={160}
-                  className="rounded"
-                />
-              </div>
-              <p className="font-semibold text-slate-800 mt-3 text-xs">
-                Scan with phone camera to download APK directly
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Or download to your workstation / share via WhatsApp Web:
-              </p>
-
-              <a
-                href={downloadUrl}
-                download="vaidyamd-telecaller-v1.0.0.apk"
-                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold text-xs shadow-xs transition-all"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download APK Directly (v1.0.0)
-              </a>
-            </div>
-
-            <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-[11px] text-emerald-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-              <span>
-                <strong>100% Private & Free:</strong> Hosted securely inside your VaidyaMD instance. Bypasses cloud telecom subscription fees by using your standard mobile plan.
-              </span>
-            </div>
           </div>
         )}
 

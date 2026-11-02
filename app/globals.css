@@ -1,802 +1,803 @@
-@import "tailwindcss";
-
-@theme {
-  --color-primary: rgb(var(--clr-primary));
-  --color-primary-mid: rgb(var(--clr-primary-mid));
-  --color-primary-light: rgb(var(--clr-primary-light));
-  --color-accent: rgb(var(--clr-accent));
-  --color-accent-light: rgb(var(--clr-accent-light));
-  --color-surface: rgb(var(--clr-surface));
-  --color-surface-muted: rgb(var(--clr-surface-muted));
-  --color-surface-raised: rgb(var(--clr-surface-raised));
-  --color-border: rgb(var(--clr-border));
-  --color-border-strong: rgb(var(--clr-border-strong));
-  --color-foreground: rgb(var(--clr-text));
-  --color-text-main: rgb(var(--clr-text));
-  --color-text-muted: rgb(var(--clr-text-muted));
-  --color-text-subtle: rgb(var(--clr-text-subtle));
-  --color-success: rgb(var(--clr-success));
-  --color-success-bg: rgb(var(--clr-success-bg));
-  --color-warning: rgb(var(--clr-warning));
-  --color-warning-bg: rgb(var(--clr-warning-bg));
-  --color-danger: rgb(var(--clr-danger));
-  --color-danger-bg: rgb(var(--clr-danger-bg));
-  --color-info: rgb(var(--clr-info));
-  --color-info-bg: rgb(var(--clr-info-bg));
-  --color-rail-bg: rgb(var(--clr-rail-bg));
-  --color-rail-active: rgb(var(--clr-rail-active));
-  --color-topbar-bg: rgb(var(--clr-topbar-bg));
-}
-
-/* ─────────────────────────────────────────────────
-   VaidyaMD HMS — Design Tokens
-   Palette: Deep Teal-Navy + Warm Gold (medical premium)
-   All colours are CSS variables — theme switch = 1 line.
-───────────────────────────────────────────────── */
-@layer base {
-  :root {
-    /* Brand */
-    --clr-primary:        11  79 108;   /* #0B4F6C — deep teal-navy */
-    --clr-primary-mid:    26 110 142;   /* #1A6E8E */
-    --clr-primary-light:  209 236 247;  /* #D1ECF7 — tint for bg */
-    --clr-accent:        200 151  79;   /* #C8974F — warm gold */
-    --clr-accent-light:  251 240 220;   /* #FBF0DC — gold tint */
-
-    /* Surface */
-    --clr-surface:       255 255 255;
-    --clr-surface-muted: 247 248 250;   /* #F7F8FA */
-    --clr-surface-raised:255 255 255;
-
-    /* Border */
-    --clr-border:        227 232 238;   /* #E3E8EE */
-    --clr-border-strong: 196 207 219;
-
-    /* Text */
-    --clr-text:           17  24  39;   /* #111827 */
-    --clr-text-muted:    107 114 128;   /* #6B7280 */
-    --clr-text-subtle:   156 163 175;
-
-    /* Semantic */
-    --clr-success:        13 122  85;   /* #0D7A55 */
-    --clr-success-bg:    220 252 231;
-    --clr-warning:       154  96   6;   /* #9A6006 */
-    --clr-warning-bg:    255 243 205;
-    --clr-danger:        185  28  28;   /* #B91C1C */
-    --clr-danger-bg:    254 226 226;
-    --clr-info:           14 116 144;
-    --clr-info-bg:       207 250 254;
-
-    /* Shell */
-    --clr-rail-bg:         8  51  72;   /* even deeper — #083348 */
-    --clr-rail-active:   200 151  79;   /* gold */
-    --clr-topbar-bg:     255 255 255;
-
-    /* Typography */
-    --font-sans:   'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-serif:  'Instrument Serif', Georgia, 'Times New Roman', serif;
-
-    /* Radius */
-    --radius-sm:  4px;
-    --radius-md:  6px;
-    --radius-lg:  8px;
-    --radius-xl: 10px;
-
-    /* Shadow */
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-    --shadow-dropdown: 0 4px 16px 0 rgb(0 0 0 / 0.10);
-  }
-
-  /* ── Dark mode skeleton (activate later with data-theme="dark") ── */
-  :root[data-theme="dark"] {
-    --clr-surface:        22  30  40;
-    --clr-surface-muted:  15  21  30;
-    --clr-border:         40  52  66;
-    --clr-text:          220 230 240;
-    --clr-text-muted:    140 155 170;
-    --clr-rail-bg:         6  20  32;
-    --clr-topbar-bg:      18  26  36;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  html {
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  body {
-    background-color: rgb(var(--clr-surface-muted));
-    color: rgb(var(--clr-text));
-  }
-
-  /* Slim, non-intrusive scrollbar */
-  ::-webkit-scrollbar          { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track   { background: transparent; }
-  ::-webkit-scrollbar-thumb   { background: rgb(var(--clr-border-strong)); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--clr-text-subtle)); }
-
-  .hide-scrollbar::-webkit-scrollbar { display: none; }
-  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-}
-
-@layer components {
-  /* ── Animations — subtle, single-direction only ── */
-  .fade-in {
-    animation: fadeIn 0.2s ease-out;
-  }
-  .slide-in-left {
-    animation: slideInLeft 0.25s ease-out both;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-8px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-
-  /* ── Stepper ── */
-  .step-active .step-circle {
-    background-color: rgb(var(--clr-primary));
-    color: white;
-    border-color: rgb(var(--clr-primary));
-    box-shadow: 0 0 0 3px rgb(var(--clr-primary) / 0.15);
-  }
-  .step-completed .step-circle {
-    background-color: rgb(var(--clr-success));
-    color: white;
-    border-color: rgb(var(--clr-success));
-  }
-  .step-pending .step-circle {
-    background-color: rgb(var(--clr-surface-muted));
-    color: rgb(var(--clr-text-subtle));
-    border-color: rgb(var(--clr-border));
-  }
-  .step-active .step-line,
-  .step-completed .step-line {
-    background-color: rgb(var(--clr-primary));
-  }
-  .step-pending .step-line {
-    background-color: rgb(var(--clr-border));
-  }
-
-  /* ── Form input base ── */
-  .vmd-input {
-    @apply w-full bg-white border border-border rounded-[var(--radius-md)] px-3 py-2 text-sm text-text-main
-    focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary
-    transition-colors placeholder:text-text-subtle disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  /* ── Status indicator dot (no animation — performance) ── */
-  .status-dot-live {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: rgb(var(--clr-success));
-    display: inline-block;
-    flex-shrink: 0;
-  }
-
-  /* ── Loading bar (replaces bouncing dots) ── */
-  .loading-bar {
-    width: 120px;
-    height: 2px;
-    background: rgb(var(--clr-primary) / 0.15);
-    border-radius: 99px;
-    overflow: hidden;
-  }
-  .loading-bar::after {
-    content: '';
-    display: block;
-    width: 40%;
-    height: 100%;
-    background: rgb(var(--clr-primary));
-    border-radius: 99px;
-    animation: loadingSlide 1.2s ease-in-out infinite;
-  }
-  @keyframes loadingSlide {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
-  }
-}
-
-/* ────────────────────────────────────────────
-   Print styles — professional document output (A4 Standardization)
-──────────────────────────────────────────── */
-@media print {
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 0 !important;
-  }
-
-  @page landscape {
-    size: A4 landscape;
-    margin: 8mm 10mm;
-  }
-
-  .print-landscape {
-    page: landscape;
-  }
-
-  html, body {
-    background: white !important;
-    color: #0f172a !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    font-size: 10pt;
-    line-height: 1.35;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    width: 100% !important;
-  }
-
-  /* Completely remove navigation, sidebar, app layout header, toolbars, and no-print wrappers from print */
-  header:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.a5-print-sheet *):not(.printable-document *),
-  nav:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.a5-print-sheet *):not(.printable-document *),
-  aside, [data-sidebar], .no-print, .print\:hidden,
-  [role="dialog"] > div.fixed.inset-0:not(:has(.printable-document)):not(:has(.a4-print-sheet)):not(:has(.a5-print-sheet)):not(:has(.barcode-sticker-print)):not(:has(.desmat48-print-sheet)) {
-    display: none !important;
-  }
-
-  /* Ensure printable headers & footers are visible during print */
-  .printable-header-container,
-  .printable-report-header,
-  .print-header-anchor,
-  .printable-footer-container,
-  .printable-report-footer,
-  .print-footer-anchor {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  /* ─────────────────────────────────────────────────────────────
-     Tree Pruning for Printable Documents, A4 Sheets & Barcode Labels:
-     When a .printable-document, .a4-print-sheet, .barcode-sticker-print, or .desmat48-print-sheet is in DOM,
-     completely collapse (display: none) all sibling branches to guarantee
-     0 leading and trailing blank sheets!
-  ───────────────────────────────────────────────────────────── */
-  body:has(.printable-document) *:not(:has(.printable-document)):not(.printable-document):not(.printable-document *),
-  body:has(.a4-print-sheet) *:not(:has(.a4-print-sheet)):not(.a4-print-sheet):not(.a4-print-sheet *),
-  body:has(.a5-print-sheet) *:not(:has(.a5-print-sheet)):not(.a5-print-sheet):not(.a5-print-sheet *) {
-    display: none !important;
-  }
-
-  body.is-printing-barcode-roll *:not(:has(.barcode-sticker-print)):not(.barcode-sticker-print):not(.barcode-sticker-print *),
-  body.is-printing-desmat48-sheet *:not(:has(.desmat48-print-sheet)):not(.desmat48-print-sheet):not(.desmat48-print-sheet *) {
-    display: none !important;
-  }
-
-  /* Completely unconstrain and neutralize all ancestors of .printable-document, .a4-print-sheet, .barcode-sticker-print, and .desmat48-print-sheet */
-  body:has(.printable-document) *:has(.printable-document),
-  body:has(.a4-print-sheet) *:has(.a4-print-sheet),
-  body:has(.a5-print-sheet) *:has(.a5-print-sheet),
-  body:has(.barcode-sticker-print) *:has(.barcode-sticker-print),
-  body:has(.desmat48-print-sheet) *:has(.desmat48-print-sheet) {
-    display: block !important;
-    position: static !important;
-    float: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    transform: none !important;
-    filter: none !important;
-    backdrop-filter: none !important;
-    overflow: visible !important;
-    inset: auto !important;
-    flex: none !important;
-    grid: none !important;
-  }
-
-  /* Explicit isolation rule for .printable-document */
-  .printable-document {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: white !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    page-break-inside: auto !important;
-  }
-
-  .printable-document * {
-    visibility: visible !important;
-  }
-
-  /* Remove trailing margins from last child to avoid 1px blank page spill */
-  .printable-document > *:last-child {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  /* Print-specific table borders & layout */
-  .print-table,
-  table {
-    border-collapse: collapse !important;
-    width: 100% !important;
-  }
-
-  thead {
-    display: table-header-group !important;
-  }
-
-  tfoot {
-    display: table-footer-group !important;
-  }
-
-  .print-table th,
-  .print-table td {
-    border: 0.5pt solid #cbd5e1 !important;
-    padding: 4pt 6pt !important;
-  }
-
-  /* Page break controls */
-  .page-break-before {
-    page-break-before: always !important;
-    break-before: page !important;
-  }
-  .page-break-after {
-    page-break-after: always !important;
-    break-after: page !important;
-  }
-  .page-break-avoid,
-  .avoid-break,
-  .break-inside-avoid,
-  tr:not(.print-layout-table *),
-  .print-card {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* ─────────────────────────────────────────────────────────────
-     Continuous Print Layout Table Architecture
-     (Guarantees repeating thead header on all pages, repeating footer on all pages,
-     and continuous single-column flow with ZERO overlap)
-  ───────────────────────────────────────────────────────────── */
-  table.print-layout-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    border: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  table.print-layout-table > thead {
-    display: table-header-group !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  table.print-layout-table > thead > tr,
-  table.print-layout-table > thead > tr > th,
-  table.print-layout-table > thead > tr > td {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    font-weight: normal !important;
-    text-align: left !important;
-  }
-
-  table.print-layout-table > tfoot {
-    display: table-footer-group !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  table.print-layout-table > tfoot > tr,
-  table.print-layout-table > tfoot > tr > td {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  table.print-layout-table > tbody {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  table.print-layout-table > tbody > tr,
-  table.print-layout-table > tbody > tr > td {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    page-break-inside: auto !important;
-    break-inside: auto !important;
-  }
-
-  /* Reserved spacer in tfoot so content never collides with fixed bottom footer */
-  .print-footer-spacer {
-    display: block !important;
-    height: 32mm !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Fixed footer at bottom of every printed page */
-  .print-footer-fixed {
-    display: block !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    z-index: 100 !important;
-    background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* Watermark repeats centered on every printed page */
-  .print-watermark-fixed {
-    display: flex !important;
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    z-index: 0 !important;
-    pointer-events: none !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  /* ─────────────────────────────────────────────────────────────
-     Thermal Sticker Label Continuous Roll Rules (Zebra / TSC / TVS / Dymo)
-  ───────────────────────────────────────────────────────────── */
-  body.is-printing-barcode-roll {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-  }
-
-  @page barcode-roll {
-    margin: 0mm !important;
-    size: auto;
-  }
-
-  @page desmat48-page {
-    size: A4 portrait !important;
-    margin: 0mm !important;
-  }
-
-  body.is-printing-barcode-roll .barcode-sticker-print {
-    page: barcode-roll;
-  }
-
-  body.is-printing-desmat48-sheet {
-    background: white !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  body.is-printing-desmat48-sheet .desmat48-print-sheet {
-    page: desmat48-page;
-    display: block !important;
-    visibility: visible !important;
-    width: 210mm !important;
-    height: 297mm !important;
-    max-height: 297mm !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background: white !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-  }
-
-  body.is-printing-desmat48-sheet .desmat48-print-sheet * {
-    visibility: visible !important;
-  }
-
-  body.is-printing-desmat48-sheet .desmat-cell {
-    box-sizing: border-box !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  body.is-printing-desmat48-sheet .desmat-cell-empty,
-  body.is-printing-desmat48-sheet .desmat-cell-empty * {
-    visibility: hidden !important;
-    opacity: 0 !important;
-    background: transparent !important;
-    border: none !important;
-  }
-
-  .barcode-sticker-print {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-    width: auto !important;
-  }
-
-  .barcode-sticker-page-wrapper {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: always !important;
-    break-after: page !important;
-    width: fit-content !important;
-    height: fit-content !important;
-  }
-
-  .barcode-sticker-page-wrapper:last-child {
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-
-  .barcode-sticker-item {
-    box-sizing: border-box !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    border: none !important;
-    background: white !important;
-    color: black !important;
-  }
-}
-
-
-/* ─────────────────────────────────────────────────────────────
-   A4 Page Sheet Architecture (Screen Preview & Physical Print)
-   • Each sheet is an authentic A4 page (210mm x 297mm)
-   • Strict flex layout: Header at top, Content in middle, Footer at bottom
-   • Content CANNOT overlap Header or Footer
-   • Zero margin @page enables full-bleed stripes touching paper edges
-───────────────────────────────────────────────────────────── */
-
-/* Screen Preview Styling */
-.a4-print-sheet {
-  width: 100%;
-  max-width: 210mm;
-  min-height: 297mm;
-  background: white;
-  margin: 0 auto;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  border: 1px solid #cbd5e1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  position: relative;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-/* Landscape Screen Preview Styling */
-.a4-print-sheet.a4-landscape-page {
-  width: 100%;
-  max-width: 297mm;
-  min-height: 210mm;
-  height: auto;
-}
-
-/* Screen Preview for A5 Sheet (210mm x 148mm Landscape) */
-.a5-print-sheet {
-  width: 100%;
-  max-width: 210mm;
-  min-height: 148mm;
-  background: white;
-  margin: 0 auto;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  border: 1px solid #cbd5e1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  position: relative;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-/* Continuous Print Layout Table (Screen Preview) */
-.print-layout-table {
-  width: 100%;
-  border-collapse: collapse;
-  border: none;
-  margin: 0;
-  padding: 0;
-}
-
-.print-footer-spacer {
-  display: none;
-}
-
-.print-footer-fixed {
-  display: block;
-  position: static;
-  width: 100%;
-  margin-top: auto;
-}
-
-.print-watermark-fixed {
-  pointer-events: none;
-  user-select: none;
-  position: absolute;
-  top: 140mm;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 0 !important; /* Zero margin enables 100% full-bleed edge-to-edge printing */
-  }
-
-  @page a5-page {
-    size: A5 landscape !important;
-    margin: 0 !important;
-  }
-
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* Physical Print: Exact A4 Sheet Page Break */
-  .a4-print-sheet {
-    width: 210mm !important;
-    min-height: 295.5mm !important;
-    height: 295.5mm !important;
-    max-height: 295.5mm !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
-    position: relative !important;
-    background: white !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  .a4-print-sheet:not(:last-child):not(:last-of-type) {
-    page-break-after: always !important;
-    break-after: page !important;
-  }
-
-  /* Physical Print: Landscape A4 Sheet */
-  .a4-print-sheet.a4-landscape-page {
-    width: 297mm !important;
-    min-height: 208mm !important;
-    height: 208.5mm !important;
-    max-height: 208.5mm !important;
-    overflow: hidden !important;
-  }
-
-  /* Physical Print: Exact A5 Sheet Page Break (Landscape: 210mm wide x 147mm high) */
-  .a5-print-sheet {
-    width: 210mm !important;
-    height: 147mm !important;
-    max-height: 147mm !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
-    position: relative !important;
-    background: white !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    page: a5-page;
-  }
-
-  .a5-print-sheet img {
-    max-height: 12mm !important;
-  }
-
-  .a5-print-sheet .printable-header-container {
-    margin-bottom: 0 !important;
-  }
-
-  .a5-print-sheet .printable-footer-container {
-    margin-top: auto !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .a5-print-sheet .printable-footer-container .h-8 {
-    height: 8px !important;
-  }
-
-  /* Strictly suppress trailing empty page on last and only sheets */
-  .a4-print-sheet:last-child,
-  .a4-print-sheet:last-of-type,
-  .a4-print-sheet:only-child,
-  .a4-print-sheet:only-of-type,
-  .a5-print-sheet:last-child,
-  .a5-print-sheet:last-of-type,
-  .a5-print-sheet:only-child,
-  .a5-print-sheet:only-of-type {
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-
-  /* Sheet content sits strictly in middle, flows top-down */
-  .a4-sheet-content {
-    flex: 1 1 auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-    overflow: visible !important;
-  }
-
-  /* Watermark repeats centered on each printed page */
-  .a4-print-sheet .print-watermark {
-    position: absolute !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    z-index: 0 !important;
-    pointer-events: none !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-}
-
-
+@import "tailwindcss";
+
+@theme {
+  --color-primary: rgb(var(--clr-primary));
+  --color-primary-mid: rgb(var(--clr-primary-mid));
+  --color-primary-light: rgb(var(--clr-primary-light));
+  --color-accent: rgb(var(--clr-accent));
+  --color-accent-light: rgb(var(--clr-accent-light));
+  --color-surface: rgb(var(--clr-surface));
+  --color-surface-muted: rgb(var(--clr-surface-muted));
+  --color-surface-raised: rgb(var(--clr-surface-raised));
+  --color-border: rgb(var(--clr-border));
+  --color-border-strong: rgb(var(--clr-border-strong));
+  --color-foreground: rgb(var(--clr-text));
+  --color-text-main: rgb(var(--clr-text));
+  --color-text-muted: rgb(var(--clr-text-muted));
+  --color-text-subtle: rgb(var(--clr-text-subtle));
+  --color-success: rgb(var(--clr-success));
+  --color-success-bg: rgb(var(--clr-success-bg));
+  --color-warning: rgb(var(--clr-warning));
+  --color-warning-bg: rgb(var(--clr-warning-bg));
+  --color-danger: rgb(var(--clr-danger));
+  --color-danger-bg: rgb(var(--clr-danger-bg));
+  --color-info: rgb(var(--clr-info));
+  --color-info-bg: rgb(var(--clr-info-bg));
+  --color-rail-bg: rgb(var(--clr-rail-bg));
+  --color-rail-active: rgb(var(--clr-rail-active));
+  --color-topbar-bg: rgb(var(--clr-topbar-bg));
+}
+
+/* ─────────────────────────────────────────────────
+   VaidyaMD HMS — Design Tokens
+   Palette: Deep Teal-Navy + Warm Gold (medical premium)
+   All colours are CSS variables — theme switch = 1 line.
+───────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Brand */
+    --clr-primary:        11  79 108;   /* #0B4F6C — deep teal-navy */
+    --clr-primary-mid:    26 110 142;   /* #1A6E8E */
+    --clr-primary-light:  209 236 247;  /* #D1ECF7 — tint for bg */
+    --clr-accent:        200 151  79;   /* #C8974F — warm gold */
+    --clr-accent-light:  251 240 220;   /* #FBF0DC — gold tint */
+
+    /* Surface */
+    --clr-surface:       255 255 255;
+    --clr-surface-muted: 247 248 250;   /* #F7F8FA */
+    --clr-surface-raised:255 255 255;
+
+    /* Border */
+    --clr-border:        227 232 238;   /* #E3E8EE */
+    --clr-border-strong: 196 207 219;
+
+    /* Text */
+    --clr-text:           17  24  39;   /* #111827 */
+    --clr-text-muted:    107 114 128;   /* #6B7280 */
+    --clr-text-subtle:   156 163 175;
+
+    /* Semantic */
+    --clr-success:        13 122  85;   /* #0D7A55 */
+    --clr-success-bg:    220 252 231;
+    --clr-warning:       154  96   6;   /* #9A6006 */
+    --clr-warning-bg:    255 243 205;
+    --clr-danger:        185  28  28;   /* #B91C1C */
+    --clr-danger-bg:    254 226 226;
+    --clr-info:           14 116 144;
+    --clr-info-bg:       207 250 254;
+
+    /* Shell */
+    --clr-rail-bg:         8  51  72;   /* even deeper — #083348 */
+    --clr-rail-active:   200 151  79;   /* gold */
+    --clr-topbar-bg:     255 255 255;
+
+    /* Typography */
+    --font-sans:   'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-serif:  'Instrument Serif', Georgia, 'Times New Roman', serif;
+
+    /* Radius */
+    --radius-sm:  4px;
+    --radius-md:  6px;
+    --radius-lg:  8px;
+    --radius-xl: 10px;
+
+    /* Shadow */
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-dropdown: 0 4px 16px 0 rgb(0 0 0 / 0.10);
+  }
+
+  /* ── Dark mode skeleton (activate later with data-theme="dark") ── */
+  :root[data-theme="dark"] {
+    --clr-surface:        22  30  40;
+    --clr-surface-muted:  15  21  30;
+    --clr-border:         40  52  66;
+    --clr-text:          220 230 240;
+    --clr-text-muted:    140 155 170;
+    --clr-rail-bg:         6  20  32;
+    --clr-topbar-bg:      18  26  36;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: rgb(var(--clr-surface-muted));
+    color: rgb(var(--clr-text));
+  }
+
+  /* Slim, non-intrusive scrollbar */
+  ::-webkit-scrollbar          { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track   { background: transparent; }
+  ::-webkit-scrollbar-thumb   { background: rgb(var(--clr-border-strong)); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--clr-text-subtle)); }
+
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+@layer components {
+  /* ── Animations — subtle, single-direction only ── */
+  .fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  .slide-in-left {
+    animation: slideInLeft 0.25s ease-out both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── Stepper ── */
+  .step-active .step-circle {
+    background-color: rgb(var(--clr-primary));
+    color: white;
+    border-color: rgb(var(--clr-primary));
+    box-shadow: 0 0 0 3px rgb(var(--clr-primary) / 0.15);
+  }
+  .step-completed .step-circle {
+    background-color: rgb(var(--clr-success));
+    color: white;
+    border-color: rgb(var(--clr-success));
+  }
+  .step-pending .step-circle {
+    background-color: rgb(var(--clr-surface-muted));
+    color: rgb(var(--clr-text-subtle));
+    border-color: rgb(var(--clr-border));
+  }
+  .step-active .step-line,
+  .step-completed .step-line {
+    background-color: rgb(var(--clr-primary));
+  }
+  .step-pending .step-line {
+    background-color: rgb(var(--clr-border));
+  }
+
+  /* ── Form input base ── */
+  .vmd-input {
+    @apply w-full bg-white border border-border rounded-[var(--radius-md)] px-3 py-2 text-sm text-text-main
+    focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary
+    transition-colors placeholder:text-text-subtle disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Status indicator dot (no animation — performance) ── */
+  .status-dot-live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgb(var(--clr-success));
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  /* ── Loading bar (replaces bouncing dots) ── */
+  .loading-bar {
+    width: 120px;
+    height: 2px;
+    background: rgb(var(--clr-primary) / 0.15);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .loading-bar::after {
+    content: '';
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: rgb(var(--clr-primary));
+    border-radius: 99px;
+    animation: loadingSlide 1.2s ease-in-out infinite;
+  }
+  @keyframes loadingSlide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
+}
+
+/* ────────────────────────────────────────────
+   Print styles — professional document output (A4 Standardization)
+──────────────────────────────────────────── */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+
+  @page landscape {
+    size: A4 landscape;
+    margin: 8mm 10mm;
+  }
+
+  .print-landscape {
+    page: landscape;
+  }
+
+  html, body {
+    background: white !important;
+    color: #0f172a !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.35;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+  }
+
+  /* Completely remove navigation, sidebar, app layout header, toolbars, and no-print wrappers from print */
+  header:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.a5-print-sheet *):not(.printable-document *),
+  nav:not(.printable-header-container):not(.printable-report-header):not(.a4-print-sheet *):not(.a5-print-sheet *):not(.printable-document *),
+  aside, [data-sidebar], .no-print, .print\:hidden,
+  [role="dialog"] > div.fixed.inset-0:not(:has(.printable-document)):not(:has(.a4-print-sheet)):not(:has(.a5-print-sheet)):not(:has(.barcode-sticker-print)):not(:has(.desmat48-print-sheet)) {
+    display: none !important;
+  }
+
+  /* Ensure printable headers & footers are visible during print */
+  .printable-header-container,
+  .printable-report-header,
+  .print-header-anchor,
+  .printable-footer-container,
+  .printable-report-footer,
+  .print-footer-anchor {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Tree Pruning for Printable Documents, A4 Sheets & Barcode Labels:
+     When a .printable-document, .a4-print-sheet, .barcode-sticker-print, or .desmat48-print-sheet is in DOM,
+     completely collapse (display: none) all sibling branches to guarantee
+     0 leading and trailing blank sheets!
+  ───────────────────────────────────────────────────────────── */
+  body:has(.printable-document) *:not(:has(.printable-document)):not(.printable-document):not(.printable-document *),
+  body:has(.a4-print-sheet) *:not(:has(.a4-print-sheet)):not(.a4-print-sheet):not(.a4-print-sheet *),
+  body:has(.a5-print-sheet) *:not(:has(.a5-print-sheet)):not(.a5-print-sheet):not(.a5-print-sheet *) {
+    display: none !important;
+  }
+
+  body.is-printing-barcode-roll *:not(:has(.barcode-sticker-print)):not(.barcode-sticker-print):not(.barcode-sticker-print *),
+  body.is-printing-desmat48-sheet *:not(:has(.desmat48-print-sheet)):not(.desmat48-print-sheet):not(.desmat48-print-sheet *) {
+    display: none !important;
+  }
+
+  /* Completely unconstrain and neutralize all ancestors of .printable-document, .a4-print-sheet, .barcode-sticker-print, and .desmat48-print-sheet */
+  body:has(.printable-document) *:has(.printable-document),
+  body:has(.a4-print-sheet) *:has(.a4-print-sheet),
+  body:has(.a5-print-sheet) *:has(.a5-print-sheet),
+  body:has(.barcode-sticker-print) *:has(.barcode-sticker-print),
+  body:has(.desmat48-print-sheet) *:has(.desmat48-print-sheet) {
+    display: block !important;
+    position: static !important;
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    inset: auto !important;
+    flex: none !important;
+    grid: none !important;
+  }
+
+  /* Explicit isolation rule for .printable-document */
+  .printable-document {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    page-break-inside: auto !important;
+  }
+
+  .printable-document * {
+    visibility: visible !important;
+  }
+
+  /* Remove trailing margins from last child to avoid 1px blank page spill */
+  .printable-document > *:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Print-specific table borders & layout */
+  .print-table,
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 0.5pt solid #cbd5e1 !important;
+    padding: 4pt 6pt !important;
+  }
+
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .page-break-avoid,
+  .avoid-break,
+  .break-inside-avoid,
+  tr:not(.print-layout-table *),
+  .print-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Continuous Print Layout Table Architecture
+     (Guarantees repeating thead header on all pages, repeating footer on all pages,
+     and continuous single-column flow with ZERO overlap)
+  ───────────────────────────────────────────────────────────── */
+  table.print-layout-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  table.print-layout-table > thead {
+    display: table-header-group !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  table.print-layout-table > thead > tr,
+  table.print-layout-table > thead > tr > th,
+  table.print-layout-table > thead > tr > td {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    font-weight: normal !important;
+    text-align: left !important;
+  }
+
+  table.print-layout-table > tfoot {
+    display: table-footer-group !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  table.print-layout-table > tfoot > tr,
+  table.print-layout-table > tfoot > tr > td {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  table.print-layout-table > tbody {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  table.print-layout-table > tbody > tr,
+  table.print-layout-table > tbody > tr > td {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  /* Reserved spacer in tfoot so content never collides with fixed bottom footer */
+  .print-footer-spacer {
+    display: block !important;
+    height: var(--print-footer-height, 34mm) !important;
+    min-height: var(--print-footer-height, 34mm) !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Fixed footer at bottom of every printed page */
+  .print-footer-fixed {
+    display: block !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 100 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Watermark repeats centered on every printed page */
+  .print-watermark-fixed {
+    display: flex !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Thermal Sticker Label Continuous Roll Rules (Zebra / TSC / TVS / Dymo)
+  ───────────────────────────────────────────────────────────── */
+  body.is-printing-barcode-roll {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  @page barcode-roll {
+    margin: 0mm !important;
+    size: auto;
+  }
+
+  @page desmat48-page {
+    size: A4 portrait !important;
+    margin: 0mm !important;
+  }
+
+  body.is-printing-barcode-roll .barcode-sticker-print {
+    page: barcode-roll;
+  }
+
+  body.is-printing-desmat48-sheet {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.is-printing-desmat48-sheet .desmat48-print-sheet {
+    page: desmat48-page;
+    display: block !important;
+    visibility: visible !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: white !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.is-printing-desmat48-sheet .desmat48-print-sheet * {
+    visibility: visible !important;
+  }
+
+  body.is-printing-desmat48-sheet .desmat-cell {
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body.is-printing-desmat48-sheet .desmat-cell-empty,
+  body.is-printing-desmat48-sheet .desmat-cell-empty * {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .barcode-sticker-print {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: auto !important;
+  }
+
+  .barcode-sticker-page-wrapper {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    width: fit-content !important;
+    height: fit-content !important;
+  }
+
+  .barcode-sticker-page-wrapper:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .barcode-sticker-item {
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   A4 Page Sheet Architecture (Screen Preview & Physical Print)
+   • Each sheet is an authentic A4 page (210mm x 297mm)
+   • Strict flex layout: Header at top, Content in middle, Footer at bottom
+   • Content CANNOT overlap Header or Footer
+   • Zero margin @page enables full-bleed stripes touching paper edges
+───────────────────────────────────────────────────────────── */
+
+/* Screen Preview Styling */
+.a4-print-sheet {
+  width: 100%;
+  max-width: 210mm;
+  min-height: 297mm;
+  background: white;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Landscape Screen Preview Styling */
+.a4-print-sheet.a4-landscape-page {
+  width: 100%;
+  max-width: 297mm;
+  min-height: 210mm;
+  height: auto;
+}
+
+/* Screen Preview for A5 Sheet (210mm x 148mm Landscape) */
+.a5-print-sheet {
+  width: 100%;
+  max-width: 210mm;
+  min-height: 148mm;
+  background: white;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Continuous Print Layout Table (Screen Preview) */
+.print-layout-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.print-footer-spacer {
+  display: none;
+}
+
+.print-footer-fixed {
+  display: block;
+  position: static;
+  width: 100%;
+  margin-top: auto;
+}
+
+.print-watermark-fixed {
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  top: 140mm;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0 !important; /* Zero margin enables 100% full-bleed edge-to-edge printing */
+  }
+
+  @page a5-page {
+    size: A5 landscape !important;
+    margin: 0 !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Physical Print: Exact A4 Sheet Page Break */
+  .a4-print-sheet {
+    width: 210mm !important;
+    min-height: 295.5mm !important;
+    height: 295.5mm !important;
+    max-height: 295.5mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    background: white !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .a4-print-sheet:not(:last-child):not(:last-of-type) {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  /* Physical Print: Landscape A4 Sheet */
+  .a4-print-sheet.a4-landscape-page {
+    width: 297mm !important;
+    min-height: 208mm !important;
+    height: 208.5mm !important;
+    max-height: 208.5mm !important;
+    overflow: hidden !important;
+  }
+
+  /* Physical Print: Exact A5 Sheet Page Break (Landscape: 210mm wide x 147mm high) */
+  .a5-print-sheet {
+    width: 210mm !important;
+    height: 147mm !important;
+    max-height: 147mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    background: white !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    page: a5-page;
+  }
+
+  .a5-print-sheet img {
+    max-height: 12mm !important;
+  }
+
+  .a5-print-sheet .printable-header-container {
+    margin-bottom: 0 !important;
+  }
+
+  .a5-print-sheet .printable-footer-container {
+    margin-top: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .a5-print-sheet .printable-footer-container .h-8 {
+    height: 8px !important;
+  }
+
+  /* Strictly suppress trailing empty page on last and only sheets */
+  .a4-print-sheet:last-child,
+  .a4-print-sheet:last-of-type,
+  .a4-print-sheet:only-child,
+  .a4-print-sheet:only-of-type,
+  .a5-print-sheet:last-child,
+  .a5-print-sheet:last-of-type,
+  .a5-print-sheet:only-child,
+  .a5-print-sheet:only-of-type {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Sheet content sits strictly in middle, flows top-down */
+  .a4-sheet-content {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }
+
+  /* Watermark repeats centered on each printed page */
+  .a4-print-sheet .print-watermark {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+
