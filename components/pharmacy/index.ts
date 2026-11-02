@@ -11,3 +11,4 @@ export { default as OcrGrnTab } from './tabs/OcrGrnTab';
 export { default as IndentsTab } from './tabs/IndentsTab';
 export { default as OpdDispenseQueueTab } from './tabs/OpdDispenseQueueTab';
 export { default as PurchaseOrdersTab } from './tabs/PurchaseOrdersTab';
+export { default as AgencyReportsTab } from './tabs/AgencyReportsTab';

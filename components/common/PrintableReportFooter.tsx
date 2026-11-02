@@ -59,7 +59,7 @@ export default function PrintableReportFooter({
     '#C29B7F';
   const padFooterHeight = currentBranch?.receipt_header?.pad_footer_height_mm
     ? `${currentBranch.receipt_header.pad_footer_height_mm}mm`
-    : '22mm';
+    : '40mm';
 
   const address =
     customBranchDetails ||

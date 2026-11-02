@@ -9,6 +9,7 @@ import {
   Layers,
   ShoppingCart,
   Receipt,
+  Building2,
   UploadCloud,
   FileText,
   Truck,
@@ -33,12 +34,13 @@ import {
   IndentsTab,
   OpdDispenseQueueTab,
   PurchaseOrdersTab,
+  AgencyReportsTab,
 } from '@/components/pharmacy';
 
 export default function PharmacyPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'dispense_queue' | 'indents' | 'pos_orders' | 'bills'>(
+  const [activeTab, setActiveTab] = useState<'inventory' | 'ocr_grn' | 'pos' | 'dispense_queue' | 'indents' | 'pos_orders' | 'bills' | 'agency_reports'>(
     tabParam === 'pos' || tabParam === 'bills' || tabParam === 'indents' || tabParam === 'pos_orders' || tabParam === 'ocr_grn'
       ? tabParam
       : 'inventory'
@@ -217,6 +219,9 @@ export default function PharmacyPage() {
       created_at: invData.created_at || new Date().toISOString(),
       appointment_source: 'Pharmacy',
       reason_for_attendance: 'Point of Sale Pharmacy Dispense',
+      doctor_id: invData.doctor_id,
+      doctor_name: invData.doctor_name || invData.referring_doctor,
+      referring_doctor: invData.referring_doctor || invData.doctor_name,
       items: (invData.dispensed_batches || []).map((b: any) => {
         const qty = b.quantity_dispensed || b.quantity || 1;
         const uPrice = b.unit_price ?? (b.total_price ? b.total_price / qty : 0);
@@ -243,6 +248,9 @@ export default function PharmacyPage() {
       created_at: inv.created_at || new Date().toISOString(),
       appointment_source: inv.appointment_source || 'Pharmacy',
       reason_for_attendance: inv.reason_for_attendance || 'Point of Sale Pharmacy Dispense',
+      doctor_id: inv.doctor_id,
+      doctor_name: inv.doctor_name || inv.referring_doctor,
+      referring_doctor: inv.referring_doctor || inv.doctor_name,
       items: (Array.isArray(inv.items) ? inv.items : []).map((it: any) => {
         const qty = it.quantity_dispensed || it.quantity || 1;
         const uPrice = it.unit_price ?? it.unitPrice ?? it.rate ?? it.price ?? (it.total ? it.total / qty : 0);
@@ -311,6 +319,7 @@ export default function PharmacyPage() {
             { id: 'dispense_queue', label: 'OPD Rx Dispense Queue', icon: FileText, badge: pendingRxCount || undefined },
             { id: 'pos', label: 'Dispensing POS', icon: ShoppingCart },
             { id: 'bills', label: 'Bills & Receipts', icon: Receipt, badge: pharmacyInvoices.length || undefined },
+            { id: 'agency_reports', label: 'Distributor Agencies & Returns', icon: Building2 },
             { id: 'ocr_grn', label: 'AI OCR Invoice (WIP)', icon: UploadCloud },
             { id: 'indents', label: 'Department Indents', icon: FileText, badge: indents.length || undefined },
             { id: 'pos_orders', label: 'Purchase Orders', icon: Truck, badge: purchaseOrders.length || undefined },
@@ -385,6 +394,10 @@ export default function PharmacyPage() {
             purchaseOrders={purchaseOrders}
             onOpenNewPoModal={() => setShowNewPoModal(true)}
           />
+        )}
+
+        {activeTab === 'agency_reports' && (
+          <AgencyReportsTab batches={batches} />
         )}
       </div>
 

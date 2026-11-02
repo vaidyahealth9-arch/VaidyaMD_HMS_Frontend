@@ -59,12 +59,22 @@ export default function DispenseSuccessModal({
                 </div>
               </div>
 
-              {/* Patient Info */}
-              <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 flex justify-between items-center text-xs">
+              {/* Patient & Prescribing Doctor Info */}
+              <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 flex flex-wrap justify-between items-center gap-3 text-xs">
                 <div>
                   <span className="text-slate-400 font-bold uppercase text-[10px] block">Patient Name</span>
                   <span className="font-bold text-slate-900 text-sm">{dispensedInvoice.patient_name || 'Patient'}</span>
                 </div>
+                {(dispensedInvoice.doctor_name || dispensedInvoice.referring_doctor) && (
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block">Prescribing Doctor</span>
+                    <span className="font-bold text-sky-950 text-xs bg-sky-50 px-2 py-0.5 rounded border border-sky-200 inline-block">
+                      {(dispensedInvoice.doctor_name || dispensedInvoice.referring_doctor).startsWith('Dr') 
+                        ? (dispensedInvoice.doctor_name || dispensedInvoice.referring_doctor) 
+                        : `Dr. ${dispensedInvoice.doctor_name || dispensedInvoice.referring_doctor}`}
+                    </span>
+                  </div>
+                )}
                 {dispensedInvoice.patient_mrn && (
                   <div className="text-right">
                     <span className="text-slate-400 font-bold uppercase text-[10px] block">Patient ID / MRN</span>

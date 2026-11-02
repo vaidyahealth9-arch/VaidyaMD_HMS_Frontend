@@ -52,6 +52,9 @@ interface PrintableInvoiceProps {
     payment_method?: string;
     upi_pay_mode?: string;
     notes?: string;
+    doctor_id?: string;
+    doctor_name?: string;
+    referring_doctor?: string;
   };
   onClose: () => void;
   defaultLayout?: 'a4' | 'a5' | 'thermal';
@@ -346,6 +349,12 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                   <span>Dept/Source:</span>
                   <span className="uppercase">{invoice.appointment_source || 'OPD'}</span>
                 </div>
+                {(invoice.doctor_name || invoice.referring_doctor) && (
+                  <div className="flex justify-between pt-0.5 font-semibold text-slate-800">
+                    <span>Prescribed By:</span>
+                    <span>{(invoice.doctor_name || invoice.referring_doctor || '').startsWith('Dr') ? (invoice.doctor_name || invoice.referring_doctor) : `Dr. ${invoice.doctor_name || invoice.referring_doctor}`}</span>
+                  </div>
+                )}
               </div>
 
               {/* Items */}
@@ -442,7 +451,8 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
               }
               footer={
                 <PrintableReportFooter
-                  signatoryTitle="Authorized Accounts Desk"
+                  signatoryName={isPharma ? (user?.name ? user.name : "Pharmacy Dispensing Desk") : undefined}
+                  signatoryTitle={isPharma ? "Pharmacist / Cashier" : "Authorized Accounts Desk"}
                   signatorySubtitle={deptSignatorySubtitle}
                   showSignatory={true}
                   showComputerGeneratedNotice={true}
@@ -494,6 +504,20 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                         <p className="text-[10px] text-slate-500 italic pt-0.5">
                           <strong>Reason:</strong> {invoice.reason_for_attendance}
                         </p>
+                      )}
+                      {(invoice.doctor_name || invoice.referring_doctor) && (
+                        <div className="mt-1.5 pt-1.5 border-t border-slate-200">
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-50 border border-sky-200">
+                            <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-600">
+                              Prescribed By:
+                            </span>
+                            <span className="text-xs font-black text-sky-950">
+                              {(invoice.doctor_name || invoice.referring_doctor || '').startsWith('Dr')
+                                ? (invoice.doctor_name || invoice.referring_doctor)
+                                : `Dr. ${invoice.doctor_name || invoice.referring_doctor}`}
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="text-right space-y-0.5">

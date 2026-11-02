@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingModal } from '@/contexts/BillingContext';
 import { pharmacyApi, walletApi } from '@/lib/api';
+import { authApi } from '@/features/auth/api';
 import {
   Search,
   ShoppingCart,
@@ -71,6 +72,20 @@ export default function PosTab({
   const posPatientDropdownRef = useRef<HTMLDivElement>(null);
 
   const [posDiscount, setPosDiscount] = useState<number>(0);
+  const [posDoctorId, setPosDoctorId] = useState<string>('');
+  const [posDoctorName, setPosDoctorName] = useState<string>('');
+  const [posExternalDoctor, setPosExternalDoctor] = useState<string>('');
+
+  const { data: staffDoctors = [] } = useQuery({
+    queryKey: ['staff-doctors-pos-list'],
+    queryFn: () => authApi.getDoctors(),
+  });
+
+  React.useEffect(() => {
+    if (activeIndentDetails?.items?.[0]?.doctor_name) {
+      setPosDoctorName(activeIndentDetails.items[0].doctor_name);
+    }
+  }, [activeIndentDetails]);
   const [posAmountPaid, setPosAmountPaid] = useState<number | ''>('');
   const [posPaymentMode, setPosPaymentMode] = useState<string>('Cash');
   const [posPaymentRef, setPosPaymentRef] = useState<string>('');
@@ -111,7 +126,9 @@ export default function PosTab({
         patient_id: effectivePatientId,
         indent_id: activeIndentId || undefined,
         items: posCart.map((i) => ({ item_code: i.item_code, quantity: i.quantity })),
-        doctor_id: user?.id,
+        doctor_id: posDoctorId || undefined,
+        doctor_name: posDoctorName === 'External / Outside Doctor' ? posExternalDoctor : (posDoctorName || activeIndentDetails?.items?.[0]?.doctor_name || (staffDoctors[0]?.name ? (staffDoctors[0].name.startsWith('Dr') ? staffDoctors[0].name : `Dr. ${staffDoctors[0].name}`) : 'Dr. Pooja Papishetty')),
+        referring_doctor: posDoctorName === 'External / Outside Doctor' ? posExternalDoctor : (posDoctorName || activeIndentDetails?.items?.[0]?.doctor_name || (staffDoctors[0]?.name ? (staffDoctors[0].name.startsWith('Dr') ? staffDoctors[0].name : `Dr. ${staffDoctors[0].name}`) : 'Dr. Pooja Papishetty')),
         notes: activeIndentDetails
           ? `Dispensed for OPD Rx ${activeIndentDetails.indent_number}`
           : 'Dispensed via Point of Sale counter',
@@ -400,6 +417,63 @@ export default function PosTab({
                       </div>
                     );
                   })()}
+
+                  {/* Prescribing / Referring Doctor Selector (VMD-007) */}
+                  <div className="mt-4 pt-3 border-t border-slate-200">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1.5">
+                      <span>Prescribing / Referring Doctor</span>
+                      {activeIndentDetails && (
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Auto-filled from OPD Rx
+                        </span>
+                      )}
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <select
+                        value={posDoctorId || (posDoctorName === 'External / Outside Doctor' ? 'External / Outside Doctor' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'External / Outside Doctor') {
+                            setPosDoctorId('');
+                            setPosDoctorName('External / Outside Doctor');
+                          } else if (val) {
+                            const foundDoc = (staffDoctors as any[]).find((d: any) => d.id === val);
+                            if (foundDoc) {
+                              setPosDoctorId(foundDoc.id);
+                              setPosDoctorName(foundDoc.name.startsWith('Dr') ? foundDoc.name : `Dr. ${foundDoc.name}`);
+                            } else {
+                              setPosDoctorId('');
+                              setPosDoctorName(val);
+                            }
+                          } else {
+                            setPosDoctorId('');
+                            setPosDoctorName('');
+                          }
+                        }}
+                        className="text-xs bg-slate-50 border border-slate-300 rounded-md h-9 px-2.5 font-medium focus:bg-white focus:ring-2 focus:ring-primary focus:outline-none"
+                      >
+                        <option value="">-- Select Prescribing Doctor from Staff Roles --</option>
+                        {(staffDoctors as any[]).map((d: any) => {
+                          const docDisplay = d.name.startsWith('Dr') ? d.name : `Dr. ${d.name}`;
+                          return (
+                            <option key={d.id} value={d.id}>
+                              {docDisplay} {d.specialization ? `(${d.specialization})` : ''}
+                            </option>
+                          );
+                        })}
+                        <option value="External / Outside Doctor">Other / Outside Doctor</option>
+                      </select>
+                      {posDoctorName === 'External / Outside Doctor' && (
+                        <Input
+                          type="text"
+                          placeholder="Type Doctor Name (e.g. Dr. Rajesh Kumar)"
+                          value={posExternalDoctor}
+                          onChange={(e) => setPosExternalDoctor(e.target.value)}
+                          className="h-9 text-xs bg-white"
+                        />
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 

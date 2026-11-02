@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/contexts/ToastContext';
 import { crmApi } from '@/lib/api';
 import PageLayout from '@/components/common/PageLayout';
 import PageHeader from '@/components/common/PageHeader';
@@ -131,6 +132,7 @@ export default function CRMPage() {
     try {
       const name = leadName || (queueItem?.lead?.id === leadId ? queueItem?.lead?.name : null) || 'Lead';
       setActiveCallLeadName(name);
+      toast.success(`Click-to-Call: Sending auto-dial trigger for ${name} (${phone}) to paired phone...`);
       const log = await crmApi.startCall(leadId, phone, 'web');
       setActiveCallId(log.id);
       setIsDispositionModalOpen(true);
