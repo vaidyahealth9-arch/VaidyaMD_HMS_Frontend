@@ -190,7 +190,14 @@ function MedTable({ medications, label }: { medications: MedRow[]; label: string
 
               <td className="py-1.5 print:py-1 px-2 font-bold text-slate-900">{med.drug}</td>
 
-              <td className="py-1.5 px-2 text-slate-700 font-medium">{med.dose || '1 tab'}</td>
+              <td className="py-1.5 px-2 text-slate-700 font-medium">
+                {med.dose || '1 tab'}
+                {med.route && med.route !== 'Oral' ? (
+                  <span className="text-[10px] text-slate-500 font-normal block sm:inline sm:ml-1">
+                    ({med.route})
+                  </span>
+                ) : null}
+              </td>
 
               <td className="py-1.5 px-2 font-bold text-[#4A2E2B]">{med.freq || 'OD'}</td>
 
@@ -1125,7 +1132,7 @@ export default function PrintablePrescription({
 
                         medications={medications}
 
-                        label={`Prescription Medications — ${patient.name}`}
+                        label={partnerMedications.length > 0 ? `Female Prescription (Wife) — ${patient.name}` : `Prescription Medications — ${patient.name}`}
 
                       />
 
@@ -1143,7 +1150,7 @@ export default function PrintablePrescription({
 
                           medications={partnerMedications}
 
-                          label={`Partner Prescription — ${partnerName || 'Spouse / Partner'}`}
+                          label={`Male Prescription (Husband / Partner) — ${partnerName || 'Spouse / Partner'}`}
 
                         />
 

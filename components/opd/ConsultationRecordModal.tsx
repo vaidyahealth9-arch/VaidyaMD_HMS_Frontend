@@ -11,6 +11,8 @@ import {
   Pill,
   Printer,
   Trash2,
+  Heart,
+  User,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -223,38 +225,147 @@ export default function ConsultationRecordModal({
               <span>Treatment Plan &amp; Regimen</span>
             </h4>
 
-            {Array.isArray(record.data?.medications) && record.data.medications.length > 0 && (
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="p-2.5">#</th>
-                      <th className="p-2.5">Drug / Medicine Name</th>
-                      <th className="p-2.5">Dose</th>
-                      <th className="p-2.5">Frequency</th>
-                      <th className="p-2.5">Duration</th>
-                      <th className="p-2.5">Instructions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {record.data.medications.map((m: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
-                        <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
-                        <td className="p-2.5 font-semibold text-slate-700">{m.dose || '—'}</td>
-                        <td className="p-2.5">
-                          <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 text-[11px] font-bold">
-                            {m.frequency || m.freq || 'OD'}
+            {(() => {
+              const proforma = record.data?.clinical_proforma;
+              const femaleMeds = (record.data?.female_medications || proforma?.femaleMedications || [])
+                .filter((m: any) => (m?.drug_name || m?.drug) && (m?.drug_name || m?.drug).toString().trim());
+              const maleMeds = (record.data?.male_medications || record.data?.partner_medications || proforma?.maleMedications || [])
+                .filter((m: any) => (m?.drug_name || m?.drug) && (m?.drug_name || m?.drug).toString().trim());
+              const hasCoupleMeds = femaleMeds.length > 0 || maleMeds.length > 0;
+              const partnerName = record.data?.partner_name || proforma?.maleName || record.data?.partner?.name || 'Husband / Partner';
+              const femaleName = proforma?.femaleName || record.data?.patient?.name || 'Wife';
+
+              if (hasCoupleMeds) {
+                return (
+                  <div className="space-y-3">
+                    {femaleMeds.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold text-rose-800 bg-rose-50 px-3 py-1.5 rounded-t-lg border border-rose-200">
+                          <span className="flex items-center gap-1.5">
+                            <Heart className="w-3.5 h-3.5 text-rose-500" />
+                            Female Prescription — {femaleName}
                           </span>
-                        </td>
-                        <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
-                        <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                          <span className="text-[10px] text-rose-600 font-semibold uppercase">{femaleMeds.length} Item(s)</span>
+                        </div>
+                        <div className="border border-rose-200 rounded-b-lg overflow-hidden">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-rose-50/50 border-b border-rose-100 text-rose-900 font-bold uppercase tracking-wider text-[10px]">
+                              <tr>
+                                <th className="p-2.5 w-8">#</th>
+                                <th className="p-2.5">Drug / Medicine Name</th>
+                                <th className="p-2.5">Dose &amp; Route</th>
+                                <th className="p-2.5">Frequency</th>
+                                <th className="p-2.5">Duration</th>
+                                <th className="p-2.5">Instructions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {femaleMeds.map((m: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-rose-50/30">
+                                  <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                                  <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
+                                  <td className="p-2.5 font-semibold text-slate-700">
+                                    {m.dose || '1 tab'}{m.route ? ` (${m.route})` : ''}
+                                  </td>
+                                  <td className="p-2.5">
+                                    <span className="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded border border-rose-200 text-[11px] font-bold">
+                                      {m.frequency || m.freq || 'OD'}
+                                    </span>
+                                  </td>
+                                  <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
+                                  <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {maleMeds.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold text-blue-800 bg-blue-50 px-3 py-1.5 rounded-t-lg border border-blue-200">
+                          <span className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-blue-500" />
+                            Male Prescription — {partnerName}
+                          </span>
+                          <span className="text-[10px] text-blue-600 font-semibold uppercase">{maleMeds.length} Item(s)</span>
+                        </div>
+                        <div className="border border-blue-200 rounded-b-lg overflow-hidden">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-blue-50/50 border-b border-blue-100 text-blue-900 font-bold uppercase tracking-wider text-[10px]">
+                              <tr>
+                                <th className="p-2.5 w-8">#</th>
+                                <th className="p-2.5">Drug / Medicine Name</th>
+                                <th className="p-2.5">Dose &amp; Route</th>
+                                <th className="p-2.5">Frequency</th>
+                                <th className="p-2.5">Duration</th>
+                                <th className="p-2.5">Instructions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {maleMeds.map((m: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-blue-50/30">
+                                  <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                                  <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
+                                  <td className="p-2.5 font-semibold text-slate-700">
+                                    {m.dose || '1 tab'}{m.route ? ` (${m.route})` : ''}
+                                  </td>
+                                  <td className="p-2.5">
+                                    <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200 text-[11px] font-bold">
+                                      {m.frequency || m.freq || 'OD'}
+                                    </span>
+                                  </td>
+                                  <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
+                                  <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (Array.isArray(record.data?.medications) && record.data.medications.length > 0) {
+                return (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Drug / Medicine Name</th>
+                          <th className="p-2.5">Dose</th>
+                          <th className="p-2.5">Frequency</th>
+                          <th className="p-2.5">Duration</th>
+                          <th className="p-2.5">Instructions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {record.data.medications.map((m: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/60">
+                            <td className="p-2.5 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{m.drug_name || m.drug || '—'}</td>
+                            <td className="p-2.5 font-semibold text-slate-700">{m.dose || '—'}</td>
+                            <td className="p-2.5">
+                              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 text-[11px] font-bold">
+                                {m.frequency || m.freq || 'OD'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-medium text-slate-700">{m.duration || '—'}</td>
+                            <td className="p-2.5 text-slate-600">{m.instructions || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
 
             {(record.data?.treatment_notes || record.data?.plan) && (
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70">

@@ -31,10 +31,10 @@ export default function OverviewTab({
   const alerts = Array.isArray(patient?.alert_notes) ? patient.alert_notes : [];
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-4 w-full animate-in fade-in">
       {/* Clinical Alerts & Drug Allergies Card */}
       <div
-        className={`border rounded-lg p-4 shadow-xs transition-all ${
+        className={`border rounded-xl p-4 shadow-2xs transition-all ${
           alerts.length > 0
             ? 'bg-amber-50/70 border-amber-200'
             : 'bg-white border-slate-200'
@@ -90,95 +90,98 @@ export default function OverviewTab({
         </div>
       </div>
 
-      {/* Active Treatment Cycles Card */}
-      <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
-          <div
-            className="flex items-center gap-2 cursor-pointer select-none"
-            onClick={() => setIsCyclesCardExpanded(!isCyclesCardExpanded)}
-          >
-            <h3 className="font-bold text-sm text-slate-900">Treatment Cycles Overview</h3>
+      {/* Main Responsive Grid: Active Cycles & Wallet Side-by-Side on Wide Screens */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        {/* Active Treatment Cycles Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div
+              className="flex items-center gap-2 cursor-pointer select-none"
+              onClick={() => setIsCyclesCardExpanded(!isCyclesCardExpanded)}
+            >
+              <h3 className="font-bold text-sm text-slate-900">Treatment Cycles Overview</h3>
+              <button
+                type="button"
+                className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                aria-label={isCyclesCardExpanded ? 'Collapse cycles' : 'Expand cycles'}
+              >
+                {isCyclesCardExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
             <button
               type="button"
-              className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
-              aria-label={isCyclesCardExpanded ? 'Collapse cycles' : 'Expand cycles'}
+              onClick={onAddNewCycle}
+              className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
             >
-              {isCyclesCardExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add New Cycle</span>
             </button>
           </div>
-          <button
-            type="button"
-            onClick={onAddNewCycle}
-            className="px-3 py-1.5 bg-primary hover:bg-primary-mid text-white rounded-md font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add New Cycle</span>
-          </button>
-        </div>
 
-        {isCyclesCardExpanded && (
-          cycles.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">No active or completed cycles on file.</p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {cycles.map((c) => (
-                <div key={c.id} className="py-3 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-primary">{c.cycle_id}</span>
-                      <strong className="text-slate-900">{c.treatment_type} (Attempt #{c.attempt_number})</strong>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                        {c.status}
-                      </span>
+          {isCyclesCardExpanded && (
+            cycles.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-6">No active or completed cycles on file.</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {cycles.map((c) => (
+                  <div key={c.id} className="py-3 flex items-center justify-between text-xs gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-primary">{c.cycle_id}</span>
+                        <strong className="text-slate-900">{c.treatment_type} (Attempt #{c.attempt_number})</strong>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {c.status}
+                        </span>
+                      </div>
+                      <p className="text-slate-500 mt-1">
+                        Stimulation Start: {c.sentinel_dates?.stim_start || '—'} · OPU: {c.sentinel_dates?.opu || '—'}
+                      </p>
                     </div>
-                    <p className="text-slate-400 mt-1">
-                      Stimulation Start: {c.sentinel_dates?.stim_start || '—'} · OPU: {c.sentinel_dates?.opu || '—'}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onSelectCycle(c)}
+                      className="font-bold text-primary hover:underline cursor-pointer flex-shrink-0"
+                    >
+                      View Calendar →
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onSelectCycle(c)}
-                    className="font-bold text-primary hover:underline cursor-pointer"
-                  >
-                    View Calendar →
-                  </button>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
-
-      {/* Advance Wallet Card */}
-      <div className="space-y-2 pt-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-emerald-600" />
-            <h3 className="font-bold text-sm text-slate-900">
-              Fertility Wallet / Financial Statement
-            </h3>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-              Live Ledger
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenBillingTab}
-            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <span>Open Full Billing Tab</span>
-            <span>→</span>
-          </button>
+                ))}
+              </div>
+            )
+          )}
         </div>
 
-        <PatientWalletCard
-          patientId={patientId}
-          patientName={patient?.name}
-          patientVid={patient?.vid}
-          invoices={invoices}
-          onWalletUpdated={onWalletUpdated}
-          compact={true}
-        />
+        {/* Advance Wallet Card */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <h3 className="font-bold text-sm text-slate-900">
+                Fertility Wallet &amp; Financial Ledger
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                Live
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenBillingTab}
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>Open Billing Tab</span>
+              <span>→</span>
+            </button>
+          </div>
+
+          <PatientWalletCard
+            patientId={patientId}
+            patientName={patient?.name}
+            patientVid={patient?.vid}
+            invoices={invoices}
+            onWalletUpdated={onWalletUpdated}
+            compact={true}
+          />
+        </div>
       </div>
     </div>
   );

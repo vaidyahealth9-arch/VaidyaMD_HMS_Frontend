@@ -263,11 +263,16 @@ export default function PatientProfilePage() {
     );
   }
 
-  const femalePartner = patient.gender === 'female' ? patient : partner;
-  const malePartner = patient.gender === 'male' ? patient : partner;
+  const isFemale = patient?.gender?.toLowerCase() === 'female';
+  const isMale = patient?.gender?.toLowerCase() === 'male';
+  const partnerIsFemale = partner?.gender?.toLowerCase() === 'female';
+  const partnerIsMale = partner?.gender?.toLowerCase() === 'male';
+
+  const femalePartner = isFemale ? patient : (partnerIsFemale ? partner : null);
+  const malePartner = isMale ? patient : (partnerIsMale ? partner : null);
 
   return (
-    <PageLayout className="space-y-6">
+    <PageLayout fullWidth className="space-y-3">
       {/* Sticky Patient Summary Bar & Tab Rail */}
       <PatientHeader
         patient={patient}
