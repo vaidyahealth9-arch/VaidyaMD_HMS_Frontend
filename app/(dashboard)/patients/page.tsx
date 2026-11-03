@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { patientsApi } from '@/lib/api';
+import { patientsApi, authApi } from '@/lib/api';
 import Link from 'next/link';
 import { Download, Plus, Users } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, isUserDoctor } from '@/lib/utils';
 import AddToOPDModal from '@/components/opd/AddToOPDModal';
 import PageLayout from '@/components/common/PageLayout';
 import PageHeader from '@/components/common/PageHeader';
@@ -15,13 +15,15 @@ import PatientFilterBar from '@/components/patients/PatientFilterBar';
 import PatientTable from '@/components/patients/PatientTable';
 
 export default function PatientsPage() {
-  const { currentBranch } = useAuth();
+  const { user, currentBranch } = useAuth();
   const searchParams = useSearchParams();
   const filterParam = searchParams.get('filter');
 
   const [patients, setPatients] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [treatingDoctorId, setTreatingDoctorId] = useState('');
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [referredByType, setReferredByType] = useState('');
   const [area, setArea] = useState('');
   const [gender, setGender] = useState('');
@@ -31,10 +33,19 @@ export default function PatientsPage() {
   const [page, setPage] = useState(1);
   const [opdModalPatient, setOpdModalPatient] = useState<any>(null);
 
+  useEffect(() => {
+    authApi.listUsers().then((u: any) => {
+      if (Array.isArray(u)) {
+        setDoctorsList(u.filter((x: any) => isUserDoctor(x)));
+      }
+    }).catch(() => {});
+  }, []);
+
   const fetchPatients = () => {
     setIsLoading(true);
     const params: any = { page, limit: 20 };
     if (search) params.search = search;
+    if (treatingDoctorId) params.treating_doctor_id = treatingDoctorId;
     if (referredByType) params.referred_by_type = referredByType;
     if (area) params.area = area;
     if (gender) params.gender = gender;
@@ -63,7 +74,7 @@ export default function PatientsPage() {
       fetchPatients();
     }, 300);
     return () => clearTimeout(timer);
-  }, [search, referredByType, area, gender, startDate, endDate, page, filterParam, currentBranch]);
+  }, [search, treatingDoctorId, referredByType, area, gender, startDate, endDate, page, filterParam, currentBranch]);
 
   const handleSendToOPD = (patient: any) => {
     setOpdModalPatient(patient);
@@ -71,7 +82,7 @@ export default function PatientsPage() {
 
   const handleExportCSV = () => {
     if (!patients || patients.length === 0) return;
-    const headers = ['VID', 'Name', 'Gender', 'Age', 'Phone', 'Blood Group', 'Partner Name', 'Referred By', 'Area', 'Reg Date'];
+    const headers = ['VID', 'Name', 'Gender', 'Age', 'Phone', 'Blood Group', 'Partner Name', 'Treating Doctor', 'Referred By', 'Area', 'Reg Date'];
     const rows = patients.map((p: any) => [
       p.vid,
       p.name,
@@ -80,6 +91,7 @@ export default function PatientsPage() {
       p.phone ? `'${p.phone}` : '',
       p.blood_group || '',
       p.partner_name || '',
+      p.treating_doctor_name || 'Unassigned',
       p.referred_by_name || p.referred_by_type || '',
       p.area || '',
       formatDate(p.created_at),
@@ -95,7 +107,7 @@ export default function PatientsPage() {
   };
 
   return (
-    <PageLayout className="space-y-6">
+    <PageLayout className="space-y-4">
       <PageHeader
         icon={Users}
         title="Fertility Patient Directory"
@@ -128,6 +140,9 @@ export default function PatientsPage() {
       <PatientFilterBar
         search={search}
         onSearchChange={(v) => { setSearch(v); setPage(1); }}
+        treatingDoctorId={treatingDoctorId}
+        onTreatingDoctorChange={(v) => { setTreatingDoctorId(v); setPage(1); }}
+        doctorsList={doctorsList}
         gender={gender}
         onGenderChange={(v) => { setGender(v); setPage(1); }}
         referredByType={referredByType}
@@ -136,6 +151,8 @@ export default function PatientsPage() {
         onAreaChange={(v) => { setArea(v); setPage(1); }}
         startDate={startDate}
         onStartDateChange={(v) => { setStartDate(v); setPage(1); }}
+        currentUserId={user?.id}
+        isCurrentUserDoctor={isUserDoctor(user)}
       />
 
       <PatientTable

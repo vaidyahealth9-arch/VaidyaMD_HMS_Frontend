@@ -338,7 +338,7 @@ export default function ProformaPlanSection({
       </div>
 
       {/* Section 9: Couple Prescribed Medications (Separated for Female and Male) */}
-      <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4">
+      <div id="section-9-couple-meds" className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 space-y-4 scroll-mt-24 transition-all duration-300">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-xs uppercase tracking-wider text-[#2878a8] flex items-center gap-1.5">
             <Pill className="w-4 h-4 text-[#2878a8]" />

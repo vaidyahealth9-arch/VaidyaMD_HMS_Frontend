@@ -656,6 +656,13 @@ export default function OPDWorkbench({
     name: 'medications'
 
   });
+  // Fresh consultations strictly default to standard free-text notes
+  useEffect(() => {
+    setActiveConsultationRecordId(null);
+    setClinicalHistoryTemplate('standard');
+    setActiveNoteTemplateId(null);
+  }, [selectedPatientId]);
+
 
 
 
@@ -795,6 +802,8 @@ export default function OPDWorkbench({
 
           dose: m.dose ? m.dose.toString().trim() : '1 tab',
 
+          route: m.route ? m.route.toString().trim() : undefined,
+
           freq: m.frequency || m.freq || 'OD',
 
           duration: m.duration ? m.duration.toString().trim() : '—',
@@ -881,11 +890,41 @@ export default function OPDWorkbench({
 
   const handleOpenPrintPreview = (customMeds?: any[]) => {
 
-    const rawMeds = customMeds || getValues('medications') || [];
-
-    const meds = resolvePrescriptionMeds(rawMeds);
-
     const formVals = getValues();
+
+    const proforma = formVals.clinical_proforma;
+
+    const isFertility = clinicalHistoryTemplate === 'fertility';
+
+
+
+    const proformaFemaleMeds = resolvePrescriptionMeds(proforma?.femaleMedications || []);
+
+    const proformaMaleMeds = resolvePrescriptionMeds(proforma?.maleMedications || []);
+
+    const hasCoupleMeds = proformaFemaleMeds.length > 0 || proformaMaleMeds.length > 0;
+
+
+
+    const rawMeds = customMeds || formVals.medications || [];
+
+    const standardMeds = resolvePrescriptionMeds(rawMeds);
+
+
+
+    const meds = (isFertility || hasCoupleMeds) && proformaFemaleMeds.length > 0
+
+      ? proformaFemaleMeds
+
+      : standardMeds;
+
+    const partnerMeds = (isFertility || hasCoupleMeds)
+
+      ? proformaMaleMeds
+
+      : [];
+
+    const partnerName = proforma?.maleName || patient?.partner?.name || 'Spouse / Partner';
 
     const isClinician = user?.role === 'doctor' || user?.role === 'consultant';
 
@@ -1023,6 +1062,10 @@ export default function OPDWorkbench({
 
       medications: meds,
 
+      partnerMedications: partnerMeds,
+
+      partnerName: partnerName,
+
       advice: formVals.treatment_notes || formVals.plan,
 
       nextFollowUp: formatFollowUpSchedule(formVals.follow_up),
@@ -1094,77 +1137,104 @@ export default function OPDWorkbench({
 
 
   // Load an existing past consultation into Workbench in in-place update mode
-
   const handleLoadConsultationForEdit = (rec: any) => {
+    const d = rec?.data || {};
 
+    // Determine the template type saved with this consultation record
+    let template: 'standard' | 'fertility' | 'gynaecology' | 'obstetric' = 'standard';
+    if (d.clinical_history_template && ['standard', 'fertility', 'gynaecology', 'obstetric'].includes(d.clinical_history_template)) {
+      template = d.clinical_history_template;
+    } else if (d.clinical_proforma?.activeTab && ['standard', 'fertility', 'gynaecology', 'obstetric'].includes(d.clinical_proforma.activeTab)) {
+      template = d.clinical_proforma.activeTab;
+    } else if (
+      rec.record_type === 'clinical_proforma_fertility' ||
+      d.template_type === 'fertility' ||
+      (Array.isArray(d.female_medications) && d.female_medications.length > 0) ||
+      (Array.isArray(d.male_medications) && d.male_medications.length > 0) ||
+      (Array.isArray(d.partner_medications) && d.partner_medications.length > 0) ||
+      (d.clinical_proforma && Object.keys(d.clinical_proforma).length > 0)
+    ) {
+      template = 'fertility';
+    } else if (rec.record_type === 'clinical_proforma_gynaecology' || d.template_type === 'gynaecology') {
+      template = 'gynaecology';
+    } else if (rec.record_type === 'clinical_proforma_obstetric' || d.template_type === 'obstetric') {
+      template = 'obstetric';
+    }
+
+    const proformaData = d.clinical_proforma ? {
+      ...d.clinical_proforma,
+      activeTab: d.clinical_proforma.activeTab || template,
+      femaleMedications: (Array.isArray(d.clinical_proforma.femaleMedications) && d.clinical_proforma.femaleMedications.length > 0)
+        ? d.clinical_proforma.femaleMedications
+        : (Array.isArray(d.female_medications) ? d.female_medications : []),
+      maleMedications: (Array.isArray(d.clinical_proforma.maleMedications) && d.clinical_proforma.maleMedications.length > 0)
+        ? d.clinical_proforma.maleMedications
+        : (Array.isArray(d.male_medications) ? d.male_medications : (Array.isArray(d.partner_medications) ? d.partner_medications : [])),
+      femaleName: d.clinical_proforma.femaleName || patient?.name || '',
+      maleName: d.clinical_proforma.maleName || d.partner_name || patient?.partner?.name || '',
+    } : (template !== 'standard' || (Array.isArray(d.female_medications) && d.female_medications.length > 0) || (Array.isArray(d.male_medications) && d.male_medications.length > 0) ? {
+      activeTab: template,
+      femaleMedications: Array.isArray(d.female_medications) ? d.female_medications : [],
+      maleMedications: Array.isArray(d.male_medications) ? d.male_medications : (Array.isArray(d.partner_medications) ? d.partner_medications : []),
+      femaleName: patient?.name || '',
+      maleName: d.partner_name || patient?.partner?.name || '',
+    } : null);
+
+    const vitals = d.vitals || {};
+    let bpSys = d.blood_pressure_systolic || '';
+    let bpDia = d.blood_pressure_diastolic || '';
+    if (vitals.bp) {
+      const parts = String(vitals.bp).split('/');
+      if (parts[0]) bpSys = parts[0];
+      if (parts[1]) bpDia = parts[1];
+    }
+
+    const meds = Array.isArray(d.medications) && d.medications.length > 0
+      ? d.medications.map((m: any) => ({
+          drug_name: m.drug_name || m.drug || '',
+          dose: m.dose || '',
+          frequency: m.frequency || m.freq || 'OD',
+          duration: m.duration || '',
+          instructions: m.instructions || '',
+        }))
+      : [{ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' }];
+
+    reset({
+      chief_complaints: d.chief_complaints || '',
+      history_of_illness: d.history_of_illness || '',
+      previous_history: d.previous_history || '',
+      present_history: d.present_history || '',
+      examination: d.examination || '',
+      provisional_diagnosis: d.provisional_diagnosis || d.diagnosis || '',
+      differential_diagnosis: d.differential_diagnosis || '',
+      investigations_ordered: d.investigations_ordered || '',
+      investigations_to_be_advised: d.investigations_to_be_advised || '',
+      treatment_notes: d.treatment_notes || '',
+      plan: d.plan || '',
+      future_consultation_notes: d.future_consultation_notes || '',
+      follow_up: d.follow_up || '1_week',
+      nurse_notes: d.nurse_notes || '',
+      cvs_findings: d.cvs_findings || '',
+      cns_findings: d.cns_findings || '',
+      rs_findings: d.rs_findings || '',
+      blood_pressure_systolic: bpSys,
+      blood_pressure_diastolic: bpDia,
+      heart_rate: vitals.hr || d.heart_rate || '',
+      respiratory_rate: vitals.rr || d.respiratory_rate || '',
+      temperature: vitals.temp || d.temperature || '',
+      spo2: vitals.spo2 || d.spo2 || '',
+      weight: vitals.weight || d.weight || '',
+      height: vitals.height || d.height || '',
+      bmi: vitals.bmi || d.bmi || '',
+      medications: meds,
+      clinical_proforma: proformaData,
+    });
+
+    setClinicalHistoryTemplate(template);
+    setActiveNoteTemplateId(d.active_note_template_id || null);
     setActiveConsultationRecordId(rec.id);
 
-    const d = rec.data || {};
-
-
-
-    if (d.vitals) {
-
-      if (d.vitals.weight) setValue('weight', String(d.vitals.weight));
-
-      if (d.vitals.height) setValue('height', String(d.vitals.height));
-
-      if (d.vitals.bmi) setValue('bmi', String(d.vitals.bmi));
-
-      if (d.vitals.bp) {
-
-        const parts = String(d.vitals.bp).split('/');
-
-        if (parts[0]) setValue('blood_pressure_systolic', parts[0]);
-
-        if (parts[1]) setValue('blood_pressure_diastolic', parts[1]);
-
-      }
-
-      if (d.vitals.hr) setValue('heart_rate', String(d.vitals.hr));
-
-      if (d.vitals.rr) setValue('respiratory_rate', String(d.vitals.rr));
-
-      if (d.vitals.temp) setValue('temperature', String(d.vitals.temp));
-
-      if (d.vitals.spo2) setValue('spo2', String(d.vitals.spo2));
-
-    }
-
-    if (d.chief_complaints) setValue('chief_complaints', d.chief_complaints);
-
-    if (d.history_of_illness) setValue('history_of_illness', d.history_of_illness);
-
-    if (d.previous_history) setValue('previous_history', d.previous_history);
-
-    if (d.present_history) setValue('present_history', d.present_history);
-
-    if (d.examination) setValue('examination', d.examination);
-
-    if (d.provisional_diagnosis || d.diagnosis) setValue('provisional_diagnosis', d.provisional_diagnosis || d.diagnosis);
-
-    if (d.nurse_notes) setValue('nurse_notes', d.nurse_notes);
-
-    if (d.investigations_to_be_advised) setValue('investigations_to_be_advised', d.investigations_to_be_advised);
-
-    if (d.treatment_notes) setValue('treatment_notes', d.treatment_notes);
-
-    if (d.plan) setValue('plan', d.plan);
-
-    if (d.future_consultation_notes) setValue('future_consultation_notes', d.future_consultation_notes);
-
-    if (d.follow_up) setValue('follow_up', d.follow_up);
-
-    if (Array.isArray(d.medications) && d.medications.length > 0) {
-
-      replaceMeds(d.medications);
-
-    }
-
-
-
     toast.info('Consultation Loaded', `Loaded consultation (${rec.created_at?.split('T')[0] || 'history'}) in in-place update mode`);
-
   };
 
 
@@ -1214,6 +1284,8 @@ export default function OPDWorkbench({
       });
 
       setActiveConsultationRecordId(null);
+      setClinicalHistoryTemplate('standard');
+      setActiveNoteTemplateId(null);
 
       setSaveSuccessMessage(null);
 
@@ -1250,6 +1322,8 @@ export default function OPDWorkbench({
       if (activeConsultationRecordId === deletedRecordId) {
 
         setActiveConsultationRecordId(null);
+        setClinicalHistoryTemplate('standard');
+        setActiveNoteTemplateId(null);
 
         reset({
 
@@ -1749,7 +1823,7 @@ export default function OPDWorkbench({
 
     const rawMeds = (data.medications && data.medications.length > 0) ? data.medications : (getValues('medications') || []);
 
-    const validMeds = Array.isArray(rawMeds)
+    let validMeds = Array.isArray(rawMeds)
 
       ? rawMeds
 
@@ -1773,12 +1847,50 @@ export default function OPDWorkbench({
 
 
 
+    const proforma = data.clinical_proforma || getValues('clinical_proforma');
+
+    const proformaFemaleMeds = resolvePrescriptionMeds(proforma?.femaleMedications || []);
+
+    const proformaMaleMeds = resolvePrescriptionMeds(proforma?.maleMedications || []);
+
+    const isFertility = clinicalHistoryTemplate === 'fertility';
+
+
+
+    if (validMeds.length === 0 && (isFertility || proformaFemaleMeds.length > 0)) {
+
+      validMeds = proformaFemaleMeds.map((m) => ({
+
+        drug_name: m.drug,
+
+        dose: m.dose,
+
+        frequency: m.freq,
+
+        duration: m.duration,
+
+        instructions: m.instructions,
+
+      }));
+
+    }
+
+
+
+    const partnerName = proforma?.maleName || patient?.partner?.name || 'Spouse / Partner';
+
+
+
     const consultationData = {
-
       ...data,
-
       medications: validMeds,
-
+      clinical_proforma: proforma || null,
+      female_medications: proformaFemaleMeds,
+      male_medications: proformaMaleMeds,
+      partner_medications: proformaMaleMeds,
+      partner_name: partnerName,
+      clinical_history_template: clinicalHistoryTemplate,
+      active_note_template_id: activeNoteTemplateId,
     };
 
 
@@ -2059,7 +2171,23 @@ export default function OPDWorkbench({
 
   const handlePrintPrevious = (rec: any) => {
 
-    const meds = resolvePrescriptionMeds(rec.data?.medications, rec.data?.treatment_notes || rec.data?.plan);
+    const proforma = rec.data?.clinical_proforma;
+
+    const femaleMeds = resolvePrescriptionMeds(rec.data?.female_medications || proforma?.femaleMedications || []);
+
+    const maleMeds = resolvePrescriptionMeds(rec.data?.male_medications || rec.data?.partner_medications || proforma?.maleMedications || []);
+
+    const hasCoupleMeds = femaleMeds.length > 0 || maleMeds.length > 0;
+
+    const partnerName = rec.data?.partner_name || proforma?.maleName || rec.data?.partner?.name || 'Spouse / Partner';
+
+
+
+    const meds = hasCoupleMeds && femaleMeds.length > 0
+
+      ? femaleMeds
+
+      : resolvePrescriptionMeds(rec.data?.medications, rec.data?.treatment_notes || rec.data?.plan);
 
     setPrintablePrescription({
 
@@ -2140,6 +2268,10 @@ export default function OPDWorkbench({
       investigations: rec.data?.investigations_to_be_advised || rec.data?.investigations_ordered || rec.data?.previous_investigations,
 
       medications: meds,
+
+      partnerMedications: maleMeds,
+
+      partnerName: partnerName,
 
       advice: rec.data?.treatment_notes || rec.data?.plan,
 
@@ -2311,7 +2443,7 @@ export default function OPDWorkbench({
 
           {workbenchMode === 'nurse' ? (
 
-            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 max-w-4xl pb-24">
+            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-6 w-full pb-24">
 
               <OPDVitalsSection
 
@@ -2385,7 +2517,7 @@ export default function OPDWorkbench({
 
             /* ========================================================= */
 
-            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-5 max-w-5xl pb-24">
+            <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-5 w-full pb-24">
 
               {/* Active Consultation In-Place Update Alert */}
 
@@ -2416,13 +2548,40 @@ export default function OPDWorkbench({
                     size="sm"
 
                     onClick={() => {
-
                       setActiveConsultationRecordId(null);
-
-                      reset();
-
+                      setClinicalHistoryTemplate('standard');
+                      setActiveNoteTemplateId(null);
+                      reset({
+                        chief_complaints: '',
+                        history_of_illness: '',
+                        previous_history: '',
+                        present_history: '',
+                        examination: '',
+                        provisional_diagnosis: '',
+                        differential_diagnosis: '',
+                        investigations_ordered: '',
+                        investigations_to_be_advised: '',
+                        treatment_notes: '',
+                        plan: '',
+                        future_consultation_notes: '',
+                        follow_up: '1_week',
+                        nurse_notes: '',
+                        cvs_findings: '',
+                        cns_findings: '',
+                        rs_findings: '',
+                        blood_pressure_systolic: '',
+                        blood_pressure_diastolic: '',
+                        heart_rate: '',
+                        respiratory_rate: '',
+                        temperature: '',
+                        spo2: '',
+                        weight: '',
+                        height: '',
+                        bmi: '',
+                        medications: [{ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' }],
+                        clinical_proforma: null,
+                      });
                       toast.info('New Consultation', 'Reset form to start a brand new consultation record');
-
                     }}
 
                     className="h-7 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
@@ -2550,6 +2709,8 @@ export default function OPDWorkbench({
                 register={register}
 
                 setValue={setValue}
+                watch={watch}
+                activeConsultationRecordId={activeConsultationRecordId}
 
                 patient={patient}
 
@@ -2564,6 +2725,8 @@ export default function OPDWorkbench({
               <OPDPrescriptionSection
 
                 register={register}
+
+                clinicalHistoryTemplate={clinicalHistoryTemplate}
 
                 watch={watch}
 

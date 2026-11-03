@@ -119,7 +119,7 @@ export default function AppointmentCardGrid({
           <div className="w-8 h-8 border-2 border-[rgb(var(--clr-primary))] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {filteredAppointments.map((apt: any, idx: number) => {
             const aptGender = (apt.patient_gender || patients.find((p) => p.id === apt.patient_id)?.gender || '').toLowerCase();
             const matchedPatient = patients.find((p) => p.id === apt.patient_id);

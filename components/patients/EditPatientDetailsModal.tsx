@@ -28,11 +28,12 @@ export default function EditPatientDetailsModal({
 
   useEffect(() => {
     if (open && patient) {
+      const g = (patient.gender || '').toLowerCase();
       setFormData({
-        title: patient.title || (patient.gender === 'male' ? 'Mr.' : 'Mrs.'),
+        title: patient.title || (g === 'male' ? 'Mr.' : 'Mrs.'),
         name: patient.name || '',
         surname: patient.surname || '',
-        gender: patient.gender || 'female',
+        gender: g || 'female',
         age: patient.age !== null && patient.age !== undefined ? String(patient.age) : '',
         dob: patient.dob || '',
         marital_status: patient.marital_status || 'married',
@@ -67,7 +68,23 @@ export default function EditPatientDetailsModal({
   if (!open || !patient) return null;
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+    setFormData((prev: any) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'gender') {
+        if (value === 'male' && (prev.title === 'Mrs.' || prev.title === 'Ms.')) {
+          next.title = 'Mr.';
+        } else if (value === 'female' && prev.title === 'Mr.') {
+          next.title = 'Mrs.';
+        }
+      } else if (field === 'title') {
+        if (value === 'Mr.') {
+          next.gender = 'male';
+        } else if (value === 'Mrs.' || value === 'Ms.') {
+          next.gender = 'female';
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

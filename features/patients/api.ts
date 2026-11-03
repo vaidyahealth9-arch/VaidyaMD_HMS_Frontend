@@ -4,7 +4,7 @@ import { request, toQueryString } from '@/lib/api';
 // Patients Feature API (Clean Architecture)
 // ==========================================
 export const patientsApi = {
-  list: (params?: { page?: number; per_page?: number; search?: string; referred_by_type?: string; area?: string; gender?: string; branch_id?: string; start_date?: string; end_date?: string }) =>
+  list: (params?: { page?: number; per_page?: number; search?: string; referred_by_type?: string; area?: string; gender?: string; branch_id?: string; start_date?: string; end_date?: string; treating_doctor_id?: string; [key: string]: any }) =>
     request<any>(`/core/patients/${toQueryString(params)}`),
   get: (id: string) => request<any>(`/core/patients/${id}`),
   getTimeline: (id: string) => request<any>(`/core/patients/${id}/timeline`),

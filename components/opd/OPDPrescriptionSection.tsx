@@ -21,6 +21,7 @@ import {
   Plus,
   FileText,
   Stethoscope,
+  Heart,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { pharmacyApi } from '@/lib/api';
@@ -41,6 +42,7 @@ interface OPDPrescriptionSectionProps {
   isPlanSectionExpanded: boolean;
   setIsPlanSectionExpanded: (expanded: boolean) => void;
   onOpenSmartOrder: () => void;
+  clinicalHistoryTemplate?: string;
 }
 
 export default function OPDPrescriptionSection({
@@ -58,6 +60,7 @@ export default function OPDPrescriptionSection({
   isPlanSectionExpanded,
   setIsPlanSectionExpanded,
   onOpenSmartOrder,
+  clinicalHistoryTemplate,
 }: OPDPrescriptionSectionProps) {
   const { data: batches = [] } = useQuery({
     queryKey: ['pharmacy-inventory-batches-active'],
@@ -127,6 +130,17 @@ export default function OPDPrescriptionSection({
   const availableMedicines = React.useMemo(() => {
     return medicineDirectory.map((m) => m.itemName);
   }, [medicineDirectory]);
+
+
+  const isCoupleMode = clinicalHistoryTemplate === 'fertility';
+  const clinicalProforma = watch('clinical_proforma');
+  const femaleMeds = React.useMemo(() => {
+    return (clinicalProforma?.femaleMedications || []).filter((m: any) => m && m.drug && m.drug.trim());
+  }, [clinicalProforma?.femaleMedications]);
+  const maleMeds = React.useMemo(() => {
+    return (clinicalProforma?.maleMedications || []).filter((m: any) => m && m.drug && m.drug.trim());
+  }, [clinicalProforma?.maleMedications]);
+  const totalCoupleMeds = femaleMeds.length + maleMeds.length;
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -296,6 +310,105 @@ export default function OPDPrescriptionSection({
                 </Button>
               </div>
             </div>
+
+            {isCoupleMode ? (
+              <div className="bg-gradient-to-r from-rose-50/50 via-slate-50/50 to-blue-50/50 border border-slate-200 rounded-lg p-3.5 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center shrink-0 text-rose-600 mt-0.5">
+                      <Heart className="w-4 h-4 text-rose-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-900">
+                          Couple Prescriptions Active (Managed in Section 9)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100/80 text-rose-800 border border-rose-200">
+                          Female &amp; Male Separated
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {totalCoupleMeds > 0 ? (
+                          <>
+                            <strong className="text-rose-700 font-semibold">{femaleMeds.length} Female</strong>
+                            {' and '}
+                            <strong className="text-blue-700 font-semibold">{maleMeds.length} Male</strong>
+                            {' medication(s) prescribed. Both will automatically print as separate labeled tables.'}
+                          </>
+                        ) : (
+                          'No medications added yet. Prescribe separated medications for Female & Male in Section 9 above.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('section-9-couple-meds');
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth' });
+                          el.classList.add('ring-2', 'ring-rose-400');
+                          setTimeout(() => el.classList.remove('ring-2', 'ring-rose-400'), 1500);
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 border border-rose-300 rounded shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>↑ Go to Section 9 (Couple Rx)</span>
+                    </button>
+
+                  </div>
+                </div>
+
+                {totalCoupleMeds > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/70 text-xs">
+                    <div className="bg-white/80 rounded-md p-2.5 border border-rose-100 space-y-1">
+                      <div className="flex items-center justify-between border-b border-rose-100 pb-1">
+                        <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wide">
+                          Female Medications ({femaleMeds.length})
+                        </span>
+                        <span className="text-[9px] text-rose-600 font-medium">Wife</span>
+                      </div>
+                      {femaleMeds.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {femaleMeds.map((m: any, idx: number) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[11px] font-medium text-slate-800">
+                              {m.drug} <span className="text-[10px] text-slate-500 font-normal">({m.dose || '1 tab'}{m.route ? ` • ${m.route}` : ''})</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">None added yet</span>
+                      )}
+                    </div>
+
+                    <div className="bg-white/80 rounded-md p-2.5 border border-blue-100 space-y-1">
+                      <div className="flex items-center justify-between border-b border-blue-100 pb-1">
+                        <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wide">
+                          Male Medications ({maleMeds.length})
+                        </span>
+                        <span className="text-[9px] text-blue-600 font-medium">Husband / Partner</span>
+                      </div>
+                      {maleMeds.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {maleMeds.map((m: any, idx: number) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-[11px] font-medium text-slate-800">
+                              {m.drug} <span className="text-[10px] text-slate-500 font-normal">({m.dose || '1 tab'}{m.route ? ` • ${m.route}` : ''})</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">None added yet</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+
+              </div>
+            ) : (
+              <div>
 
             {/* Structured Medication Array */}
             <div ref={searchContainerRef} className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
@@ -506,6 +619,8 @@ export default function OPDPrescriptionSection({
                 <span>Add Medicine</span>
               </button>
             </div>
+              </div>
+            )}
 
             <div className="mt-3">
               <label className="text-xs font-bold text-slate-700 block mb-1">

@@ -4,21 +4,22 @@ interface PageLayoutProps {
   children: React.ReactNode;
   /** Extra classes applied to the outer wrapper */
   className?: string;
-  /** Set true for pages that need full-bleed width (e.g. calendar grids) */
+  /** Set false only if a page explicitly needs a narrow reading column */
   fullWidth?: boolean;
 }
 
 /**
- * Standard page wrapper used by every dashboard page.
- * Guarantees all pages are consistently centrally aligned with comfortable,
- * modern margins across all viewports.
+ * Standard page wrapper used by dashboard pages.
+ * Adapts fluidly to all viewports and zoom levels, eliminating dead gutters.
  */
-export default function PageLayout({ children, className, fullWidth = false }: PageLayoutProps) {
+export default function PageLayout({ children, className, fullWidth = true }: PageLayoutProps) {
   return (
     <div
       className={cn(
-        'w-full mx-auto px-3 sm:px-5 lg:px-6 py-5 space-y-5',
-        fullWidth ? 'max-w-full' : 'max-w-[1600px]',
+        'w-full mx-auto transition-all duration-150',
+        fullWidth
+          ? 'max-w-full px-2 sm:px-4 lg:px-6 py-3.5 space-y-4'
+          : 'max-w-5xl px-3 sm:px-5 lg:px-6 py-4 space-y-4',
         className,
       )}
     >

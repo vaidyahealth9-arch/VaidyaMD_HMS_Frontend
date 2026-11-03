@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Building2 } from 'lucide-react';
+import { Building2, Stethoscope } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface PatientTableProps {
@@ -21,7 +21,7 @@ export default function PatientTable({
   onSendToOPD,
 }: PatientTableProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
       {isLoading ? (
         <div className="p-12 flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-[rgb(var(--clr-primary))] border-t-transparent rounded-full animate-spin" />
@@ -29,7 +29,7 @@ export default function PatientTable({
       ) : patients.length === 0 ? (
         <div className="p-12 text-center text-slate-400">
           <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="font-semibold">No patients found</p>
+          <p className="font-semibold text-slate-700">No patients found</p>
           <p className="text-xs mt-1">Try adjusting search filters or register a new patient.</p>
         </div>
       ) : (
@@ -40,7 +40,8 @@ export default function PatientTable({
                 <th className="px-5 py-3.5">Patient Details</th>
                 <th className="px-5 py-3.5">Contact / Location</th>
                 <th className="px-5 py-3.5">Linked Partner</th>
-                <th className="px-5 py-3.5">Referral & ROI</th>
+                <th className="px-5 py-3.5">Treating Doctor</th>
+                <th className="px-5 py-3.5">Referral &amp; Source</th>
                 <th className="px-5 py-3.5">Category</th>
                 <th className="px-5 py-3.5">Reg. Date</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
@@ -67,7 +68,7 @@ export default function PatientTable({
                           </span>
                           <span
                             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              p.gender === 'female'
+                              p.gender?.toLowerCase() === 'female'
                                 ? 'bg-pink-50 text-pink-700 border border-pink-100'
                                 : 'bg-primary/10 text-primary border border-primary/20'
                             }`}
@@ -98,6 +99,20 @@ export default function PatientTable({
                       </div>
                     ) : (
                       <span className="text-slate-400 italic">No partner linked</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {p.treating_doctor_name ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                          <Stethoscope className="w-3 h-3" />
+                        </div>
+                        <span className="font-bold text-slate-800 truncate max-w-[150px]">
+                          {p.treating_doctor_name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic text-[11px]">Unassigned</span>
                     )}
                   </td>
                   <td className="px-5 py-3.5">
@@ -139,24 +154,24 @@ export default function PatientTable({
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Pagination Footer */}
       {total > 20 && (
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
+        <div className="px-5 py-3 border-t border-slate-200 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
           <span>
-            Showing {((page - 1) * 20) + 1}–{Math.min(page * 20, total)} of {total} patients
+            Showing page <strong>{page}</strong> of <strong>{Math.ceil(total / 20)}</strong> ({total} total patients)
           </span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
-              disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
-              className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
+              disabled={page <= 1}
+              className="px-3 py-1 bg-white border border-slate-200 rounded-md font-bold disabled:opacity-40 hover:bg-slate-50 transition-colors"
             >
               Previous
             </button>
             <button
-              disabled={page * 20 >= total}
               onClick={() => onPageChange(page + 1)}
-              className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 font-bold cursor-pointer"
+              disabled={page >= Math.ceil(total / 20)}
+              className="px-3 py-1 bg-white border border-slate-200 rounded-md font-bold disabled:opacity-40 hover:bg-slate-50 transition-colors"
             >
               Next
             </button>

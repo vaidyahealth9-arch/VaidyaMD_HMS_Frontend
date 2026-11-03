@@ -11,6 +11,8 @@ interface OPDClinicalHistorySectionProps {
   activeNoteTemplateId: string | null;
   register: UseFormRegister<any>;
   setValue: UseFormSetValue<any>;
+  watch?: any;
+  activeConsultationRecordId?: string | null;
   patient: any;
   onCloseStructured: () => void;
 }
@@ -22,9 +24,12 @@ export default function OPDClinicalHistorySection({
   activeNoteTemplateId,
   register,
   setValue,
+  watch,
+  activeConsultationRecordId,
   patient,
   onCloseStructured,
 }: OPDClinicalHistorySectionProps) {
+  const currentProformaData = watch ? watch('clinical_proforma') : undefined;
   return (
     <Card id="clinical-history-section" className="border-slate-200 shadow-sm scroll-mt-20">
       <CardHeader
@@ -162,10 +167,12 @@ export default function OPDClinicalHistorySection({
             /* Mode B: Structured Clinical Template replacing the Free-Text inputs directly inline */
             <div className="-mx-4 -my-4 border-t border-slate-200">
               <ClinicalHistoryProformaModal
+                key={`${clinicalHistoryTemplate}-${activeConsultationRecordId || 'new'}`}
                 patient={patient}
                 partner={patient?.partner}
                 inline={true}
                 initialType={clinicalHistoryTemplate as 'fertility' | 'gynaecology' | 'obstetric'}
+                initialData={currentProformaData}
                 onClose={onCloseStructured}
                 onDataChange={(proformaData, summary) => {
                   if (summary.complaints) setValue('chief_complaints', summary.complaints);
