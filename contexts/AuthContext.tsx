@@ -16,6 +16,7 @@ export interface VaidyaMdUser {
   specialization?: string;
   qualification?: string;
   registration_number?: string;
+  reg_number?: string;
   avatar_url?: string;
   phone?: string;
   tenant_id: string;

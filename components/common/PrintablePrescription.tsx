@@ -62,6 +62,8 @@ interface PrescriptionProps {
 
   doctor: {
 
+    id?: string;
+
     name: string;
 
     qualification?: string;
@@ -459,20 +461,58 @@ export default function PrintablePrescription({
 
   const { currentBranch, user: currentUser } = useAuth() || {};
 
-  const isClinicianUser = Boolean(currentUser?.is_doctor || currentUser?.role === 'doctor' || currentUser?.role === 'consultant');
-  const effectivePrintedBy = printedByOperator || (!isClinicianUser && currentUser?.name ? currentUser.name : undefined);
-
   const [realtimeDoctors, setRealtimeDoctors] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    setActiveDoctor(doctor);
+  }, [doctor]);
 
   React.useEffect(() => {
     import('@/features/auth/api').then(({ authApi }) => {
       authApi.getDoctors().then((docs) => {
         if (Array.isArray(docs) && docs.length > 0) {
           setRealtimeDoctors(docs);
+
+          const norm = (s?: string) => (s || '').toLowerCase().replace(/^dr\.?\s*/i, '').trim();
+          const targetName = activeDoctor?.name || doctor?.name;
+          const targetId = activeDoctor?.id || doctor?.id;
+
+          const matched = docs.find((d: any) => {
+            if (targetId && d.id === targetId) return true;
+            if (targetName) {
+              const nd = norm(d.name);
+              const nt = norm(targetName);
+              return nd === nt || nd.includes(nt) || nt.includes(nd);
+            }
+            return false;
+          });
+
+          if (matched) {
+            setActiveDoctor((prev) => {
+              const cleanBogus = (val?: string, forbidden: string[] = []) => {
+                if (!val) return '';
+                const trimVal = val.trim();
+                return forbidden.some((f) => f.toLowerCase() === trimVal.toLowerCase()) ? '' : trimVal;
+              };
+
+              const qual = matched.qualification || cleanBogus(prev?.qualification, ['Consultant Specialist', 'Consultant Clinician', 'MBBS, MS, DNB']);
+              const spec = matched.specialization || (matched.departments?.[0]) || cleanBogus(prev?.specialization, ['Outpatient Department', 'Consultant Specialist']);
+
+              return {
+                ...prev,
+                id: matched.id,
+                name: matched.name.startsWith('Dr') ? matched.name : `Dr. ${matched.name}`,
+                qualification: qual,
+                specialization: spec,
+                reg_number: matched.reg_number || prev?.reg_number || undefined,
+                department: matched.departments?.[0] || prev?.department || 'Outpatient Department',
+              };
+            });
+          }
         }
       }).catch(() => {});
     });
-  }, []);
+  }, [doctor]);
 
 
 
@@ -579,12 +619,13 @@ export default function PrintablePrescription({
                 onChange={(e) => {
 
                   const val = e.target.value;
+                  const norm = (s?: string) => (s || '').toLowerCase().replace(/^dr\.?\s*/i, '').trim();
 
                   const matched = realtimeDoctors.find((d: any) => {
 
                     const docName = d.name.startsWith('Dr') ? d.name : `Dr. ${d.name}`;
 
-                    return docName === val || d.id === val || d.name === val;
+                    return docName === val || d.id === val || d.name === val || norm(d.name) === norm(val);
 
                   });
 
@@ -592,11 +633,13 @@ export default function PrintablePrescription({
 
                     setActiveDoctor({
 
+                      id: matched.id,
+
                       name: matched.name.startsWith('Dr') ? matched.name : `Dr. ${matched.name}`,
 
-                      qualification: matched.qualification || 'MBBS, MS, DNB',
+                      qualification: matched.qualification || '',
 
-                      specialization: matched.specialization || (matched.departments?.[0]) || 'Consultant Specialist',
+                      specialization: matched.specialization || (matched.departments?.[0]) || '',
 
                       reg_number: matched.reg_number || undefined,
 
@@ -637,16 +680,6 @@ export default function PrintablePrescription({
               </select>
 
             </div>
-
-            {effectivePrintedBy && (
-
-              <span className="text-xs text-slate-700 font-semibold bg-white px-2.5 py-1 rounded border border-slate-300 shadow-2xs flex items-center gap-1.5">
-
-                <span>🖨️ Desk Operator / Printed by:</span> <strong className="text-slate-900">{effectivePrintedBy}</strong>
-
-              </span>
-
-            )}
 
           </div>
 
@@ -1232,20 +1265,6 @@ export default function PrintablePrescription({
 
                         )}
 
-                        {effectivePrintedBy && (
-
-                          <p className="text-[9.5px] text-slate-600 font-medium pt-1">
-
-                            <span className="inline-block px-2 py-0.5 rounded bg-slate-50 border border-slate-200">
-
-                              Printed at Front Desk by: <strong className="text-slate-800">{effectivePrintedBy}</strong>
-
-                            </span>
-
-                          </p>
-
-                        )}
-
                       </div>
 
 
@@ -1264,12 +1283,6 @@ export default function PrintablePrescription({
 
                           </p>
 
-                          {activeDoctor.qualification && (
-
-                            <p className="text-[10px] print:text-[9.5px] text-slate-700 font-semibold leading-tight">{activeDoctor.qualification}</p>
-
-                          )}
-
                           {(activeDoctor.specialization || activeDoctor.department) && (
 
                             <p className="text-[9.5px] print:text-[9px] text-slate-600 leading-tight">
@@ -1277,12 +1290,6 @@ export default function PrintablePrescription({
                               {activeDoctor.specialization || activeDoctor.department}
 
                             </p>
-
-                          )}
-
-                          {activeDoctor.reg_number && (
-
-                            <p className="text-[9px] print:text-[8.5px] text-slate-400 font-mono">Reg. No: {activeDoctor.reg_number}</p>
 
                           )}
 
@@ -1338,7 +1345,7 @@ export default function PrintablePrescription({
 
               showComputerGeneratedNotice={true}
 
-              disclaimer={effectivePrintedBy ? `Certified computer-generated prescription. Printed at Front Desk by: ${effectivePrintedBy}` : undefined}
+              disclaimer="Certified computer-generated prescription."
 
               hideHospitalFooter={hideHeader}
 

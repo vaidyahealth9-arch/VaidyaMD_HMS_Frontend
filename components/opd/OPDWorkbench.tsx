@@ -9,9 +9,10 @@ import { useForm, useFieldArray } from 'react-hook-form';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi, pharmacyApi } from '@/lib/api';
+import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi, pharmacyApi, authApi } from '@/lib/api';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { isUserDoctor } from '@/lib/utils';
 
 import {
 
@@ -215,6 +216,7 @@ export default function OPDWorkbench({
 
 
 
+
   // Workbench Mode: Doctor Consultation vs Nurse Triage View
 
   const searchParams = useSearchParams();
@@ -256,6 +258,7 @@ export default function OPDWorkbench({
     enabled: !!selectedPatientId,
 
   });
+
 
 
 
@@ -421,6 +424,7 @@ export default function OPDWorkbench({
 
 
 
+
   // Fetch Patient Appointments (to locate today's triage / active appointment if not explicitly passed)
 
   const { data: appointmentResponse } = useQuery({
@@ -435,6 +439,7 @@ export default function OPDWorkbench({
 
 
 
+
   // Auto-print triggered via URL parameter (e.g. 1-click Print Rx from Reception Appointment Queue)
   useEffect(() => {
     if (searchParams?.get('auto_print') === '1' && !autoPrintRef.current && consultationHistory && consultationHistory.length > 0) {
@@ -444,6 +449,98 @@ export default function OPDWorkbench({
   }, [searchParams, consultationHistory]);
 
   const patientAppointments = appointmentResponse?.appointments || [];
+
+  // Fetch System Doctors from Master Settings (Single source of truth for credentials)
+  const { data: systemDoctors = [] } = useQuery({
+    queryKey: ['system-doctors'],
+    queryFn: () => authApi.getDoctors(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Resolve Doctor credentials reliably using Master Settings
+  const resolveDoctorDetails = (rawName?: string, docObj?: any) => {
+    const isClinicianUser = isUserDoctor(user);
+
+    // Determine target name candidate
+    const candidateName =
+      rawName ||
+      docObj?.doctor_name ||
+      docObj?.name ||
+      (isClinicianUser
+        ? user?.name
+        : (appointment?.doctor_name ||
+           (appointment as any)?.doctor?.name ||
+           patient?.treating_doctor_name ||
+           patient?.treating_doctor ||
+           patient?.consulting_doctor ||
+           'Dr. Pooja Papishetty'));
+
+    const candidateId =
+      docObj?.id ||
+      docObj?.doctor_id ||
+      (isClinicianUser ? user?.id : (appointment?.doctor_id || patient?.treating_doctor_id));
+
+    // Lookup in systemDoctors (Master Settings)
+    const norm = (s?: string) => (s || '').toLowerCase().replace(/^dr\.?\s*/i, '').trim();
+    const matched = (systemDoctors || []).find((d: any) => {
+      if (candidateId && d.id === candidateId) return true;
+      if (candidateName) {
+        if (d.id === candidateName) return true;
+        const nd = norm(d.name);
+        const nc = norm(candidateName);
+        if (nd && nc && (nd === nc || nd.includes(nc) || nc.includes(nd))) return true;
+      }
+      return false;
+    });
+
+    const finalName = matched?.name
+      ? (matched.name.startsWith('Dr') ? matched.name : `Dr. ${matched.name}`)
+      : (candidateName && candidateName.startsWith('Dr') ? candidateName : `Dr. ${candidateName || 'Doctor'}`);
+
+    const cleanBogus = (val?: string, forbidden: string[] = []) => {
+      if (!val) return '';
+      const trimVal = val.trim();
+      return forbidden.some(f => f.toLowerCase() === trimVal.toLowerCase()) ? '' : trimVal;
+    };
+
+    const qualification =
+      matched?.qualification ||
+      (isClinicianUser ? (user?.qualification || (user as any)?.qualifications) : '') ||
+      cleanBogus(docObj?.doctor_qualification || docObj?.qualification, ['Consultant Specialist', 'Consultant Clinician', 'MBBS, MS, DNB']) ||
+      '';
+
+    const specialization =
+      matched?.specialization ||
+      (matched?.departments?.[0]) ||
+      (isClinicianUser ? (user?.specialization || user?.department) : '') ||
+      cleanBogus(docObj?.doctor_specialization || docObj?.specialization, ['Outpatient Department', 'Consultant Specialist']) ||
+      '';
+
+    const regNumber =
+      matched?.reg_number ||
+      (isClinicianUser ? (user?.reg_number || (user as any)?.registration_number) : '') ||
+      docObj?.doctor_reg_number ||
+      docObj?.reg_number ||
+      undefined;
+
+    const department =
+      matched?.departments?.[0] ||
+      docObj?.doctor_department ||
+      docObj?.department ||
+      (isClinicianUser ? (user?.department || user?.departments?.[0]) : '') ||
+      appointment?.department ||
+      'Outpatient Department';
+
+    return {
+      id: matched?.id || candidateId,
+      name: finalName,
+      qualification,
+      specialization,
+      reg_number: regNumber,
+      department,
+    };
+  };
+
 
 
 
@@ -926,97 +1023,24 @@ export default function OPDWorkbench({
 
     const partnerName = proforma?.maleName || patient?.partner?.name || 'Spouse / Partner';
 
-    const isClinician = user?.role === 'doctor' || user?.role === 'consultant';
-
+    const isClinician = isUserDoctor(user);
     const latestConsultation = activeConsultationRecordId
-
       ? consultationHistory?.find((r: any) => r.id === activeConsultationRecordId)
-
       : consultationHistory?.[0];
-
-
-
     const savedDoc = latestConsultation?.data?.doctor || latestConsultation?.data;
-
-    const fallbackDoctorName = appointment?.doctor_name || appointment?.doctor?.name || patient?.consulting_doctor || patient?.treating_doctor || 'Dr. Pooja Papishetty';
-
-
-
-    const effectiveDoctorName = isClinician
-
-      ? (user?.name?.startsWith('Dr') ? user.name : `Dr. ${user?.name || 'Physician'}`)
-
-      : (savedDoc?.doctor_name || savedDoc?.name || (fallbackDoctorName.startsWith('Dr') ? fallbackDoctorName : `Dr. ${fallbackDoctorName}`));
-
-
-
-    const effectiveQualification = isClinician
-
-      ? ((user as any)?.qualification || (user as any)?.qualifications || 'MBBS, MS, DNB')
-
-      : (savedDoc?.doctor_qualification || savedDoc?.qualification || 'MBBS, MS, DNB');
-
-
-
-    const effectiveSpecialization = isClinician
-
-      ? ((user as any)?.specialization || (user as any)?.department || 'Consultant Specialist')
-
-      : (savedDoc?.doctor_specialization || savedDoc?.specialization || 'Consultant Specialist');
-
-
-
-    const effectiveRegNumber = isClinician
-
-      ? ((user as any)?.registration_number || (user as any)?.reg_number || undefined)
-
-      : (savedDoc?.doctor_reg_number || savedDoc?.reg_number || undefined);
-
-
-
-    const effectiveDepartment = isClinician
-
-      ? (user?.department || user?.departments?.[0] || 'Outpatient Department')
-
-      : (savedDoc?.doctor_department || savedDoc?.department || 'Outpatient Department');
-
-
+    const resolvedDoctor = resolveDoctorDetails(undefined, savedDoc);
 
     setPrintablePrescription({
-
       patient: {
-
         name: patient?.name,
-
         vid: patient?.vid,
-
         mrn: patient?.mrn,
-
         age: patient?.age,
-
         gender: patient?.gender,
-
         phone: patient?.phone,
-
         blood_group: patient?.blood_group,
-
       },
-
-      doctor: {
-
-        name: effectiveDoctorName,
-
-        department: effectiveDepartment,
-
-        qualification: effectiveQualification,
-
-        specialization: effectiveSpecialization,
-
-        reg_number: effectiveRegNumber,
-
-      },
-
-      printedByOperator: !isClinician && user?.name ? user.name : undefined,
+      doctor: resolvedDoctor,
 
       visitDate: new Date().toISOString().split('T')[0],
 
@@ -1434,60 +1458,8 @@ export default function OPDWorkbench({
 
 
       const targetRecordId = activeConsultationRecordId; // In-place update if already saved in current consultation!
-
- 
-
-       const isClinicianUser = user?.role === 'doctor' || user?.role === 'consultant';
-
        const existingDoc = consultationHistory?.find((r: any) => r.id === targetRecordId)?.data?.doctor;
-
-       const authorDoctor = isClinicianUser ? {
-
-         id: user?.id,
-
-         name: user?.name ? (user.name.startsWith('Dr') ? user.name : `Dr. ${user.name}`) : 'Doctor',
-
-         qualification: (user as any)?.qualification || (user as any)?.qualifications || 'MBBS, MS, DNB',
-
-         specialization: (user as any)?.specialization || (user as any)?.department || 'Consultant Specialist',
-
-         reg_number: (user as any)?.registration_number || (user as any)?.reg_number || '',
-
-         department: (user as any)?.department || user?.departments?.[0] || 'Outpatient Department',
-
-       } : (
-
-         existingDoc || (
-
-           appointment?.doctor_name ? {
-
-             name: appointment.doctor_name.startsWith('Dr') ? appointment.doctor_name : `Dr. ${appointment.doctor_name}`,
-
-             qualification: appointment?.doctor?.qualification || 'Consultant Specialist',
-
-             specialization: appointment?.doctor?.specialization || 'Outpatient Department',
-
-             reg_number: appointment?.doctor?.reg_number || '',
-
-             department: appointment?.department || 'Outpatient Department',
-
-           } : (
-
-             patient?.consulting_doctor ? {
-
-               name: patient.consulting_doctor.startsWith('Dr') ? patient.consulting_doctor : `Dr. ${patient.consulting_doctor}`,
-
-               qualification: 'Consultant Clinician',
-
-             } : undefined
-
-           )
-
-         )
-
-       );
-
-
+       const authorDoctor = resolveDoctorDetails(undefined, existingDoc);
 
        const consultationPayload = {
 
@@ -2209,21 +2181,10 @@ export default function OPDWorkbench({
 
       },
 
-      doctor: {
-
-        name: rec.data?.doctor?.name || rec.data?.doctor_name || ((rec.created_by_name && !rec.created_by_name.toLowerCase().includes('reception')) ? (rec.created_by_name.startsWith('Dr') ? rec.created_by_name : `Dr. ${rec.created_by_name}`) : (appointment?.doctor_name || patient?.treating_doctor || 'Dr. Pooja Papishetty')),
-
-        department: rec.data?.doctor?.department || rec.data?.doctor_department || 'Outpatient Department',
-
-        qualification: rec.data?.doctor?.qualification || rec.data?.doctor_qualification || 'MBBS, MS, DNB',
-
-        specialization: rec.data?.doctor?.specialization || rec.data?.doctor_specialization || 'Consultant Specialist',
-
-        reg_number: rec.data?.doctor?.reg_number || rec.data?.doctor_reg_number || undefined,
-
-      },
-
-      printedByOperator: user?.name,
+      doctor: resolveDoctorDetails(
+        rec.data?.doctor?.name || rec.data?.doctor_name || rec.created_by_name,
+        rec.data?.doctor || rec.data
+      ),
 
       visitDate: rec.created_at ? rec.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
 
