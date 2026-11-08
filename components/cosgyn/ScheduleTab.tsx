@@ -1,4 +1,5 @@
 'use client';
+import { formatDateTime } from '@/lib/utils';
 
 import React from 'react';
 import { Badge } from '@/shared/ui/badge';
@@ -211,10 +212,7 @@ export default function ScheduleTab({
                       {session.treatment_name}
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-900">
-                      {new Date(session.scheduled_datetime).toLocaleString('en-IN', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })}
+                      {formatDateTime(session.scheduled_datetime)}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 font-semibold">
                       <span className="flex items-center gap-1">

@@ -18,6 +18,50 @@ export function formatCurrency(amount: number | string, forceDecimals?: boolean)
   }).format(val);
 }
 
+/** Canonical Clinical Timezone for Indian Healthcare Operations */
+export const CLINICAL_TIMEZONE_IST = 'Asia/Kolkata';
+
+/**
+ * Returns today's calendar date as YYYY-MM-DD in Indian Standard Time (IST).
+ * Prevents UTC midnight boundary rollbacks where Indian local time between 00:00 and 05:30
+ * is still the previous day in UTC.
+ */
+export function getTodayIst(): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLINICAL_TIMEZONE_IST,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(new Date()); // Formats as YYYY-MM-DD
+}
+
+/**
+ * Returns a given date or today formatted as YYYY-MM-DD in Indian Standard Time (IST).
+ */
+export function formatDateToIst(date?: Date | string | null): string {
+  if (!date) return getTodayIst();
+  const d = date instanceof Date ? date : parseUtcDate(date);
+  if (!d || isNaN(d.getTime())) return getTodayIst();
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLINICAL_TIMEZONE_IST,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** Format a time for display in the client's system timezone (hh:mm A) */
+export function formatTime(date: string | Date | null | undefined): string {
+  const parsed = parseUtcDate(date);
+  if (!parsed || isNaN(parsed.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(parsed);
+}
+
 /** Parse a date string safely into a Date object, treating naive ISO strings from UTC backend as UTC */
 export function parseUtcDate(date: string | Date | null | undefined): Date | null {
   if (!date) return null;

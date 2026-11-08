@@ -10,6 +10,11 @@ import type {
   FluidBalance,
   DischargeSummary,
   BedStatus,
+  BillItem,
+  IPDPayment,
+  RollingBillSummary,
+  BillItemPayload,
+  PaymentPayload,
 } from './types';
 
 export const ipdApi = {
@@ -83,6 +88,32 @@ export const ipdApi = {
       body: JSON.stringify(payload),
     });
   },
+  settleInvoice: (
+    admissionId: string,
+    data: {
+      invoice_id: string;
+      item_ids?: string[];
+      amount_paid?: number;
+      payment_method?: string;
+      transaction_reference?: string;
+      notes?: string;
+      is_discharge?: boolean;
+      discharge_summary?: Record<string, unknown>;
+    }
+  ) =>
+    request<{
+      message: string;
+      invoice_id: string;
+      invoice_number: string;
+      items_settled_count: number;
+      amount_paid: number;
+      receipt_number?: string;
+      remaining_unbilled_total: number;
+      is_discharge: boolean;
+    }>(`/core/ipd/admissions/${admissionId}/settle-invoice`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Doctor Round Notes (SOAP)
   listRoundNotes: (admissionId: string) =>
@@ -169,4 +200,25 @@ export const ipdApi = {
   // Accrual
   accrueDailyCharges: () =>
     request<{ success: boolean; message: string }>('/core/ipd/accrue-daily-charges', { method: 'POST' }),
+  // Rolling Bill & Ledger
+  getRollingBill: (admissionId: string) =>
+    request<RollingBillSummary>(`/core/ipd/admissions/${admissionId}/rolling-bill`),
+  listBillItems: (admissionId: string, params?: { item_type?: string; category?: string }) =>
+    request<BillItem[]>(`/core/ipd/admissions/${admissionId}/bill-items${toQueryString(params)}`),
+  postBillItem: (admissionId: string, data: BillItemPayload) =>
+    request<BillItem>(`/core/ipd/admissions/${admissionId}/bill-items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteBillItem: (itemId: string) =>
+    request<{ message: string; item_id: string }>(`/core/ipd/bill-items/${itemId}`, {
+      method: 'DELETE',
+    }),
+  listPayments: (admissionId: string) =>
+    request<IPDPayment[]>(`/core/ipd/admissions/${admissionId}/payments`),
+  postPayment: (admissionId: string, data: PaymentPayload) =>
+    request<IPDPayment>(`/core/ipd/admissions/${admissionId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };

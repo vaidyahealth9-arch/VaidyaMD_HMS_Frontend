@@ -151,9 +151,10 @@ const sidebarConfig: Record<string, { label?: string; items: { id: string; href:
     {
       label: 'Inpatient Ward',
       items: [
-        { id: 'ipd-beds',    href: '/ipd',               icon: BedDouble,    label: 'Bedboard & Admissions', statusDot: true },
-        { id: 'ipd-nursing', href: '/ipd?tab=nursing',   icon: Pill,         label: 'Nursing Checklists' },
-        { id: 'ipd-history', href: '/ipd?tab=history',   icon: History,      label: 'Discharge History' },
+        { id: 'ipd-beds',       href: '/ipd',                icon: BedDouble,     label: 'Bedboard Census', statusDot: true },
+        { id: 'ipd-admissions', href: '/ipd?tab=admissions', icon: Users,         label: 'Active Inpatients' },
+        { id: 'ipd-nursing',    href: '/ipd?tab=nursing',    icon: ClipboardList, label: 'Nursing Checklists' },
+        { id: 'ipd-history',    href: '/ipd?tab=history',    icon: History,       label: 'Discharge History' },
       ],
     },
   ],
@@ -353,12 +354,14 @@ export default function ContextSidebar() {
                   const [itemPath, itemQuery] = item.href.split('?');
                   const itemParams = new URLSearchParams(itemQuery);
                   const pathMatches   = pathname === itemPath;
-                  const defaultTab    = itemPath === '/billing' ? 'invoices' : itemPath === '/pharmacy' ? 'inventory' : null;
+                  const defaultTab    = itemPath === '/billing' ? 'invoices' : itemPath === '/pharmacy' ? 'inventory' : itemPath === '/ipd' ? 'bedboard' : null;
                   const tabMatches    = !itemParams.has('tab')    || itemParams.get('tab')    === (currentTab    || defaultTab);
                   const statusMatches = !itemParams.has('status') || itemParams.get('status') === currentStatus;
                   isActive = pathMatches && tabMatches && statusMatches;
                 } else {
-                  isActive = pathname === item.href && (!currentStatus || currentStatus === 'all' || item.id === 'today');
+                  const defaultTab    = pathname === '/billing' ? 'invoices' : pathname === '/pharmacy' ? 'inventory' : pathname === '/ipd' ? 'bedboard' : null;
+                  const noSpecificTab = !currentTab || Boolean(defaultTab && currentTab === defaultTab);
+                  isActive = Boolean(pathname === item.href && noSpecificTab && (!currentStatus || currentStatus === 'all' || item.id === 'today'));
                 }
 
                 return (

@@ -1,4 +1,5 @@
 'use client';
+import { formatDateTime } from '@/lib/utils';
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -354,15 +355,7 @@ export default function FertilityWalletCard({
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {transactions.map((tx: any) => {
                     const isDeposit = tx.type === 'deposit';
-                    const txDate = tx.created_at
-                      ? new Date(tx.created_at).toLocaleString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '—';
+                    const txDate = formatDateTime(tx.created_at);
 
                     return (
                       <tr key={tx.id} className="hover:bg-slate-50 transition-colors">

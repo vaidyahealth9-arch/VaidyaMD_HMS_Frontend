@@ -1,4 +1,5 @@
 'use client';
+import { formatTime } from '@/lib/utils';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -271,12 +272,7 @@ export default function ScanHistorySidebar({
             const d = rec.data || {};
             const dateStr =
               d.scan_date || d.date_of_scan || (rec.created_at ? rec.created_at.split('T')[0] : '---');
-            const timeStr = rec.created_at
-              ? new Date(rec.created_at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '';
+            const timeStr = formatTime(rec.created_at);
             const highlights = getScanKeyHighlights(rec);
 
             return (

@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDateTime } from '@/lib/utils';
+
 import React from 'react';
 import { Search, Barcode, Eye, Receipt } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
@@ -19,20 +21,6 @@ interface LimsWorklistTableProps {
   onOpenBarcodeModal: (item: any) => void;
   onOpenReview: (item: any) => void;
 }
-
-const formatDateTime = (dateStr?: string) => {
-  if (!dateStr) return '—';
-  try {
-    return new Date(dateStr).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
-};
 
 export default function LimsWorklistTable({
   worklist: filteredWorklist,

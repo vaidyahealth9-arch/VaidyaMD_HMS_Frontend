@@ -3,9 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Printer, CheckCircle2, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/ui/dialog';
+import PrintableModal from '@/components/common/PrintableModal';
+import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import PrintableReportFooter from '@/components/common/PrintableReportFooter';
+import A4Sheet from '@/components/common/A4Sheet';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { ipdApi } from '@/features/ipd/api';
+import { pharmacyApi } from '@/lib/api';
+import PharmacyItemSearchDropdown from '@/components/common/PharmacyItemSearchDropdown';
 import { toast } from '@/contexts/ToastContext';
 import type { AdmissionDetails, DischargeSummary } from '@/features/ipd/types';
 
@@ -43,6 +49,7 @@ export default function ClinicalDischargeModal({
   }>>([]);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isPrintSummaryOpen, setIsPrintSummaryOpen] = useState(false);
 
   useEffect(() => {
     if (admission) {
@@ -106,6 +113,41 @@ export default function ClinicalDischargeModal({
   const handleProceed = async () => {
     const summary = buildSummaryObject();
     await handleSaveDraft();
+
+    const validMeds = medications.filter((m) => (m.medicine_name || '').trim());
+    if (validMeds.length > 0 && admission?.id) {
+      try {
+        await pharmacyApi.createIndent({
+          requesting_department: 'IPD',
+          indent_type: 'IPD_RX',
+          urgency: 'Routine',
+          notes: `IPD Discharge Rx: ${admission?.patient?.name || 'Inpatient'} (Bed ${admission?.bed?.bed_number || '—'}) - Take-Home Discharge Medications`,
+          items: validMeds.map((m) => {
+            const rawDur = String(m.duration || '');
+            const durMatch = rawDur.match(/\d+/);
+            const calcQty = durMatch ? parseInt(durMatch[0], 10) : 1;
+            return {
+              item_name: m.medicine_name,
+              item_code: m.medicine_name,
+              dose: m.dosage,
+              frequency: m.frequency,
+              duration: m.duration,
+              instructions: m.instructions,
+              quantity: calcQty,
+              quantity_requested: calcQty,
+              patient_id: admission?.patient?.id,
+              patient_name: admission?.patient?.name,
+              patient_vid: admission?.patient?.vid,
+              admission_id: admission?.id,
+              bed_number: admission?.bed?.bed_number,
+            };
+          }),
+        });
+      } catch (err) {
+        console.warn('Could not auto-create pharmacy indent for discharge prescription:', err);
+      }
+    }
+
     onProceedToBilling(summary);
   };
 
@@ -224,11 +266,12 @@ export default function ClinicalDischargeModal({
                       {medications.map((m, idx) => (
                         <tr key={idx}>
                           <td className="p-1.5">
-                            <Input
+                            <PharmacyItemSearchDropdown
                               value={m.medicine_name}
-                              onChange={(e) => handleMedChange(idx, 'medicine_name', e.target.value)}
-                              placeholder="e.g. Tab. Augmentin 625mg"
-                              className="h-7 text-xs font-medium"
+                              onChange={(val) => handleMedChange(idx, 'medicine_name', val)}
+                              onSelect={(item) => handleMedChange(idx, 'medicine_name', item.itemName)}
+                              categoryFilter="medication"
+                              placeholder="Search discharge medication..."
                             />
                           </td>
                           <td className="p-1.5">
@@ -409,7 +452,7 @@ export default function ClinicalDischargeModal({
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between">
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={() => setIsPrintSummaryOpen(true)} className="gap-1.5 text-xs">
             <Printer className="w-3.5 h-3.5" />
             <span>Print Summary</span>
           </Button>
@@ -435,6 +478,131 @@ export default function ClinicalDischargeModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Official A4 Clinical Discharge Summary Print Modal */}
+      {isPrintSummaryOpen && (
+        <PrintableModal
+          isOpen={isPrintSummaryOpen}
+          onClose={() => setIsPrintSummaryOpen(false)}
+          title="Clinical Discharge Summary Preview"
+          subtitle={`Official discharge documentation for ${admission?.patient?.name || 'Patient'}`}
+          maxWidth="max-w-4xl"
+        >
+          {({ hideHeader }: { hideHeader: boolean }) => (
+            <A4Sheet
+              header={
+                <PrintableReportHeader
+                  title="Inpatient Clinical Discharge Summary"
+                  badge="DISCHARGE SUMMARY"
+                  hideHospitalHeader={hideHeader}
+                  department="Inpatient Department (IPD)"
+                  patient={{
+                    name: admission?.patient?.name,
+                    vid: admission?.patient?.vid,
+                    mrn: admission?.patient?.vid,
+                    gender: admission?.patient?.gender,
+                    age: admission?.patient?.age,
+                    phone: admission?.patient?.phone,
+                    blood_group: admission?.patient?.blood_group,
+                  }}
+                  doctor={{
+                    name: admission?.admitting_doctor?.name || 'Attending Physician',
+                  }}
+                  metaFields={[
+                    { label: 'Admission #', value: admission?.admission_number },
+                    { label: 'Bed & Ward', value: `Bed ${admission?.bed?.bed_number || '—'} (${admission?.bed?.ward_name || 'Ward'})` },
+                    {
+                      label: 'Admission Date',
+                      value: admission?.admission_date ? new Date(admission.admission_date).toLocaleDateString('en-IN') : '—',
+                    },
+                    { label: 'Discharge Date', value: new Date().toLocaleDateString('en-IN') },
+                  ]}
+                />
+              }
+              footer={
+                <PrintableReportFooter
+                  signatoryTitle="Attending Physician"
+                  signatoryName={`Dr. ${admission?.admitting_doctor?.name || 'Attending Physician'}`}
+                  witnessTitle="Staff Nurse"
+                  showWitness={true}
+                  showSignatory={true}
+                  showComputerGeneratedNotice={true}
+                  hideHospitalFooter={hideHeader}
+                />
+              }
+            >
+              <div className="px-6 sm:px-8 print:px-[12mm] py-4 space-y-4 text-xs text-slate-800">
+                <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Condition at Discharge</span>
+                    <p className="font-bold text-slate-900 mt-0.5">{condition} ({dischargeType})</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Discharge Diagnosis</span>
+                    <p className="font-bold text-slate-900 mt-0.5">{diagnosis || 'Under Observation / Resolved'}</p>
+                  </div>
+                </div>
+
+                {hospitalCourse && (
+                  <div>
+                    <h4 className="font-bold text-slate-900 uppercase text-[11px] border-b border-slate-200 pb-1 mb-1">
+                      Clinical Course in Hospital
+                    </h4>
+                    <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{hospitalCourse}</p>
+                  </div>
+                )}
+
+                {medications.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-slate-900 uppercase text-[11px] border-b border-slate-200 pb-1 mb-1.5">
+                      Discharge Medications & Regimen
+                    </h4>
+                    <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                      <thead className="bg-slate-100 font-bold uppercase text-[10px] text-slate-600 border-b border-slate-200">
+                        <tr>
+                          <th className="p-2">Medication</th>
+                          <th className="p-2">Frequency</th>
+                          <th className="p-2">Duration</th>
+                          <th className="p-2">Instructions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {medications.map((m, i) => (
+                          <tr key={i}>
+                            <td className="p-2 font-bold text-slate-900">{m.medicine_name}</td>
+                            <td className="p-2">{m.frequency}</td>
+                            <td className="p-2">{m.duration}</td>
+                            <td className="p-2 text-slate-600">{m.instructions}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {(dietaryAdvice || followUpDate) && (
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    {dietaryAdvice && (
+                      <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+                        <span className="text-[10px] uppercase font-bold text-amber-900 block mb-0.5">Dietary & Activity Advice</span>
+                        <p className="text-slate-700">{dietaryAdvice}</p>
+                      </div>
+                    )}
+                    {followUpDate && (
+                      <div className="p-3 bg-indigo-50/50 border border-indigo-200 rounded-lg">
+                        <span className="text-[10px] uppercase font-bold text-indigo-900 block mb-0.5">Follow-Up Consultation</span>
+                        <p className="text-slate-900 font-bold">{new Date(followUpDate).toLocaleDateString('en-IN')}</p>
+                        <p className="text-slate-600 text-[11px] mt-0.5">{followUpInstructions}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </A4Sheet>
+          )}
+        </PrintableModal>
+      )}
     </Dialog>
+
   );
 }

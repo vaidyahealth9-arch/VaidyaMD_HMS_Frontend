@@ -4,7 +4,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Stethoscope, ArrowRightLeft, Receipt, LogOut } from 'lucide-react';
 
 interface AdmissionsTabProps {
@@ -14,20 +14,6 @@ interface AdmissionsTabProps {
   onDischarge: (admissionId: string) => void;
   onInterimBill?: (admissionId: string) => void;
 }
-
-const formatDateTime = (dateStr?: string) => {
-  if (!dateStr) return '—';
-  try {
-    return new Date(dateStr).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
-};
 
 export default function AdmissionsTab({
   admissions,
