@@ -135,3 +135,40 @@ export interface TelecallerKPIItem {
   wrong_number_count: number;
   skipped_count: number;
 }
+
+export interface LeadImportRowError {
+  row: number;
+  name?: string;
+  phone?: string;
+  reason: string;
+}
+
+export interface LeadImportResult {
+  batch_id?: string;
+  imported: number;
+  updated: number;
+  skipped: number;
+  duplicates: number;
+  errors?: string[];
+  error_details?: LeadImportRowError[];
+}
+
+export interface LeadImportBatch {
+  id: string;
+  tenant_id: string;
+  branch_id?: string | null;
+  imported_by_id?: string | null;
+  imported_by_name?: string | null;
+  file_name: string;
+  file_size: number;
+  total_rows: number;
+  imported_count: number;
+  updated_count: number;
+  skipped_count: number;
+  duplicate_count: number;
+  status: 'completed' | 'partial' | 'failed';
+  duplicate_strategy: 'update' | 'skip';
+  error_details?: LeadImportRowError[];
+  created_at: string;
+}
+

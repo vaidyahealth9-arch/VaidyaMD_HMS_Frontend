@@ -9,7 +9,9 @@ import {
   LeadStatus,
   LeadSource,
   TelecallerRosterItem,
-  TelecallerKPIItem
+  TelecallerKPIItem,
+  LeadImportResult,
+  LeadImportBatch
 } from '@/components/crm/types';
 
 export const crmApi = {
@@ -41,10 +43,11 @@ export const crmApi = {
     });
   },
 
-  importCsv: async (file: File) => {
+  importCsv: async (file: File, duplicateStrategy: 'update' | 'skip' = 'update') => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('duplicate_strategy', duplicateStrategy);
 
     const res = await fetch(`${getApiBase()}/crm/leads/import-csv`, {
       method: 'POST',
@@ -56,8 +59,17 @@ export const crmApi = {
     if (!res.ok) {
       throw new Error('Failed to import leads CSV');
     }
-    return res.json() as Promise<{ imported: number; skipped: number }>;
+    return res.json() as Promise<LeadImportResult>;
   },
+
+  getImportHistory: (limit: number = 50, offset: number = 0) => {
+    return request<LeadImportBatch[]>(`/crm/leads/import-history?limit=${limit}&offset=${offset}`);
+  },
+
+  getFailedRowsDownloadUrl: (batchId: string) => {
+    return `${getApiBase()}/crm/leads/import-history/${batchId}/failed-csv`;
+  },
+
 
   // Dialer
   getNextLead: () => {
