@@ -3,3 +3,8 @@ export { default as NursingTab } from './tabs/NursingTab';
 export { default as AdmissionsTab } from './tabs/AdmissionsTab';
 export { default as AdmissionSheet } from './sheets/AdmissionSheet';
 export { default as IPDDischargeBillingModal } from './modals/IPDDischargeBillingModal';
+export { default as BedTransferModal } from './modals/BedTransferModal';
+export { default as WardBedManagementModal } from './modals/WardBedManagementModal';
+export { default as VitalsEntryModal } from './modals/VitalsEntryModal';
+export { default as ClinicalDischargeModal } from './modals/ClinicalDischargeModal';
+export { default as InpatientBedsideDrawer } from './drawers/InpatientBedsideDrawer';

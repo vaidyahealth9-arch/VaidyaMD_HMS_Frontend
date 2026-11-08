@@ -164,8 +164,8 @@ export default function CRMPage() {
     }
   };
 
-  const handleImportUpload = async (file: File) => {
-    const res = await crmApi.importCsv(file);
+  const handleImportUpload = async (file: File, duplicateStrategy: 'update' | 'skip' = 'update') => {
+    const res = await crmApi.importCsv(file, duplicateStrategy);
     refreshAll();
     return res;
   };
