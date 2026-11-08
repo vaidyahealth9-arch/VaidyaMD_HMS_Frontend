@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ipdApi, patientsApi, authApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
@@ -11,30 +12,66 @@ import {
   CheckCircle2,
   RefreshCw,
   Plus,
+  History,
 } from 'lucide-react';
 import { Card, CardContent } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import PageLayout from '@/components/common/PageLayout';
 import PageHeader from '@/components/common/PageHeader';
 import TabBar from '@/components/common/TabBar';
+import StatCard from '@/components/common/StatCard';
 import {
   BedboardTab,
   NursingTab,
   AdmissionsTab,
+  DischargeHistoryTab,
   AdmissionSheet,
   BedTransferModal,
   WardBedManagementModal,
   VitalsEntryModal,
   ClinicalDischargeModal,
-  InpatientBedsideDrawer,
+  InpatientBedsideChart,
 } from '@/components/ipd';
 import { useBillingModal } from '@/contexts/BillingContext';
 
 export default function IPDPage() {
   const queryClient = useQueryClient();
   const { openBilling } = useBillingModal();
-  const [activeTab, setActiveTab] = useState<'bedboard' | 'nursing' | 'admissions'>('bedboard');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  type IPDTab = 'bedboard' | 'admissions' | 'nursing' | 'history';
+  const tabParam = searchParams.get('tab');
+  const currentTab: IPDTab = (
+    tabParam === 'nursing' || tabParam === 'admissions' || tabParam === 'history'
+      ? tabParam
+      : 'bedboard'
+  );
+
+  // Full-Width Inpatient Chart state (360-degree View in Main Canvas)
+  const [activeChartAdmissionId, setActiveChartAdmissionId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<IPDTab>(currentTab);
   const [selectedWardId, setSelectedWardId] = useState<string>('all');
+
+  // Synchronize active tab with URL query parameter (e.g. from ContextSidebar or direct navigation)
+  useEffect(() => {
+    setActiveTab(currentTab);
+    if (activeChartAdmissionId) {
+      setActiveChartAdmissionId(null);
+    }
+  }, [currentTab]);
+
+  const handleTabChange = (newTab: string) => {
+    const validTab = newTab as IPDTab;
+    setActiveTab(validTab);
+    setActiveChartAdmissionId(null);
+    if (validTab === 'bedboard') {
+      router.push('/ipd');
+    } else {
+      router.push('/ipd?tab=' + validTab);
+    }
+  };
 
   // Admission Sheet state
   const [admitSheetOpen, setAdmitSheetOpen] = useState(false);
@@ -44,10 +81,6 @@ export default function IPDPage() {
   const [diagnosis, setDiagnosis] = useState('');
   const [packageName, setPackageName] = useState('');
   const [notes, setNotes] = useState('');
-
-  // Bedside Chart Drawer state
-  const [bedsideDrawerOpen, setBedsideDrawerOpen] = useState(false);
-  const [selectedBedsideAdmissionId, setSelectedBedsideAdmissionId] = useState<string | null>(null);
 
   // Bed Transfer Modal state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -177,9 +210,9 @@ export default function IPDPage() {
     setAdmitSheetOpen(true);
   };
 
+  // Open Full Inpatient 360 Chart in Main Canvas
   const handleOpenChart = (admissionId: string) => {
-    setSelectedBedsideAdmissionId(admissionId);
-    setBedsideDrawerOpen(true);
+    setActiveChartAdmissionId(admissionId);
   };
 
   const handleOpenTransfer = (data: any) => {
@@ -253,23 +286,36 @@ export default function IPDPage() {
       ],
       onSuccess: async (invoice) => {
         try {
-          await ipdApi.dischargePatient(summary.admission_id, {
+          const billedItemIds = (summary.suggested_items || [])
+            .map((it: any) => it.id || it.bill_item_id)
+            .filter(Boolean);
+
+          await ipdApi.settleInvoice(summary.admission_id, {
             invoice_id: invoice.id,
+            item_ids: billedItemIds.length > 0 ? billedItemIds : undefined,
+            amount_paid: invoice.paid_amount || 0,
+            payment_method: invoice.payment_method || 'cash',
+            transaction_reference: invoice.invoice_number,
             notes: `Discharged via Unified Billing with Final Invoice #${invoice.invoice_number}`,
+            is_discharge: true,
             discharge_summary: dischargeSummaryData,
           });
+
           queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
           queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
           queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['ipd-discharged-history'] });
           queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
-          setBedsideDrawerOpen(false);
+          if (activeChartAdmissionId === summary.admission_id) {
+            setActiveChartAdmissionId(null);
+          }
           toast.success(
             'Discharged & Billed Successfully',
-            `Patient ${summary.patient_name || ''} discharged. Final invoice #${invoice.invoice_number} generated.`
+            `Patient ${summary.patient_name || ''} discharged. Final invoice #${invoice.invoice_number} generated and payment recorded.`
           );
         } catch (err: any) {
           console.error('Failed to mark admission discharged after billing', err);
-          toast.error('Discharge Status Error', err.message || 'Invoice generated, but discharge status update failed.');
+          toast.error('Discharge Status Error', err.message || 'Invoice generated, but discharge settlement update failed.');
         }
       },
     });
@@ -281,7 +327,13 @@ export default function IPDPage() {
       const summary = await ipdApi.getDischargeSummary(admissionId);
       if (!summary) return;
 
-      const defaultItems = (summary.suggested_items || []).map((it: any) => ({
+      const suggested = summary.suggested_items || [];
+      if (suggested.length === 0) {
+        toast.info('No Unbilled Charges', 'All currently accrued inpatient charges have already been billed.');
+        return;
+      }
+
+      const defaultItems = suggested.map((it: any) => ({
         description: `Interim: ${it.description || `IPD Room Charges (${summary.bed_number || 'Bed'})`}`,
         quantity: it.quantity || 1,
         unit_price: it.unit_price || 0,
@@ -290,6 +342,8 @@ export default function IPDPage() {
         category: it.category || 'IPD',
       }));
 
+      const billedItemIds = suggested.map((it: any) => it.id || it.bill_item_id).filter(Boolean);
+
       openBilling({
         patientId: summary.patient_id,
         lockedPatient: true,
@@ -297,10 +351,28 @@ export default function IPDPage() {
         sourceReferenceId: admissionId,
         defaultReason: `IPD Interim Inpatient Bill: ${summary.ward_name || 'Ward'} (Bed ${summary.bed_number || ''})`,
         defaultItems,
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
-          queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
-          toast.success('Interim Bill Generated', 'Interim invoice created successfully.');
+        onSuccess: async (invoice) => {
+          try {
+            await ipdApi.settleInvoice(admissionId, {
+              invoice_id: invoice.id,
+              item_ids: billedItemIds.length > 0 ? billedItemIds : undefined,
+              amount_paid: invoice.paid_amount || 0,
+              payment_method: invoice.payment_method || 'cash',
+              transaction_reference: invoice.invoice_number,
+              notes: `Interim invoice #${invoice.invoice_number} settlement`,
+              is_discharge: false,
+            });
+            queryClient.invalidateQueries({ queryKey: ['ipd-rolling-bill', admissionId] });
+            queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
+            queryClient.invalidateQueries({ queryKey: ['billing-invoices'] });
+            toast.success(
+              'Interim Bill Paid & Recorded',
+              `Invoice #${invoice.invoice_number} created and payment saved in inpatient ledger.`
+            );
+          } catch (err: any) {
+            console.error('Failed to settle interim invoice', err);
+            toast.error('Settlement Error', err?.message || 'Invoice created, but ledger update failed.');
+          }
         },
       });
     } catch (err: any) {
@@ -315,134 +387,152 @@ export default function IPDPage() {
     refetchNursingTasks();
   };
 
+  // 4 Standard Tabs synchronized with ContextSidebar
+  const tabsList = [
+    { id: 'bedboard', label: 'Visual Bedboard Grid', icon: BedDouble },
+    { id: 'admissions', label: 'Active Inpatients', icon: Users, badge: admissions.length || undefined },
+    { id: 'nursing', label: 'Nursing Station Tasks', icon: ClipboardList, badge: nursingTasks.length || undefined },
+    { id: 'history', label: 'Discharge History', icon: History },
+  ];
+
   return (
     <PageLayout className="space-y-6">
-      {/* Header Bar */}
-      <PageHeader
-        title="Inpatient Department (IPD) & Bedboard"
-        subtitle="Live census visual grid, inpatient clinical charts, CPOE orders & bedside care"
-        icon={BedDouble}
-        actions={
-          <Button
-            onClick={() => {
-              const firstVacant = beds.find((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available');
-              if (firstVacant) {
-                handleOpenAdmit(firstVacant);
-              } else {
-                toast.error('No Bed Available', 'All inpatient beds are currently occupied or undergoing cleaning.');
-              }
-            }}
-            className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Admit to Vacant Bed</span>
-          </Button>
-        }
-      />
-
-      {/* Live Bed KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-slate-200 shadow-xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Occupancy Rate</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{occupancyRate}%</h3>
-            </div>
-            <div className="w-10 h-10 rounded-md bg-[rgb(var(--clr-primary)/0.08)] text-[rgb(var(--clr-primary))] flex items-center justify-center font-bold">
-              {occupiedCount}/{totalBeds}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-200 bg-emerald-50/40">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-emerald-700 uppercase">Vacant Available</p>
-              <h3 className="text-2xl font-bold text-emerald-700 mt-0.5">{vacantCount} Beds</h3>
-            </div>
-            <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 bg-red-50/40">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-red-700 uppercase">Occupied (Census)</p>
-              <h3 className="text-2xl font-bold text-red-700 mt-0.5">{occupiedCount} Beds</h3>
-            </div>
-            <div className="w-10 h-10 rounded-md bg-red-100 text-red-600 flex items-center justify-center font-bold">
-              <Users className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200 bg-amber-50/40">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-amber-700 uppercase">Cleaning / Turnover</p>
-              <h3 className="text-2xl font-bold text-amber-700 mt-0.5">{cleaningCount} Beds</h3>
-            </div>
-            <div className="w-10 h-10 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
-              <RefreshCw className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Tabs */}
-      <div className="space-y-4">
-        <TabBar
-          activeTab={activeTab}
-          onChange={(v) => setActiveTab(v as any)}
-          tabs={[
-            { id: 'bedboard', label: 'Visual Bedboard Grid', icon: BedDouble },
-            { id: 'nursing', label: 'Nursing Station Tasks', icon: ClipboardList, badge: nursingTasks.length || undefined },
-            { id: 'admissions', label: 'Inpatient Register', icon: Users, badge: admissions.length || undefined },
-          ]}
+      {/* If viewing a patient chart, render the full-width chart directly without tab bar */}
+      {activeChartAdmissionId ? (
+        <InpatientBedsideChart
+          admissionId={activeChartAdmissionId}
+          onBack={() => setActiveChartAdmissionId(null)}
+          onTransfer={(adm) => {
+            handleOpenTransfer({
+              admission_id: adm.id,
+              patient_name: adm.patient?.name,
+              bed_number: adm.bed?.bed_number,
+              ward_name: adm.bed?.ward_name,
+            });
+          }}
+          onInterimBill={(admId) => handleInterimBilling(admId)}
+          onDischarge={(admId) => handleInitiateDischarge(admId)}
+          onOpenVitalsModal={(admId, bId, pName, bNum) => handleOpenVitalsModal(admId, bId, pName, bNum)}
+          onRefreshParent={handleRefreshAll}
         />
-
-        {activeTab === 'bedboard' && (
-          <BedboardTab
-            wards={wards}
-            beds={beds}
-            selectedWardId={selectedWardId}
-            setSelectedWardId={setSelectedWardId}
-            onAdmit={handleOpenAdmit}
-            onOpenChart={handleOpenChart}
-            onTransfer={handleOpenTransfer}
-            onDischarge={handleInitiateDischarge}
-            onInterimBill={handleInterimBilling}
-            onCleanBed={(bedId) => bedStatusMutation.mutate({ bedId, status: 'Vacant' })}
-            onManageWards={() => setWardBedModalOpen(true)}
-            onAccrueCharges={() => accrueTariffMutation.mutate()}
-          />
-        )}
-
-        {activeTab === 'nursing' && (
-          <NursingTab
-            nursingTasks={nursingTasks}
-            onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
-            onOpenVitalsTask={(task) =>
-              handleOpenVitalsModal(task.admission_id, task.bed_id, task.patient_name, task.bed_number, task.id)
+      ) : (
+        <>
+          {/* Header Bar */}
+          <PageHeader
+            title="Inpatient Department (IPD) & Bedboard"
+            subtitle="Live census visual grid, inpatient clinical charts, medication orders & bedside care"
+            icon={BedDouble}
+            actions={
+              <Button
+                onClick={() => {
+                  const firstVacant = beds.find((b: any) => b.status === 'Vacant' || b.status?.toLowerCase() === 'available');
+                  if (firstVacant) {
+                    handleOpenAdmit(firstVacant);
+                  } else {
+                    toast.error('No Bed Available', 'All inpatient beds are currently occupied or undergoing cleaning.');
+                  }
+                }}
+                className="gap-2 bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold h-9 rounded-md shadow-sm text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Admit to Vacant Bed</span>
+              </Button>
             }
-            isCompleting={completeTaskMutation.isPending}
           />
-        )}
 
-        {activeTab === 'admissions' && (
-          <AdmissionsTab
-            admissions={admissions}
-            onOpenChart={handleOpenChart}
-            onTransfer={handleOpenTransfer}
-            onDischarge={handleInitiateDischarge}
-            onInterimBill={handleInterimBilling}
-          />
-        )}
-      </div>
+          {/* Live Bed KPI Cards using StatCard */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <StatCard
+              label="Occupancy Rate"
+              value={`${occupancyRate}%`}
+              subtext={`${occupiedCount} of ${totalBeds} beds occupied`}
+              color="default"
+              icon={BedDouble}
+            />
 
-      {/* 1. Admission Sheet */}
+            <StatCard
+              label="Vacant Available"
+              value={`${vacantCount} Beds`}
+              subtext="Ready for admission"
+              color="success"
+              icon={CheckCircle2}
+            />
+
+            <StatCard
+              label="Occupied (Census)"
+              value={`${occupiedCount} Beds`}
+              subtext="Active inpatients"
+              color="danger"
+              icon={Users}
+            />
+
+            <StatCard
+              label="Cleaning / Turnover"
+              value={`${cleaningCount} Beds`}
+              subtext="Undergoing sanitization"
+              color="warning"
+              icon={RefreshCw}
+            />
+          </div>
+
+          {/* Standard 3-Tab Main Navigation Bar */}
+          <div className="space-y-4">
+            <TabBar
+              activeTab={activeTab}
+              onChange={handleTabChange}
+              tabs={tabsList}
+            />
+
+            {/* TAB 1: VISUAL BEDBOARD GRID */}
+            {activeTab === 'bedboard' && (
+              <BedboardTab
+                wards={wards}
+                beds={beds}
+                selectedWardId={selectedWardId}
+                setSelectedWardId={setSelectedWardId}
+                onAdmit={handleOpenAdmit}
+                onOpenChart={handleOpenChart}
+                onTransfer={handleOpenTransfer}
+                onDischarge={handleInitiateDischarge}
+                onInterimBill={handleInterimBilling}
+                onCleanBed={(bedId) => bedStatusMutation.mutate({ bedId, status: 'Vacant' })}
+                onManageWards={() => setWardBedModalOpen(true)}
+                onAccrueCharges={() => accrueTariffMutation.mutate()}
+              />
+            )}
+
+            {/* TAB 2: ACTIVE INPATIENTS */}
+            {activeTab === 'admissions' && (
+              <AdmissionsTab
+                admissions={admissions}
+                onOpenChart={handleOpenChart}
+                onTransfer={handleOpenTransfer}
+                onDischarge={handleInitiateDischarge}
+                onInterimBill={handleInterimBilling}
+              />
+            )}
+
+            {/* TAB 3: NURSING STATION TASKS */}
+            {activeTab === 'nursing' && (
+              <NursingTab
+                nursingTasks={nursingTasks}
+                onCompleteTask={(taskId) => completeTaskMutation.mutate(taskId)}
+                onOpenVitalsTask={(task) =>
+                  handleOpenVitalsModal(task.admission_id, task.bed_id, task.patient_name, task.bed_number, task.id)
+                }
+                isCompleting={completeTaskMutation.isPending}
+              />
+            )}
+
+            {/* TAB 4: DISCHARGE HISTORY */}
+            {activeTab === 'history' && (
+              <DischargeHistoryTab onRefreshParent={handleRefreshAll} />
+            )}
+          </div>
+        </>
+      )}
+
+      {/* MODAL 1: Admission Sheet Drawer */}
       <AdmissionSheet
         isOpen={admitSheetOpen}
         onClose={() => setAdmitSheetOpen(false)}
@@ -463,30 +553,7 @@ export default function IPDPage() {
         onConfirmAdmit={() => admitMutation.mutate()}
       />
 
-      {/* 2. Inpatient Bedside Chart Drawer */}
-      <InpatientBedsideDrawer
-        isOpen={bedsideDrawerOpen}
-        onClose={() => {
-          setBedsideDrawerOpen(false);
-          setSelectedBedsideAdmissionId(null);
-        }}
-        admissionId={selectedBedsideAdmissionId}
-        onTransfer={(adm) => {
-          setBedsideDrawerOpen(false);
-          handleOpenTransfer({
-            admission_id: adm.id,
-            patient_name: adm.patient?.name,
-            bed_number: adm.bed?.bed_number,
-            ward_name: adm.bed?.ward_name,
-          });
-        }}
-        onInterimBill={(admId) => handleInterimBilling(admId)}
-        onDischarge={(admId) => handleInitiateDischarge(admId)}
-        onOpenVitalsModal={(admId, bId, pName, bNum) => handleOpenVitalsModal(admId, bId, pName, bNum)}
-        onRefreshParent={handleRefreshAll}
-      />
-
-      {/* 3. Bed Transfer Modal */}
+      {/* MODAL 2: Bed Transfer Modal */}
       <BedTransferModal
         isOpen={transferModalOpen}
         onClose={() => {
@@ -502,7 +569,7 @@ export default function IPDPage() {
         onSuccess={handleRefreshAll}
       />
 
-      {/* 4. Ward & Bed Management Modal */}
+      {/* MODAL 3: Ward & Bed Management Modal */}
       <WardBedManagementModal
         isOpen={wardBedModalOpen}
         onClose={() => setWardBedModalOpen(false)}
@@ -511,7 +578,7 @@ export default function IPDPage() {
         onRefresh={handleRefreshAll}
       />
 
-      {/* 5. Vitals Entry Modal */}
+      {/* MODAL 4: Vitals Entry Modal */}
       <VitalsEntryModal
         isOpen={vitalsModalOpen}
         onClose={() => {
@@ -526,7 +593,7 @@ export default function IPDPage() {
         onSuccess={handleRefreshAll}
       />
 
-      {/* 6. Clinical Discharge Modal */}
+      {/* MODAL 5: Clinical Discharge Modal */}
       <ClinicalDischargeModal
         isOpen={dischargeModalOpen}
         onClose={() => {

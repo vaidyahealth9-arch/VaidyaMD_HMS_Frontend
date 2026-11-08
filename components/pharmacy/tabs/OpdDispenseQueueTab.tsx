@@ -3,21 +3,10 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { pharmacyApi } from '@/lib/api';
-import {
-  FileText,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Pill,
-  ArrowRight,
-  Stethoscope,
-} from 'lucide-react';
+import { FileText, Search } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/card';
-import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { Badge } from '@/shared/ui/badge';
-import { formatDate } from '@/lib/utils';
+import DispenseQueueItemCard from './DispenseQueueItemCard';
 
 interface OpdDispenseQueueTabProps {
   batches: any[];
@@ -31,6 +20,7 @@ export default function OpdDispenseQueueTab({
 }: OpdDispenseQueueTabProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'fulfilled'>('pending');
+  const [departmentFilter, setDepartmentFilter] = useState<'all' | 'opd' | 'ipd'>('all');
 
   // Stock lookup map
   const stockMap = useMemo(() => {
@@ -59,24 +49,36 @@ export default function OpdDispenseQueueTab({
     refetchInterval: 10000,
   });
 
-  // Filter for OPD Prescriptions
-  const opdIndents = useMemo(() => {
+  // Filter for Clinical (OPD & IPD) Prescriptions & Consumables
+  const clinicalIndents = useMemo(() => {
     return (allIndents || []).filter((ind: any) => {
-      const isOpdRx =
+      const isClinical =
         ind.indent_type === 'OPD_RX' ||
-        (ind.requesting_department || '').toUpperCase() === 'OPD' ||
-        (ind.notes || '').toLowerCase().includes('opd rx');
-      return isOpdRx;
+        ind.indent_type === 'IPD_RX' ||
+        ind.indent_type === 'IPD_ORDER' ||
+        ['OPD', 'IPD', 'INPATIENT'].includes((ind.requesting_department || '').toUpperCase()) ||
+        (ind.notes || '').toLowerCase().includes('opd rx') ||
+        (ind.notes || '').toLowerCase().includes('ipd');
+      return isClinical;
     });
   }, [allIndents]);
 
   const filteredIndents = useMemo(() => {
-    return opdIndents.filter((ind: any) => {
+    return clinicalIndents.filter((ind: any) => {
       const isPending = ind.status === 'Submitted' || ind.status === 'Pending';
       const isFulfilled = ind.status === 'Fulfilled' || ind.status === 'Dispensed';
 
       if (statusFilter === 'pending' && !isPending) return false;
       if (statusFilter === 'fulfilled' && !isFulfilled) return false;
+
+      const isIpd =
+        ind.indent_type === 'IPD_RX' ||
+        ind.indent_type === 'IPD_ORDER' ||
+        (ind.requesting_department || '').toUpperCase() === 'IPD' ||
+        (ind.notes || '').toLowerCase().includes('ipd');
+
+      if (departmentFilter === 'opd' && isIpd) return false;
+      if (departmentFilter === 'ipd' && !isIpd) return false;
 
       if (!search.trim()) return true;
       const q = search.toLowerCase();
@@ -89,11 +91,11 @@ export default function OpdDispenseQueueTab({
       );
       return numMatch || notesMatch || itemsMatch;
     });
-  }, [opdIndents, statusFilter, search]);
+  }, [clinicalIndents, statusFilter, departmentFilter, search]);
 
   const pendingCount = useMemo(() => {
-    return opdIndents.filter((i: any) => i.status === 'Submitted' || i.status === 'Pending').length;
-  }, [opdIndents]);
+    return clinicalIndents.filter((i: any) => i.status === 'Submitted' || i.status === 'Pending').length;
+  }, [clinicalIndents]);
 
   return (
     <div className="space-y-4 pt-2">
@@ -102,7 +104,7 @@ export default function OpdDispenseQueueTab({
           <div>
             <div className="flex items-center gap-2">
               <CardTitle className="text-sm font-bold text-slate-800">
-                OPD Prescription Dispense Queue
+                Clinical Prescription &amp; Inpatient Dispense Queue
               </CardTitle>
               {pendingCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white animate-pulse">
@@ -111,20 +113,49 @@ export default function OpdDispenseQueueTab({
               )}
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Doctor prescriptions issued from OPD workbench — tap to dispense directly in the standard POS counter with Unified Billing
+              Doctor prescriptions &amp; bedside material orders issued from OPD and IPD — tap to dispense directly at the POS counter
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Department Filter Pills */}
+            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setDepartmentFilter('all')}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  departmentFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Sources
+              </button>
+              <button
+                type="button"
+                onClick={() => setDepartmentFilter('opd')}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  departmentFilter === 'opd' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                OPD Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setDepartmentFilter('ipd')}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  departmentFilter === 'ipd' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                IPD Bedside
+              </button>
+            </div>
+
             {/* Status Filter Pills */}
             <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setStatusFilter('pending')}
-                className={`px-3 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'pending'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'pending' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Pending ({pendingCount})
@@ -132,10 +163,8 @@ export default function OpdDispenseQueueTab({
               <button
                 type="button"
                 onClick={() => setStatusFilter('fulfilled')}
-                className={`px-3 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'fulfilled'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'fulfilled' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Fulfilled
@@ -143,18 +172,16 @@ export default function OpdDispenseQueueTab({
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
+                  statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                All ({opdIndents.length})
+                All ({clinicalIndents.length})
               </button>
             </div>
 
             {/* Search Input */}
-            <div className="relative w-56">
+            <div className="relative w-52">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <Input
                 value={search}
@@ -175,140 +202,20 @@ export default function OpdDispenseQueueTab({
               <p className="font-semibold text-slate-700 text-xs">No Prescriptions in Queue</p>
               <p className="text-[11px] text-slate-400 mt-0.5 max-w-sm mx-auto">
                 {statusFilter === 'pending'
-                  ? 'All OPD prescriptions have been reviewed and dispensed. New doctor prescriptions will appear here live.'
+                  ? 'All clinical prescriptions have been reviewed and dispensed. New doctor orders will appear here live.'
                   : 'No prescriptions match the selected filter.'}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredIndents.map((indent: any) => {
-                const items = indent.items || [];
-                const firstItem = items[0] || {};
-                const patientName = firstItem.patient_name || 'OPD Patient';
-                const patientVid = firstItem.patient_vid || '';
-                const doctorName = firstItem.doctor_name || 'Consulting Physician';
-                const isPending = indent.status === 'Submitted' || indent.status === 'Pending';
-
-                // Check stock for all items
-                const allInStock = items.every((it: any) => {
-                  const nameKey = (it.item_name || it.drug_name || '').trim().toLowerCase();
-                  const codeKey = (it.item_code || '').trim().toLowerCase();
-                  const stock = stockMap.get(codeKey) || stockMap.get(nameKey);
-                  return (stock?.total || 0) >= (Number(it.quantity || it.quantity_requested || 1));
-                });
-
-                return (
-                  <div key={indent.id} className="p-4 hover:bg-slate-50/70 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      {/* Left: Patient and indent details */}
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-xs text-slate-900">{patientName}</span>
-                          {patientVid && (
-                            <Badge variant="outline" className="text-[10px] font-mono border-slate-300 text-slate-600 bg-white">
-                              {patientVid}
-                            </Badge>
-                          )}
-                          <span className="text-[11px] font-mono text-slate-400">#{indent.indent_number}</span>
-                          {isPending ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              Pending Dispense
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Fulfilled
-                            </span>
-                          )}
-
-                          {isPending && (
-                            allInStock ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 flex items-center gap-1 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                All in Stock
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 flex items-center gap-1 border border-rose-200">
-                                <AlertTriangle className="w-3 h-3 text-rose-600" />
-                                Check Stock Shortage
-                              </span>
-                            )
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Stethoscope className="w-3 h-3 text-[rgb(var(--clr-primary))]" />
-                            <span>Dr. {doctorName}</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            <span>{formatDate(indent.created_at)}</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Right: Action button */}
-                      <div className="shrink-0">
-                        {isPending ? (
-                          <Button
-                            size="sm"
-                            onClick={() => onSelectForDispense(indent)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 px-3.5 rounded-md shadow-xs gap-1.5 cursor-pointer"
-                          >
-                            <Pill className="w-3.5 h-3.5" />
-                            <span>Dispense in POS</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-medium italic">
-                            Dispensed &amp; Invoiced
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Prescribed Medications Pill Grid */}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {items.map((it: any, idx: number) => {
-                        const drugName = it.item_name || it.drug_name || 'Drug';
-                        const nameKey = drugName.trim().toLowerCase();
-                        const codeKey = (it.item_code || '').trim().toLowerCase();
-                        const match = stockMap.get(codeKey) || stockMap.get(nameKey);
-                        const available = match?.total || 0;
-                        const reqQty = Number(it.quantity || it.quantity_requested || 1);
-                        const hasEnough = available >= reqQty;
-
-                        return (
-                          <div
-                            key={idx}
-                            className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs shadow-2xs"
-                          >
-                            <span className="font-semibold text-slate-800">{drugName}</span>
-                            {it.dose && <span className="text-[10px] text-slate-500 font-mono">{it.dose}</span>}
-                            {it.frequency && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 border-slate-200 text-slate-600">
-                                {it.frequency}
-                              </Badge>
-                            )}
-                            <span className="text-[11px] font-bold text-slate-700">x{reqQty}</span>
-
-                            {hasEnough ? (
-                              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                Stock: {available}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
-                                Stock: {available}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredIndents.map((indent: any) => (
+                <DispenseQueueItemCard
+                  key={indent.id}
+                  indent={indent}
+                  stockMap={stockMap}
+                  onSelectForDispense={onSelectForDispense}
+                />
+              ))}
             </div>
           )}
         </CardContent>

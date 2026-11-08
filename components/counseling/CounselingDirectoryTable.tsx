@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatTime } from '@/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import {
@@ -67,7 +67,7 @@ export default function CounselingDirectoryTable({
                 <td className="p-3.5 text-slate-600 whitespace-nowrap">
                   <p className="font-bold text-slate-900">{formatDate(note.created_at)}</p>
                   <p className="text-[10px] text-slate-400">
-                    {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime(note.created_at)}
                   </p>
                 </td>
                 <td className="p-3.5">

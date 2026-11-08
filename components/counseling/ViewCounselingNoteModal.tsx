@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatTime } from '@/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { HeartHandshake, X, Printer, ShieldCheck } from 'lucide-react';
 
@@ -33,7 +33,7 @@ export default function ViewCounselingNoteModal({
               <h3 className="font-bold text-base">Pre-ART Clinical Counseling Sheet</h3>
               <p className="text-xs text-slate-400">
                 Recorded on {formatDate(viewingNote.created_at)} at{' '}
-                {new Date(viewingNote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatTime(viewingNote.created_at)}
               </p>
             </div>
           </div>

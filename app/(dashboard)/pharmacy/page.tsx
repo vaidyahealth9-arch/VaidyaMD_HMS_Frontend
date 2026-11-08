@@ -139,7 +139,12 @@ export default function PharmacyPage() {
   const pendingRxCount = useMemo(() => {
     return (indents || []).filter(
       (i: any) =>
-        (i.indent_type === 'OPD_RX' || (i.requesting_department || '').toUpperCase() === 'OPD') &&
+        (i.indent_type === 'OPD_RX' ||
+          i.indent_type === 'IPD_RX' ||
+          i.indent_type === 'IPD_ORDER' ||
+          ['OPD', 'IPD', 'INPATIENT'].includes((i.requesting_department || '').toUpperCase()) ||
+          (i.notes || '').toLowerCase().includes('opd rx') ||
+          (i.notes || '').toLowerCase().includes('ipd')) &&
         (i.status === 'Submitted' || i.status === 'Pending')
     ).length;
   }, [indents]);
@@ -316,7 +321,7 @@ export default function PharmacyPage() {
           onChange={(v) => setActiveTab(v as any)}
           tabs={[
             { id: 'inventory', label: 'Stock Inventory & FEFO', icon: Layers, badge: batches.length || undefined },
-            { id: 'dispense_queue', label: 'OPD Rx Dispense Queue', icon: FileText, badge: pendingRxCount || undefined },
+            { id: 'dispense_queue', label: 'Clinical Dispense Queue (OPD & IPD)', icon: FileText, badge: pendingRxCount || undefined },
             { id: 'pos', label: 'Dispensing POS', icon: ShoppingCart },
             { id: 'bills', label: 'Bills & Receipts', icon: Receipt, badge: pharmacyInvoices.length || undefined },
             { id: 'agency_reports', label: 'Distributor Agencies & Returns', icon: Building2 },

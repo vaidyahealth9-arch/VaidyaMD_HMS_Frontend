@@ -133,7 +133,15 @@ export interface AdmissionDetails {
     gender?: string;
     age?: number;
     phone?: string;
+    alternate_phone?: string;
     blood_group?: string;
+    photo_url?: string;
+    partner?: {
+      id: string;
+      name: string;
+      phone?: string;
+      vid?: string;
+    } | null;
   };
   bed: {
     id: string;
@@ -146,6 +154,7 @@ export interface AdmissionDetails {
   admitting_doctor: {
     id?: string;
     name: string;
+    specialization?: string;
   };
   admission_date: string;
   duration_days: number;
@@ -156,6 +165,8 @@ export interface AdmissionDetails {
   risk_factors: RiskFactors;
   advance_amount: number;
   total_accrued_amount: number;
+  credit_limit?: number;
+  attending_doctor_charge_per_day?: number;
   discharge_summary?: DischargeSummary;
   round_notes: RoundNote[];
   orders: IPDOrder[];
@@ -213,5 +224,81 @@ export interface NursingTask {
   completed_by_name?: string;
   completed_at?: string;
   vitals_payload?: VitalsPayload;
+  notes?: string;
+}
+
+
+export interface BillItem {
+  id: string;
+  admission_id?: string;
+  item_type: 'room_rent' | 'nursing_care' | 'doctor_consultation' | 'pharmacy_medication' | 'pharmacy_surgical' | 'lab_investigation' | 'radiology' | 'equipment' | 'diet' | 'procedure_ot' | 'miscellaneous' | string;
+  category: string;
+  service_code?: string;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  is_automated?: boolean;
+  is_billed?: boolean;
+  status?: 'unbilled' | 'billed' | 'paid' | string;
+  invoice_id?: string;
+  billed_at?: string;
+  billing_date?: string;
+  source_module?: string;
+  created_by_name?: string;
+  notes?: string;
+}
+
+export interface IPDPayment {
+  id: string;
+  receipt_number: string;
+  amount: number;
+  payment_method: string;
+  transaction_reference?: string;
+  payment_date: string;
+  payment_type: 'advance' | 'interim' | 'final' | 'refund' | string;
+  invoice_id?: string;
+  collected_by_name?: string;
+  notes?: string;
+}
+
+export interface RollingBillSummary {
+  admission_id: string;
+  admission_number: string;
+  patient_id: string;
+  patient_name: string;
+  patient_mrn: string;
+  bed_number: string;
+  ward_name: string;
+  admitting_doctor: string;
+  admission_date?: string;
+  total_gross: number;
+  unbilled_total?: number;
+  billed_total?: number;
+  total_advance: number;
+  net_due: number;
+  credit_limit: number;
+  is_credit_exceeded: boolean;
+  category_breakdown: Record<string, number>;
+  items: BillItem[];
+  payments: IPDPayment[];
+}
+
+export interface BillItemPayload {
+  item_type: string;
+  category: string;
+  service_code?: string;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  notes?: string;
+  billing_date?: string;
+}
+
+export interface PaymentPayload {
+  amount: number;
+  payment_method: string;
+  transaction_reference?: string;
+  payment_type: string;
   notes?: string;
 }

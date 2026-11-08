@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDateTime } from '@/lib/utils';
+
 import React from 'react';
 import { FlaskConical, FileCheck } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
@@ -22,20 +24,6 @@ interface PathologistReviewSheetProps {
   isAuthorizing?: boolean;
   onAuthorize: () => void;
 }
-
-const formatDateTime = (dateStr?: string) => {
-  if (!dateStr) return '—';
-  try {
-    return new Date(dateStr).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
-};
 
 export default function PathologistReviewSheet({
   isOpen,
