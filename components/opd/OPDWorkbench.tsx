@@ -138,6 +138,8 @@ export default function OPDWorkbench({
 
   patient: propPatient,
 
+  partner: propPartner,
+
   triageData,
 
   appointment,
@@ -149,6 +151,8 @@ export default function OPDWorkbench({
   patientId?: string;
 
   patient?: any;
+
+  partner?: any;
 
   triageData?: any;
 
@@ -262,7 +266,9 @@ export default function OPDWorkbench({
 
 
 
-  const patient = propPatient || queryPatient;
+  const rawPatient = propPatient || queryPatient;
+  const partner = propPartner || rawPatient?.partner;
+  const patient = rawPatient ? { ...rawPatient, partner: partner || rawPatient.partner } : rawPatient;
 
   const activeAlerts = localAlerts !== null ? localAlerts : (patient?.alert_notes || []);
 

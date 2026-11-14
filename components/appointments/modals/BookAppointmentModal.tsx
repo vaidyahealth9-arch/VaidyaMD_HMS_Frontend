@@ -188,6 +188,7 @@ export default function BookAppointmentModal({
   const [patientSearchFocus, setPatientSearchFocus] = useState(false);
   const [notifyPatientSms, setNotifyPatientSms] = useState(true);
   const [notifyPartnerSms, setNotifyPartnerSms] = useState(true);
+  const [isCoupleVisit, setIsCoupleVisit] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
 
   const selectedPatientObj = useMemo(() => {
@@ -293,6 +294,15 @@ export default function BookAppointmentModal({
     try {
       const fee = Number(bookForm.consultation_fee) || 0;
 
+      const isCouple = Boolean(isCoupleVisit && selectedPatientObj?.partner_name);
+      const apptMeta: Record<string, any> = {};
+      if (isCouple) {
+        apptMeta.is_couple_visit = true;
+        apptMeta.partner_id = selectedPatientObj.partner_id;
+        apptMeta.partner_name = selectedPatientObj.partner_name;
+        apptMeta.partner_vid = selectedPatientObj.partner_vid;
+      }
+
       await appointmentsApi.create({
         patient_id: bookForm.patient_id,
         doctor_id: bookForm.doctor_id,
@@ -302,12 +312,13 @@ export default function BookAppointmentModal({
         status: bookForm.status,
         consultation_fee: fee,
         notes: bookForm.notes,
+        metadata: Object.keys(apptMeta).length > 0 ? apptMeta : undefined,
       });
       toast.success(
         'Appointment Confirmed',
         bookForm.status === 'waiting'
-          ? 'Patient directly checked into the OPD Waiting Queue.'
-          : 'Appointment scheduled on the clinical roster.'
+          ? (isCouple ? 'Couple checked into OPD Waiting Queue (1 Token, 1 Fee).' : 'Patient directly checked into the OPD Waiting Queue.')
+          : (isCouple ? 'Couple appointment scheduled on clinical roster.' : 'Appointment scheduled on the clinical roster.')
       );
       onSuccess();
       onClose();
@@ -443,7 +454,8 @@ export default function BookAppointmentModal({
                     )}
                   </div>
                 ) : (
-                  /* Compact Selected Patient Chip */
+                  <>
+                  {/* Compact Selected Patient Chip */}
                   <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-md bg-primary text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
@@ -482,6 +494,39 @@ export default function BookAppointmentModal({
                       Change
                     </button>
                   </div>
+                  {selectedPatientObj.partner_name && (
+                    <div className="mt-2 p-2.5 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-primary">Visit Mode:</span>
+                        <span className="ml-1.5 text-slate-600">
+                          {isCoupleVisit
+                            ? `Joint Couple Visit with ${selectedPatientObj.partner_name} (1 Consultation Fee)`
+                            : `Individual Visit for ${selectedPatientObj.name} only`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsCoupleVisit(true)}
+                          className={`px-2 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                            isCoupleVisit ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          Joint Couple
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCoupleVisit(false)}
+                          className={`px-2 py-1 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                            !isCoupleVisit ? 'bg-primary text-white' : 'bg-white text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          Individual
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
 

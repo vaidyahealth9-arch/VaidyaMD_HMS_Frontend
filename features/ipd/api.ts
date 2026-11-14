@@ -59,6 +59,7 @@ export const ipdApi = {
     allergies?: string[];
     risk_factors?: Record<string, boolean>;
     advance_amount?: number;
+    vitals_frequency?: string;
   }) =>
     request<{ message: string; admission_id: string; admission_number: string }>('/core/ipd/admissions', {
       method: 'POST',
@@ -196,6 +197,23 @@ export const ipdApi = {
     data: { completed_by_id?: string; vitals_payload?: Record<string, unknown>; notes?: string }
   ) =>
     request<NursingTask>(`/core/ipd/nursing-tasks/${taskId}/complete`, { method: 'POST', body: JSON.stringify(data) }),
+  rescheduleNursingTask: (
+    taskId: string,
+    data: { frequency?: string; scheduled_time?: string; notes?: string }
+  ) =>
+    request<{ message: string; task_id: string; frequency?: string; scheduled_time?: string }>(
+      `/core/ipd/nursing-tasks/${taskId}/reschedule`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    ),
+  updateAdmissionVitalsFrequency: (
+    admissionId: string,
+    data: { frequency: string; scheduled_time?: string; notes?: string }
+  ) =>
+    request<{ message: string; admission_id: string; task_id: string; frequency: string }>(
+      `/core/ipd/admissions/${admissionId}/vitals-frequency`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    ),
+
 
   // Accrual
   accrueDailyCharges: () =>

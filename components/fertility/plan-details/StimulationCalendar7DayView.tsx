@@ -11,7 +11,7 @@ import {
   Syringe,
   Plus,
 } from 'lucide-react';
-import { parseFollicleTokens, isProcedureName } from './utils';
+import { parseFollicleTokens, isProcedureName, fillMissingCalendarDays } from './utils';
 import { DayEventCategory } from './QuickScanEditModal';
 
 interface StimulationCalendar7DayViewProps {
@@ -31,10 +31,13 @@ export default function StimulationCalendar7DayView({
   onCopyForward,
   onOpenScanEdit,
 }: StimulationCalendar7DayViewProps) {
+  // Ensure all calendar days are kept so 7-day weeks and missing days remain accessible
+  const allDays = fillMissingCalendarDays(days);
+
   // Group days into 7-day weeks
   const weeks: any[][] = [];
-  for (let i = 0; i < days.length; i += 7) {
-    weeks.push(days.slice(i, i + 7));
+  for (let i = 0; i < allDays.length; i += 7) {
+    weeks.push(allDays.slice(i, i + 7));
   }
 
   return (

@@ -215,6 +215,146 @@ export function isScanName(name?: string | null): boolean {
 }
 
 /**
+ * Fill any missing calendar dates/days in a stimulation/treatment plan sequence.
+ * Ensures that all consecutive days between start and end date are present.
+ * Missing days are created as blank day blocks (with date, display_date, day_of_week,
+ * day_number, stim_day_number, empty medications, scans, investigations, and procedures)
+ * so doctors and patients can handwrite on them and dates/columns align accurately.
+ */
+export function fillMissingCalendarDays(days: any[]): any[] {
+  if (!days || days.length === 0) return [];
+
+  // Deduplicate by date (or day_number if date is missing)
+  const uniqueDaysMap = new Map<string, any>();
+  days.forEach((d) => {
+    const key = d.date || `day-${d.day_number}`;
+    if (!uniqueDaysMap.has(key)) {
+      uniqueDaysMap.set(key, d);
+    }
+  });
+
+  const sorted = Array.from(uniqueDaysMap.values()).sort((a, b) => {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    return (a.day_number || 0) - (b.day_number || 0);
+  });
+
+  if (sorted.length === 0) return [];
+
+  const weekdaysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const parseLocalDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+        return new Date(y, m - 1, d, 12, 0, 0);
+      }
+    }
+    const dt = new Date(dateStr);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const formatIso = (dt: Date): string => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const formatDisplay = (dt: Date): string => {
+    const d = String(dt.getDate()).padStart(2, '0');
+    const m = months[dt.getMonth()];
+    const y = dt.getFullYear();
+    return `${d}-${m}-${y}`;
+  };
+
+  // Case 1: Days have valid dates
+  const daysWithDates = sorted.filter((d) => Boolean(d.date));
+  if (daysWithDates.length > 0) {
+    const dateMap = new Map<string, any>();
+    daysWithDates.forEach((d) => dateMap.set(d.date, d));
+
+    const firstDateStr = daysWithDates[0].date;
+    const lastDateStr = daysWithDates[daysWithDates.length - 1].date;
+
+    const startDt = parseLocalDate(firstDateStr);
+    const endDt = parseLocalDate(lastDateStr);
+
+    if (startDt && endDt && startDt <= endDt) {
+      const result: any[] = [];
+      const curDt = new Date(startDt.getTime());
+      const firstDayObj = daysWithDates[0];
+      const refDayNum = firstDayObj.day_number ?? 1;
+      const refStimNum = firstDayObj.stim_day_number ?? 1;
+
+      while (curDt <= endDt) {
+        const iso = formatIso(curDt);
+        const diffDays = Math.round((curDt.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (dateMap.has(iso)) {
+          result.push(dateMap.get(iso));
+        } else {
+          // Generate blank day
+          const dayNum = refDayNum + diffDays;
+          const stimNum = refStimNum + diffDays;
+          result.push({
+            day_number: dayNum,
+            stim_day_number: stimNum,
+            date: iso,
+            display_date: formatDisplay(curDt),
+            day_of_week: weekdaysShort[curDt.getDay()],
+            medications: [],
+            scans: [],
+            investigations: [],
+            procedures: [],
+            is_blank: true,
+          });
+        }
+        curDt.setDate(curDt.getDate() + 1);
+      }
+      return result;
+    }
+  }
+
+  // Case 2: Days do not have dates, but have day_number
+  const dayNumMap = new Map<number, any>();
+  sorted.forEach((d) => {
+    if (d.day_number !== undefined) {
+      dayNumMap.set(d.day_number, d);
+    }
+  });
+
+  const dayNums = Array.from(dayNumMap.keys()).sort((a, b) => a - b);
+  if (dayNums.length > 0) {
+    const minDay = dayNums[0];
+    const maxDay = dayNums[dayNums.length - 1];
+    const result: any[] = [];
+    for (let dn = minDay; dn <= maxDay; dn++) {
+      if (dayNumMap.has(dn)) {
+        result.push(dayNumMap.get(dn));
+      } else {
+        result.push({
+          day_number: dn,
+          stim_day_number: dn,
+          medications: [],
+          scans: [],
+          investigations: [],
+          procedures: [],
+          is_blank: true,
+        });
+      }
+    }
+    return result;
+  }
+
+  return sorted;
+}
+
+/**
  * Flatten multi-track DayData items into the Sparta row-by-row event ledger
  */
 export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
@@ -500,7 +640,7 @@ export function unflattenTimelineItemsToDays(items: PlanTimelineItem[], existing
     }
   });
 
-  return Array.from(daysMap.values()).sort((a, b) => a.day_number - b.day_number);
+  return fillMissingCalendarDays(Array.from(daysMap.values()));
 }
 
 export function createEmptyDraftCycle(patientId: string, attemptNumber: number = 1): TreatmentCycleRecord {

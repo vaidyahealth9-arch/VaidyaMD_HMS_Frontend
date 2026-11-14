@@ -12,3 +12,7 @@ export { default as SectionLabel } from './SectionLabel';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export type { DataTableColumn } from './DataTable';
 export type { FilterField, SelectOption } from './FilterToolbar';
+export { default as PrintablePaymentVoucherModal } from './PrintablePaymentVoucherModal';
+export type { PaymentVoucherData, PrintablePaymentVoucherModalProps } from './PrintablePaymentVoucherModal';
+export { default as PrintableInsuranceBillModal } from './PrintableInsuranceBillModal';
+export type { PrintableInsuranceBillModalProps } from './PrintableInsuranceBillModal';

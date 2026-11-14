@@ -21,6 +21,7 @@ import { useEffect } from 'react';
 interface PatientBillingTabProps {
   patientId: string;
   patient: any;
+  partner?: any;
   invoices: any[];
   patientPackages?: any[];
   onDataRefresh?: () => void;
@@ -31,6 +32,7 @@ interface PatientBillingTabProps {
 export default function PatientBillingTab({
   patientId,
   patient,
+  partner,
   invoices,
   patientPackages: propPackages,
   onDataRefresh,
@@ -43,21 +45,25 @@ export default function PatientBillingTab({
   const [internalPackages, setInternalPackages] = useState<any[]>([]);
   const patientPackages = propPackages || internalPackages;
 
-  const loadPackages = () => {
-    patientPackagesApi.listByPatient(patientId)
-      .then((pkgs: any) => {
-        const list = Array.isArray(pkgs) ? pkgs : [];
-        if (onPackagesRefresh) onPackagesRefresh(list);
-        setInternalPackages(list);
-      })
-      .catch(() => {});
+  const loadPackages = async () => {
+    try {
+      const ids = [patientId, partner?.id].filter(Boolean);
+      const lists = await Promise.all(
+        ids.map((id: string) => patientPackagesApi.listByPatient(id).catch(() => []))
+      );
+      const combined = lists.flat();
+      if (onPackagesRefresh) onPackagesRefresh(combined);
+      setInternalPackages(combined);
+    } catch {
+      setInternalPackages([]);
+    }
   };
 
   useEffect(() => {
     if (!propPackages && patientId) {
       loadPackages();
     }
-  }, [propPackages, patientId]);
+  }, [propPackages, patientId, partner?.id]);
 
   const { openBilling } = useBillingModal();
   const [availablePackages, setAvailablePackages] = useState<any[]>([]);

@@ -6,6 +6,7 @@ import PrintableReportFooter from '@/components/common/PrintableReportFooter';
 import A4Sheet from '@/components/common/A4Sheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveLogoUrl } from '@/components/common/PrintableReportHeader';
+import { fillMissingCalendarDays } from './utils';
 
 interface TakeawayCalendarModalProps {
   isOpen: boolean;
@@ -50,19 +51,9 @@ export default function TakeawayCalendarModal({
   const effectiveModality = cycle?.treatment_type || 'Controlled Ovarian Stimulation';
 
   // 1. Build calendar cells starting from Day 1's actual weekday (zero leading waste)
-  // Deduplicate days by date or day_number to avoid phantom extra rows
-  const uniqueDaysMap = new Map<string, any>();
-  (days || []).forEach((d) => {
-    const key = d.date || `day-${d.day_number}`;
-    if (!uniqueDaysMap.has(key)) {
-      uniqueDaysMap.set(key, d);
-    }
-  });
-
-  const sortedDays = Array.from(uniqueDaysMap.values()).sort((a, b) => {
-    if (a.date && b.date) return a.date.localeCompare(b.date);
-    return (a.day_number || 0) - (b.day_number || 0);
-  });
+  // Ensure all consecutive calendar dates between start and end date are present.
+  // Missing dates (e.g. Day 13 / 25th) are kept as blank blocks for handwriting adjustments.
+  const sortedDays = fillMissingCalendarDays(days);
 
   const weekdaysFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const weekdaysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -72,8 +63,13 @@ export default function TakeawayCalendarModal({
     const firstDay = sortedDays[0];
     if (firstDay.date) {
       try {
-        const d = new Date(firstDay.date);
-        startDow = d.getDay();
+        const parts = firstDay.date.split('-');
+        if (parts.length === 3) {
+          const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+          startDow = dt.getDay();
+        } else {
+          startDow = new Date(firstDay.date).getDay();
+        }
       } catch {
         startDow = 1;
       }
@@ -265,9 +261,9 @@ export default function TakeawayCalendarModal({
       try {
         const parts = d.date.split('-');
         if (parts.length === 3) {
-          const dt = new Date(d.date);
           const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          return `${parts[2]}-${months[dt.getMonth()]}-${parts[0]}`;
+          const mIdx = parseInt(parts[1], 10) - 1;
+          return `${parts[2]}-${months[mIdx] || parts[1]}-${parts[0]}`;
         }
       } catch {
         return d.date;
