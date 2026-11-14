@@ -30,8 +30,10 @@ class VaidyaMdWebSocket {
       }
     }
 
+    // Sanitize base: strip trailing slashes and any trailing '/ws' or '/api/ws' to prevent duplicate path segments (e.g. '/ws/ws/')
+    const cleanWsBase = wsBaseUrl.trim().replace(/\/+$/, '').replace(/\/(api\/)?ws$/, '');
     const token = typeof window !== 'undefined' ? localStorage.getItem('vaidya_md_token') : null;
-    const wsUrl = `${wsBaseUrl.replace(/\/$/, '')}/ws/notifications/${userId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const wsUrl = `${cleanWsBase}/ws/notifications/${userId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
     try {
       this.ws = new WebSocket(wsUrl);

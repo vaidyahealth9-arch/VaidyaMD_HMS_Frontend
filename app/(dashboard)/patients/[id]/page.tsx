@@ -328,6 +328,7 @@ export default function PatientProfilePage() {
           <WorkbenchTab
             patientId={patientId}
             patient={patient}
+            partner={partner}
             appointment={activeAppointment}
             onBack={() => {
               handleSelectTab('overview');
@@ -382,6 +383,7 @@ export default function PatientProfilePage() {
           <PatientBillingTab
             patientId={patientId}
             patient={patient}
+            partner={partner}
             invoices={invoices}
             onDataChanged={loadData}
           />
@@ -485,6 +487,7 @@ export default function PatientProfilePage() {
         open={showAddToOPDModal}
         onClose={() => setShowAddToOPDModal(false)}
         patient={patient}
+        partner={partner}
       />
 
       <EditAlertsModal

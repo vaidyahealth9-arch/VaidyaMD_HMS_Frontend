@@ -6,6 +6,7 @@ export { default as AdmissionSheet } from './sheets/AdmissionSheet';
 export { default as BedTransferModal } from './modals/BedTransferModal';
 export { default as WardBedManagementModal } from './modals/WardBedManagementModal';
 export { default as VitalsEntryModal } from './modals/VitalsEntryModal';
+export { default as RescheduleVitalModal } from './modals/RescheduleVitalModal';
 export { default as ClinicalDischargeModal } from './modals/ClinicalDischargeModal';
 export { default as AddBedsideItemModal } from './modals/AddBedsideItemModal';
 export { default as CollectDepositModal } from './modals/CollectDepositModal';

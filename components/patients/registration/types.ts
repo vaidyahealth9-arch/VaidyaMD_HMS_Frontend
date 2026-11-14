@@ -67,6 +67,10 @@ export interface DocumentUploadFile {
 export interface RegistrationSuccessData {
   primary: any;
   partner?: any;
+  invoice?: any;
+  fee?: number;
+  appointment?: any;
+  queuedToOpd?: boolean;
 }
 
 export type RegistrationMode = 'couple' | 'individual';

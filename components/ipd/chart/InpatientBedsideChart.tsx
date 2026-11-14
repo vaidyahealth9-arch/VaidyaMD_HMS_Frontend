@@ -26,6 +26,7 @@ import VitalsFlowsheetTab from './VitalsFlowsheetTab';
 import BedsideOrdersTab from './BedsideOrdersTab';
 import FluidBalanceTab from './FluidBalanceTab';
 import RollingBillLedger from './RollingBillLedger';
+import RescheduleVitalModal from '../modals/RescheduleVitalModal';
 
 interface InpatientBedsideChartProps {
   admissionId: string;
@@ -45,6 +46,13 @@ export default function InpatientBedsideChart({
   onOpenVitalsModal,
 }: InpatientBedsideChartProps) {
   const [activeChartTab, setActiveChartTab] = useState<'rounds' | 'vitals' | 'orders' | 'fluids' | 'finance'>('rounds');
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedRescheduleTask, setSelectedRescheduleTask] = useState<any | null>(null);
+
+  const handleOpenRescheduleModal = (task: any) => {
+    setSelectedRescheduleTask(task);
+    setRescheduleModalOpen(true);
+  };
 
   // Query Inpatient Admission Details
   const { data: admission, isLoading, isError, error, refetch } = useQuery<AdmissionDetails>({
@@ -202,6 +210,7 @@ export default function InpatientBedsideChart({
             bedNumber={admission.bed.bed_number}
             nursingTasks={admission.nursing_tasks || []}
             onOpenVitalsModal={onOpenVitalsModal}
+            onOpenRescheduleModal={handleOpenRescheduleModal}
           />
         )}
 

@@ -6,6 +6,7 @@ import PrintableModal from './PrintableModal';
 import PrintableReportHeader from './PrintableReportHeader';
 import PrintableReportFooter from './PrintableReportFooter';
 import A4Sheet from './A4Sheet';
+import PrintableInsuranceBillModal from './PrintableInsuranceBillModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { patientsApi } from '@/lib/api';
 
@@ -120,6 +121,7 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
   const hasFewItems = Boolean(invoice.items && invoice.items.length <= 4);
   const initialLayout = defaultLayout || (hasFewItems ? 'a5' : 'a4');
   const [layout, setLayout] = useState<'a4' | 'a5' | 'thermal'>(initialLayout);
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
 
   const due = n(invoice.pending_due !== undefined ? invoice.pending_due : Math.max(0, n(invoice.total_amount) - n(invoice.paid_amount)));
   const paid = n(invoice.paid_amount);
@@ -188,7 +190,8 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
   }
 
   return (
-    <PrintableModal
+    <>
+      <PrintableModal
       isOpen={true}
       onClose={onClose}
       title={`Invoice Preview — ${invoice.invoice_number}`}
@@ -241,6 +244,14 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
                   }`}
                 >
                   🧾 80mm POS Slip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInsuranceModal(true)}
+                  className="px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1 shadow-2xs"
+                  title="Generate Insurance / TPA IP Approximate Bill of Supply"
+                >
+                  🏥 Insurance Bill (Supply)
                 </button>
               </div>
               {hasFewItems && (
@@ -629,5 +640,47 @@ export default function PrintableInvoice({ invoice, onClose, defaultLayout }: Pr
         </div>
       )}
     </PrintableModal>
+
+      {showInsuranceModal && (
+        <PrintableInsuranceBillModal
+          isOpen={showInsuranceModal}
+          onClose={() => setShowInsuranceModal(false)}
+          patient={{
+            name: patientName,
+            vid: patientVid,
+            mrn: patientVid,
+            age: patientAge,
+            gender: patientGender,
+            phone: patientPhone,
+            address: patientAddress,
+          }}
+          items={(invoice.items || []).map((it, idx) => {
+            const qty = Number(it.quantity || (it as any).quantity_dispensed || 1);
+            const rate = Number(getUnitPrice(it));
+            const total = Number(it.total || (it as any).total_price || (qty * rate));
+            return {
+              id: `item-${idx}`,
+              bill_date: formatDate(invoice.created_at),
+              service_code: (it as any).service_code || `SRV${String(idx + 1).padStart(3, '0')}`,
+              description: it.description || (it as any).item_name || 'Hospital Service',
+              quantity: qty,
+              unit_price: rate,
+              total_price: total,
+              gst_amount: 0,
+              is_cash_service: false,
+              is_excluded: false,
+            };
+          })}
+          advanceAmount={Number(invoice.wallet_amount_used || 0)}
+          initialInsurance={{
+            approx_bill_no: invoice.invoice_number,
+            consultant: invoice.doctor_name || invoice.referring_doctor || '',
+            department: isIpd ? 'Inpatient Department (IPD)' : isPharma ? 'Pharmacy' : 'Outpatient Department (OPD)',
+            admission_date: formatDate(invoice.created_at),
+            to_be_discharged_dt: formatDate(invoice.created_at),
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -1,21 +1,23 @@
 'use client';
 
 import React from 'react';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Printer } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Badge } from '@/shared/ui/badge';
-import EmptyState from '@/components/common/EmptyState';
-import { formatCurrency } from '@/lib/utils';
+import { Button } from '@/shared/ui/button';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import type { IPDPayment } from '@/features/ipd/types';
 
 interface RollingBillDepositsTableProps {
   payments: IPDPayment[];
   totalAdvance: number;
+  onPrintVoucher?: (payment: IPDPayment) => void;
 }
 
 export default function RollingBillDepositsTable({
   payments,
   totalAdvance,
+  onPrintVoucher,
 }: RollingBillDepositsTableProps) {
   if (payments.length === 0) {
     return null;
@@ -50,6 +52,7 @@ export default function RollingBillDepositsTable({
               <th className="p-3 text-right">Amount (₹)</th>
               <th className="p-3">Collected By</th>
               <th className="p-3">Notes</th>
+              {onPrintVoucher && <th className="p-3 text-right">Action</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
@@ -57,7 +60,7 @@ export default function RollingBillDepositsTable({
               <tr key={p.id} className="hover:bg-slate-50">
                 <td className="p-3 font-mono font-bold text-emerald-900">{p.receipt_number}</td>
                 <td className="p-3 font-mono text-[11px] text-slate-600">
-                  {p.payment_date ? new Date(p.payment_date).toLocaleString('en-IN') : '—'}
+                  {p.payment_date ? formatDateTime(p.payment_date) : '—'}
                 </td>
                 <td className="p-3">
                   <Badge variant="outline" className="text-[10px] uppercase font-bold border-slate-200">
@@ -70,6 +73,20 @@ export default function RollingBillDepositsTable({
                 </td>
                 <td className="p-3 text-slate-600">{p.collected_by_name || 'Cashier'}</td>
                 <td className="p-3 text-slate-500 text-[11px]">{p.notes || '—'}</td>
+                {onPrintVoucher && (
+                  <td className="p-3 text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onPrintVoucher(p)}
+                      className="h-7 px-2 text-xs text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 gap-1 font-semibold"
+                      title="Print Official Payment Voucher"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Print</span>
+                    </Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -13,6 +13,7 @@ import {
   formatDoseDisplay,
   generateDaysFromProtocol,
   getProtocolActualDays,
+  fillMissingCalendarDays,
 } from './utils';
 import { treatmentCyclesApi, protocolsApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
@@ -108,11 +109,12 @@ export default function PlanDetailsSubTabContent({
   }, [initialDays, cycleCalendar?.days, activeCycle?.medication_calendar, activeCycle?.protocol_template_id, activeCycle?.sentinel_dates?.protocol_name]);
 
   const activeDays = useMemo(() => {
-    if (localDays.length > 0) return localDays;
-    if (initialDays && initialDays.length > 0) return initialDays;
-    if (cycleCalendar?.days && cycleCalendar.days.length > 0) return cycleCalendar.days;
-    if (activeCycle?.medication_calendar && activeCycle.medication_calendar.length > 0) return activeCycle.medication_calendar;
-    return [];
+    let source: any[] = [];
+    if (localDays.length > 0) source = localDays;
+    else if (initialDays && initialDays.length > 0) source = initialDays;
+    else if (cycleCalendar?.days && cycleCalendar.days.length > 0) source = cycleCalendar.days;
+    else if (activeCycle?.medication_calendar && activeCycle.medication_calendar.length > 0) source = activeCycle.medication_calendar;
+    return fillMissingCalendarDays(source);
   }, [localDays, initialDays, cycleCalendar?.days, activeCycle?.medication_calendar]);
 
   const updateDays = (nextDays: any[], protocolInfo?: { protocolId: string; protocolName: string }) => {
@@ -325,7 +327,7 @@ export default function PlanDetailsSubTabContent({
     const newDays = Array.from(dayMap.values()).sort((a, b) => a.day_number - b.day_number);
     let finalDays: any[] = [];
     if (mode === 'overwrite') {
-      finalDays = newDays;
+      finalDays = fillMissingCalendarDays(newDays);
     } else {
       const merged = [...activeDays];
       newDays.forEach((nd) => {
@@ -333,7 +335,7 @@ export default function PlanDetailsSubTabContent({
         if (idx >= 0) merged[idx] = { ...merged[idx], ...nd };
         else merged.push(nd);
       });
-      finalDays = merged.sort((a, b) => a.day_number - b.day_number);
+      finalDays = fillMissingCalendarDays(merged);
     }
     updateDays(finalDays, protocolInfo);
 

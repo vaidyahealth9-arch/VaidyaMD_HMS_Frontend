@@ -38,5 +38,5 @@ jobs:
       - name: Next.js Production Build Validation
         env:
           NEXT_PUBLIC_API_URL: "https://dev-api.vaidyamd.vaidyahealth.com"
-          NEXT_PUBLIC_WS_URL: "wss://dev-api.vaidyamd.vaidyahealth.com/ws"
+          NEXT_PUBLIC_WS_URL: "wss://dev-api.vaidyamd.vaidyahealth.com"
         run: npm run build

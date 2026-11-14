@@ -209,3 +209,54 @@ export function isUserDoctor(user: { role?: string; is_doctor?: boolean } | null
   if (roleLower === 'admin') return Boolean(user.is_doctor);
   return Boolean(user.is_doctor);
 }
+
+
+/**
+ * Converts a numeric amount to Indian currency words (e.g. 15000 -> "Rupees Fifteen Thousand Only")
+ */
+export function amountInWords(amount: number | string): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num) || num <= 0) return 'Rupees Zero Only';
+
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const convertTwoDigits = (n: number): string => {
+    if (n < 20) return a[n];
+    return `${b[Math.floor(n / 10)]} ${a[n % 10]}`.trim();
+  };
+
+  const convertThreeDigits = (n: number): string => {
+    const h = Math.floor(n / 100);
+    const rem = n % 100;
+    const hStr = h > 0 ? `${a[h]} Hundred` : '';
+    const remStr = rem > 0 ? convertTwoDigits(rem) : '';
+    return [hStr, remStr].filter(Boolean).join(' and ');
+  };
+
+  const integerPart = Math.floor(num);
+  const paisePart = Math.round((num - integerPart) * 100);
+
+  let str = '';
+  const crore = Math.floor(integerPart / 10000000);
+  const lakh = Math.floor((integerPart % 10000000) / 100000);
+  const thousand = Math.floor((integerPart % 100000) / 1000);
+  const remainder = integerPart % 1000;
+
+  if (crore > 0) str += `${convertTwoDigits(crore)} Crore `;
+  if (lakh > 0) str += `${convertTwoDigits(lakh)} Lakh `;
+  if (thousand > 0) str += `${convertTwoDigits(thousand)} Thousand `;
+  if (remainder > 0) str += convertThreeDigits(remainder);
+
+  str = str.trim();
+  if (!str) str = 'Zero';
+
+  let res = `Rupees ${str}`;
+  if (paisePart > 0) {
+    res += ` and ${convertTwoDigits(paisePart)} Paise`;
+  }
+  return `${res} Only`;
+}

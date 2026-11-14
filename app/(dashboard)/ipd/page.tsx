@@ -29,6 +29,7 @@ import {
   BedTransferModal,
   WardBedManagementModal,
   VitalsEntryModal,
+  RescheduleVitalModal,
   ClinicalDischargeModal,
   InpatientBedsideChart,
 } from '@/components/ipd';
@@ -81,6 +82,14 @@ export default function IPDPage() {
   const [diagnosis, setDiagnosis] = useState('');
   const [packageName, setPackageName] = useState('');
   const [notes, setNotes] = useState('');
+  const [vitalsFrequency, setVitalsFrequency] = useState('Q4H');
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedRescheduleTask, setSelectedRescheduleTask] = useState<any | null>(null);
+
+  const handleOpenRescheduleModal = (task: any) => {
+    setSelectedRescheduleTask(task);
+    setRescheduleModalOpen(true);
+  };
 
   // Bed Transfer Modal state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -153,6 +162,7 @@ export default function IPDPage() {
         diagnosis,
         package_name: packageName,
         notes,
+        vitals_frequency: vitalsFrequency,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ipd-beds'] });
@@ -202,6 +212,7 @@ export default function IPDPage() {
     setDiagnosis('');
     setPackageName('');
     setNotes('');
+    setVitalsFrequency('Q4H');
     setSelectedBedForAdmission(null);
   };
 
@@ -520,6 +531,7 @@ export default function IPDPage() {
                 onOpenVitalsTask={(task) =>
                   handleOpenVitalsModal(task.admission_id, task.bed_id, task.patient_name, task.bed_number, task.id)
                 }
+                onRescheduleTask={handleOpenRescheduleModal}
                 isCompleting={completeTaskMutation.isPending}
               />
             )}
@@ -549,6 +561,8 @@ export default function IPDPage() {
         setPackageName={setPackageName}
         notes={notes}
         setNotes={setNotes}
+        vitalsFrequency={vitalsFrequency}
+        setVitalsFrequency={setVitalsFrequency}
         isAdmitting={admitMutation.isPending}
         onConfirmAdmit={() => admitMutation.mutate()}
       />
@@ -603,6 +617,25 @@ export default function IPDPage() {
         admission={selectedDischargeAdmission}
         onProceedToBilling={handleProceedFromDischargeToBilling}
         onSuccess={handleRefreshAll}
+      />
+
+      {/* MODAL 6: Reschedule Vitals Modal */}
+      <RescheduleVitalModal
+        isOpen={rescheduleModalOpen}
+        onClose={() => {
+          setRescheduleModalOpen(false);
+          setSelectedRescheduleTask(null);
+        }}
+        taskId={selectedRescheduleTask?.id}
+        admissionId={selectedRescheduleTask?.admission_id}
+        patientName={selectedRescheduleTask?.patient_name}
+        bedNumber={selectedRescheduleTask?.bed_number}
+        currentFrequency={selectedRescheduleTask?.frequency}
+        currentScheduledTime={selectedRescheduleTask?.scheduled_time}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['ipd-nursing-tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['ipd-admissions'] });
+        }}
       />
     </PageLayout>
   );
