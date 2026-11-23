@@ -11,6 +11,10 @@ export { default as TreatmentCyclesOverviewTable } from './TreatmentCyclesOvervi
 export { default as TreatmentCycleSubTabs } from './TreatmentCycleSubTabs';
 export { default as TakeawayCalendarModal } from './TakeawayCalendarModal';
 export { default as QuickScanEditModal } from './QuickScanEditModal';
+export { default as StimulationBatchActionBar } from './StimulationBatchActionBar';
+export { default as BatchDeleteConfirmModal } from './BatchDeleteConfirmModal';
+export { default as BatchAddEventModal } from './BatchAddEventModal';
+export { default as BatchModifyMedModal } from './BatchModifyMedModal';
 export { default as PlanDetailsSubTabContent } from './PlanDetailsSubTabContent';
 
 // Subtab panels

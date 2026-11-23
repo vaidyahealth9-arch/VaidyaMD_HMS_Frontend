@@ -229,8 +229,8 @@ export default function EditPatientDetailsModal({
                 <label className="block text-xs font-bold text-slate-600 mb-1">Age (Years)</label>
                 <input
                   type="number"
-                  min={18}
-                  max={99}
+                  min={0}
+                  max={125}
                   value={formData.age || ''}
                   onChange={(e) => handleChange('age', e.target.value)}
                   className="vmd-input text-xs"

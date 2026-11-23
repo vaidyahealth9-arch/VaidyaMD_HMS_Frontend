@@ -2,6 +2,63 @@ import { ClinicalTemplateItem } from './TemplateManagementDialog';
 
 export const CLINICAL_TEMPLATES: ClinicalTemplateItem[] = [
   {
+    id: 'clinical_fertility_review',
+    name: 'Fertility Review Template (Couple)',
+    complaint: 'Fertility Review & Couple Evaluation.',
+    hopi: '[Fertility Review & Progress Analysis]\\nFemale Partner:\\n- Cycle pattern / Last menstrual period: \\n- Follicular tracking & ovulation response: \\n- Prior interventions & findings: \\n\\nMale Partner:\\n- Semen analysis parameters review: \\n- Lifestyle, medical & surgical history: \\n- Ongoing andrology supplements: ',
+    past_history: 'Previous obstetric history, medical illnesses, abdominal/pelvic surgeries, drug allergies.',
+    examination: 'General: Temp: 98.4 F | PR: 76 bpm | BP: 120/80 mmHg | BMI: \\nTVS Pelvic Ultrasound Findings:\\n- Uterus: Normal size & contour, anteverted\\n- Endometrium:    mm, regular pattern\\n- Right Ovary: AFC:   follicles, volume:   cc\\n- Left Ovary: AFC:   follicles, volume:   cc\\n- POD: Clear',
+    diagnosis: 'Primary / Secondary Subfertility — Couple Workup & Review',
+    investigations: '',
+    female_investigations: '',
+    male_investigations: '',
+    plan: '1. Review female and male investigation results\\n2. Plan clinical protocol (Timed Intercourse / OI / IUI / IVF-ICSI)\\n3. Couple counselling and pre-conceptional supplements prescribed',
+  },
+  {
+    id: 'clinical_ot_discharge',
+    name: 'Operative & Daycare Discharge Summary',
+    complaint: 'Admitted for elective operative / daycare surgical procedure.',
+    hopi: 'Seen by Dr: \\nStaff in attendance: \\nOperation: \\nReason for operation: \\nDate and Time of Admission: \\nDate and Time of Operation: \\nDate and Time of Discharge: \\nChief Complaints: \\nMenstrual History: \\nObstetric History: \\nPersonal History: \\nPast History: \\nFamily History: ',
+    past_history: 'Previous hospitalizations, surgical history, known co-morbidities, drug allergies.',
+    examination: 'Temp: \\nPR: \\nBP: \\nSpO2: \\nPA: ',
+    diagnosis: 'Provisional Diagnosis: \\nFinal Diagnosis: ',
+    investigations: 'Pre-operative investigations, CBC, Blood Group, Viral Markers, Coagulation Screen, Pelvic Ultrasound.',
+    plan: '*******OPERATION NOTES HERE************\\n\\nTreatment at discharge: \\n\\nCondition at discharge: \\nPR:      BP:      SpO2:      Temp:      Alert and active\\n\\nAdvice on Discharge: \\nIn case of any emergency e.g. Abdominal pain, Heavy bleeding per vagina please contact hospital immediately on ___________________.\\n\\nFinal Diagnosis: \\nName and Signature of the patient: \\nSignature of Doctor: \\nName: \\nQualifications: \\nRegistration No.: ',
+  },
+  {
+    id: 'clinical_opu_procedure',
+    name: 'Oocyte Retrieval (OPU) Operative Note & Post-Op',
+    complaint: 'Daycare admission for Oocyte Pick-Up (OPU) under anesthesia.',
+    hopi: 'Oocyte Retrieval done today\\nPre-Op Antibiotics Monocef 1 Gram IV\\nIntravenous Anaesthesia/LMA\\nAfter anaesthesia, patient positioned in lithotomy\\nVagina and labia cleaned with normal saline as antiseptics are not allowed in IVF\\nDraped with ETO sterilised disposable drapes\\nStrict Aseptic precautions\\nTransvaginal Ultrasound probe\\nSterile disposable probe cover with normal saline\\nSterile probe guide attached to the probe\\nScan done\\nEndometrium and both ovaries checked\\nProceeded with oocyte retreival with 17G disposable needle\\nAccess to ovaries through vaginal fornices\\nOocytes retrieved - \\nP/S - Vulva, Vagina, Cervix appear healthy\\nP/S - Vulva, Vagina, Cervix - Ectropion noted\\nFree fluid ..........\\nEasy procedure / Difficult procedure\\nMobile Ovary\\nTranscervical approach / Transuterine approach\\nProcedure completed\\nPuncture sited checked and ensure haemostasis\\nEstimated blood loss: \\nSwabs and Instruments count: Correct\\nFreeze All / Fresh Transfer - Commence Dubagest And Duphaston Today\\nCouple Informed of findings',
+    past_history: 'Stimulation protocol: Antagonist / PPOS / Agonist. Baseline AMH & AFC noted.',
+    examination: 'Post-OPU Check: BP: 110/70 mmHg | PR: 76 bpm | SpO2: 99% | P/A: Soft, non-distended | P/V: Haemostasis secured, minimal spotting.',
+    diagnosis: 'Controlled Ovarian Stimulation — Status Post Oocyte Retrieval (OPU Daycare)',
+    investigations: 'Embryology report: Total Oocytes retrieved, Cumulus complex grading, MII/MI/GV maturity, Semen prep parameters.',
+    plan: 'Advised:\\n1. Tab Dolo 650 Mg Three times a day x 3 days (10)\\n2. Tab Meprate 10 mg - 9 am - 9 pm x 10 days (20)\\n3. Can shower everyday\\n4. Abstinence for 1 week\\n5. Inform nurses on same day if fever, vomitings, loose motions, pain, foul smelling discharge\\n6. Medication - Husband to stop based on embryology report\\n7. Next appointment:\\n- Fresh embryo transfer on: \\n- Freeze all - Collect Embryology report on: \\n- Baseline Scan for FET on Day 1-2 of next period',
+  },
+  {
+    id: 'clinical_hysteroscopy_laparoscopy',
+    name: 'Operation - Hysteroscopy + Laparoscopy',
+    complaint: 'Diagnostic & Operative Hysteroscopy with Laparoscopy.',
+    hopi: 'Operation - Hysteroscopy + Laparoscopy\\nGynaecologist - \\nAssistant - \\nAnaesthetist - \\nOTA - \\nRunners: \\nAnaesthesia - LMA/GA\\nIV antibiotics Monocef 1 gm given pre-op\\nAfter anaesthesia, patient positioned in lithotomy\\nVagina and labia cleaned with betadine\\nDraped with ETO sterilised disposable drapes\\nStrict Aseptic precautions\\n\\nFindings:\\nSpeculum - Cervix, vulva and vagina appear healthy\\n\\nHYSTEROSCOPY:\\nHysteroscopy performed with normal saline to distend cavity.\\nCavity appears regular\\nEndometrium appears healthy - Endometrium shows increased vascularity - Strawberry appearances\\nBoth ostia seen\\nNo polyps or fibroids noted.\\n\\nSEPTUM:\\nSeptum noted at the fundus, 1 cm deep\\nSeptum resected using bipolar needle, L hook\\nCavity appears normal after septum resection\\n\\nSCARRING:\\nScarring noted at the \\nDissected with bipolar needle\\nCavity appears normal after scar division\\n\\nADHESIONS:\\nAdhesions noted at the \\nDissected with bipolar needle\\nCavity appears normal after adhesiolysis\\n\\nPOLYP:\\nPolyp noted on the ………… uterine wall measuring ……….. (Sessile/Pedunculated)\\nResected with bipolar needle cutting through the base.\\nCavity appears normal after polypectomy\\n\\nSUBMUCOUS FIBROID:\\nSubmucous fibroid noted on the ………… uterine wall measuring ……….. (Sessile/Pedunculated)\\nResected with bipolar needle cutting through the base.\\nBase resected with Collin/s knife and specimen retrieved\\nFibroid resected with bipolar resectoscope\\nD&C - Endometrial curettage done and send for HPE\\nCavity appears normal after fibroid resection\\n\\nLAPAROSCOPY:\\n3 port laparoscopy. Central post 1.5 inches above the umbilicus. Direct entry.\\nPneumoperitoneum with CO2 up to 12 mm Hg.\\nAdditional two 5 mm ports in left iliac fossa and above. Good view obtained.\\nUterus - Normal appearance\\nRight ovary - Mobile and appears normal\\nRight tube - Mobile & appears healthy. Fill and spill +\\nTubo-ovarian relation maintained\\nLeft ovary - Mobile and appears normal\\nLeft tube - Mobile & appears healthy. Fill and spill +\\nTubo-ovarian relation maintained\\nPOD, ovarian fossae & uterosacral ligaments inspected and all normal.\\nNo endometriosis seen. Haemostasis ensured.\\nSwabs and instruments counted and correct. EBL 20 ml.\\nPolysorb to rectus sheath 10 mm ports. Glue to the skin. Water proof dressings applied.\\n\\nLEOS: Both ovaries polycystic appearance. Ovarian drilling done with monopolar needle 4 seconds, 4 points in both ovaries.\\nENDOMETRIOMA: Endometrioma noted in right/left ovary measuring ... Adhesions noted. Cyst opened, chocolate material drained, capsule excised in toto. Haemostasis ensured. Specimen sent for HPE.\\nSALPINGECTOMY: Bilateral / Right / Left salpingectomy done using vessel sealer and bipolar energy. Specimen sent for HPE.\\nOVARIAN CYST: Removed intact and sent for HPE biopsy.\\nECTOPIC: Ectopic pregnancy in right/left tube. Salpingectomy done using bipolar energy with vessel sealer.',
+    past_history: 'Infertility duration, prior pelvic infections, past HSG/SSG findings.',
+    examination: 'Post-op Vitals: BP: 120/80 mmHg | PR: 78 bpm | SpO2: 99% | Ports: Dry and clean | P/A: Soft.',
+    diagnosis: 'Post Operative Hysteroscopy + Laparoscopy (Pelvic Endoscopy)',
+    investigations: 'HPE of resected tissue / curettings / cyst wall specimen.',
+    plan: 'POST-OP ORDERS & MEDICATION:\\n1. Tab Maxmentin 625 three times a day, after food x 5 days (15)\\n2. Tab Augxetil three times a day, after food x 5 days (15)\\n3. Tab Dox-T 100 mg Two times a day, after food x 14 days (28)\\n4. Tab Clindamycin 300 mg Two times a day, after food x 14 days (28)\\n5. Tab Acenakplus three times a day, after food x 3 days (9)\\n6. Tab Razole DSR Two times a day, before food x 5 days (10)\\n7. Tab Chymoral Forte three times a day, after food x 5 days (15)\\n8. Tab Novelon daily night at 9 PM (21 days / 42 days)\\n\\nAdvice:\\n- Can shower everyday\\n- Abstinence for 1 week / 3 weeks / 6 weeks\\n- Inform nurses on same day if fever, vomitings, loose motions, pain, foul smelling discharge\\n- Follow up after 1 week on: \\n- 3D scan after 6 weeks on: \\n\\nDoctor Signature with stamp (Name and Regn Number)',
+  },
+  {
+    id: 'clinical_hysteroscopy_plus',
+    name: 'Operation - Hysteroscopy +',
+    complaint: 'Elective Diagnostic & Operative Hysteroscopy.',
+    hopi: 'Operation - Hysteroscopy +\\nGynaecologist: \\nAssistant: \\nAnaesthetist: \\nOTA: \\nRunners: \\nAnaesthesia - IV Anaesthesia/LMA/GA\\nPre-Op Antibiotics Monocef 1 Grams IV\\nAfter anaesthesia, patient positioned in lithotomy\\nVagina and labia cleaned with betadine\\nDraped with ETO sterilised disposable drapes\\nStrict Aseptic precautions\\n\\nFindings:\\nSpeculum - Cervix, vulva and vagina appear healthy\\n\\nHYSTEROSCOPY:\\nAseptic precautions. Saline hysteroscopy.\\nBoth ostia seen. No polyps or fibroids noted.\\n\\nSEPTUM:\\nSeptum noted at the fundus, 1 cm deep\\nSeptum resected using bipolar needle, L hook\\nCavity appears normal after septum resection\\n\\nSCARRING:\\nScarring noted at the \\nDissected with bipolar needle\\nCavity appears normal after scar division\\n\\nADHESIONS:\\nAdhesions noted at the \\nDissected with bipolar needle\\nCavity appears normal after adhesiolysis\\n\\nPOLYP:\\nPolyp noted on the ………… uterine wall measuring ……….. (Sessile/Pedunculated)\\nResected with bipolar needle cutting through the base.\\nCavity appears normal after polypectomy\\n\\nSUBMUCOUS FIBROID:\\nSubmucous fibroid noted on the ………… uterine wall measuring ……….. (Sessile/Pedunculated)\\nResected with bipolar needle cutting through the base.\\nBase resected with Collin/s knife and specimen retrieved\\nFibroid resected with bipolar resectoscope\\nD&C - Endometrial curettage done and send for HPE\\nCavity appears normal after fibroid resection\\n\\nProcedure:\\nPatient cleaned and draped. Hysteroscopy performed with normal saline to distend cavity. Findings as above. EBL -   ml. Swabs and instruments counted and correct.',
+    past_history: 'Abnormal uterine bleeding, recurrent implantation failure, Asherman evaluation.',
+    examination: 'Post-procedure: Alert and stable. Vitals normal. Minimal PV spotting.',
+    diagnosis: 'Post Operative Hysteroscopy (Operative / Diagnostic)',
+    investigations: 'HPE of curettage / excised polyp / tissue.',
+    plan: 'POST-OP ORDERS & MEDICATION:\\n1. Tab Maxmentin 625 three times a day, after food x 5 days (15)\\n2. Tab Augxetil three times a day, after food x 5 days (15)\\n3. Tab Dox-T 100 mg Two times a day, after food x 14 days (28)\\n4. Tab Clindamycin 300 mg Two times a day, after food x 14 days (28)\\n5. Tab Acenakplus three times a day, after food x 3 days (9)\\n6. Tab Razole DSR Two times a day, before food x 5 days (10)\\n7. Tab Novelon daily night at 9 PM (21 days / 42 days)\\n\\nAdvice:\\n- Abstinence for 1 week / 3 weeks / 6 weeks\\n- Inform nurses on same day if fever, vomitings, loose motions, pain, foul smelling discharge\\n- Follow up after 1 week on: \\n- 3D scan after 6 weeks on: ',
+  },
+  {
     id: 'clinical_fertility_proforma',
     name: 'Fertility Consultation Proforma (WHO/ART)',
     complaint: 'Fertility Consultation. Couple evaluation for planned conception.',
@@ -83,6 +140,149 @@ export const COMMON_INVESTIGATION_OPTIONS = [
 ];
 
 export const RX_TEMPLATES: RxTemplate[] = [
+  {
+    id: 'rx_opu_discharge',
+    name: 'OPU Post-Egg Retrieval Discharge Rx',
+    category: 'Post-OPU / Daycare',
+    medications: [
+      {
+        drug_name: 'Tab Dolo 650 (Paracetamol)',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '3 days',
+        instructions: 'Three times a day after meals x 3 days (Total: 10 tabs)',
+      },
+      {
+        drug_name: 'Tab Meprate 10mg (Medroxyprogesterone Acetate)',
+        dose: '10mg',
+        frequency: 'BD',
+        duration: '10 days',
+        instructions: '9 AM - 9 PM after food x 10 days (Total: 20 tabs)',
+      },
+    ],
+    advice: 'Can shower everyday. Strict abstinence for 1 week. Inform nurses on same day if fever, vomitings, loose motions, pain, foul smelling discharge. Husband medication to stop based on embryology report. Report for next appointment / scan as scheduled.',
+  },
+  {
+    id: 'rx_hysteroscopy_laparoscopy_postop',
+    name: 'Hysteroscopy + Laparoscopy Comprehensive Post-Op Rx',
+    category: 'OT Endoscopy Post-Op',
+    medications: [
+      {
+        drug_name: 'Tab Maxmentin 625 (Amoxicillin + Clavulanic Acid)',
+        dose: '625mg',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Three times a day after food x 5 days (15 tabs)',
+      },
+      {
+        drug_name: 'Tab Augxetil (Cefuroxime Axetil)',
+        dose: '500mg',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Three times a day after food x 5 days (15 tabs)',
+      },
+      {
+        drug_name: 'Tab Dox-T 100mg (Doxycycline)',
+        dose: '100mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Two times a day after food x 14 days (28 tabs)',
+      },
+      {
+        drug_name: 'Tab Clindamycin 300mg',
+        dose: '300mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Two times a day after food x 14 days (28 tabs)',
+      },
+      {
+        drug_name: 'Tab Acenakplus (Aceclofenac + Paracetamol)',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '3 days',
+        instructions: 'Three times a day after food x 3 days (9 tabs)',
+      },
+      {
+        drug_name: 'Tab Razole DSR (Rabeprazole + Domperidone)',
+        dose: '1 cap',
+        frequency: 'BD',
+        duration: '5 days',
+        instructions: 'Two times a day before food x 5 days (10 caps)',
+      },
+      {
+        drug_name: 'Tab Chymoral Forte',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Three times a day 30 mins before food x 5 days (15 tabs)',
+      },
+      {
+        drug_name: 'Tab Novelon (Desogestrel + Ethinylestradiol)',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '21 days',
+        instructions: 'Daily night at 9:00 PM for 21 days (or 42 days as indicated)',
+      },
+    ],
+    advice: 'Can shower everyday. Abstinence for 1 to 6 weeks as advised. Inform nurses immediately if fever, vomits, or severe pain. Follow up after 1 week; 3D scan scheduled after 6 weeks.',
+  },
+  {
+    id: 'rx_hysteroscopy_postop',
+    name: 'Hysteroscopy + Post-Op Medication Protocol',
+    category: 'OT Endoscopy Post-Op',
+    medications: [
+      {
+        drug_name: 'Tab Maxmentin 625',
+        dose: '625mg',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Three times a day after food x 5 days (15 tabs)',
+      },
+      {
+        drug_name: 'Tab Augxetil',
+        dose: '500mg',
+        frequency: 'TDS',
+        duration: '5 days',
+        instructions: 'Three times a day after food x 5 days (15 tabs)',
+      },
+      {
+        drug_name: 'Tab Dox-T 100mg',
+        dose: '100mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Two times a day after food x 14 days (28 tabs)',
+      },
+      {
+        drug_name: 'Tab Clindamycin 300mg',
+        dose: '300mg',
+        frequency: 'BD',
+        duration: '14 days',
+        instructions: 'Two times a day after food x 14 days (28 tabs)',
+      },
+      {
+        drug_name: 'Tab Acenakplus',
+        dose: '1 tab',
+        frequency: 'TDS',
+        duration: '3 days',
+        instructions: 'Three times a day after food x 3 days (9 tabs)',
+      },
+      {
+        drug_name: 'Tab Razole DSR',
+        dose: '1 cap',
+        frequency: 'BD',
+        duration: '5 days',
+        instructions: 'Two times a day before food x 5 days (10 caps)',
+      },
+      {
+        drug_name: 'Tab Novelon',
+        dose: '1 tab',
+        frequency: 'OD',
+        duration: '21 days',
+        instructions: 'Daily night at 9:00 PM for 21 days (or 42 days)',
+      },
+    ],
+    advice: 'Abstinence for 1 to 3 weeks. Inform nurses if fever or severe pain occurs. Follow up visit after 1 week. 3D pelvic ultrasound scan after 6 weeks.',
+  },
   {
     id: 'rx_antagonist_stim',
     name: 'Antagonist Protocol Daily Stimulation Rx',
@@ -473,3 +673,57 @@ export const RX_TEMPLATES: RxTemplate[] = [
   },
 ];
 
+
+/**
+ * Safely extracts clinical template fields from database records regardless of schema variations
+ */
+export function extractClinicalTemplateData(t: any): ClinicalTemplateItem {
+  const schema = t?.schema_json || {};
+
+  let complaint = schema.complaint || schema.chief_complaints || schema.chief_complaint || '';
+  let hopi = schema.hopi || schema.present_history || schema.history_of_illness || schema.hpi || '';
+  let diagnosis = schema.diagnosis || schema.provisional_diagnosis || schema.assessment || '';
+  let investigations = schema.investigations || schema.planned_investigations || schema.investigations_to_be_advised || '';
+  let plan = schema.plan || schema.treatment_plan || schema.treatment_notes || schema.management_plan || '';
+  let past_history = schema.past_history || schema.previous_history || '';
+  let examination = schema.examination || schema.clinical_examination || '';
+  let female_investigations = schema.female_investigations || '';
+  let male_investigations = schema.male_investigations || '';
+
+  // If schema is saved as an array of form builder fields
+  if (Array.isArray(schema)) {
+    for (const f of schema) {
+      const fid = (f.id || '').toLowerCase();
+      const flabel = (f.label || '').toLowerCase();
+      const val = f.value || f.defaultValue || f.placeholder || '';
+      if (!val) continue;
+
+      if (!complaint && (fid.includes('complaint') || flabel.includes('complaint'))) {
+        complaint = val;
+      } else if (!hopi && (fid.includes('hopi') || fid.includes('history') || flabel.includes('history') || flabel.includes('hopi'))) {
+        hopi = val;
+      } else if (!diagnosis && (fid.includes('diag') || flabel.includes('diagnosis'))) {
+        diagnosis = val;
+      } else if (!investigations && (fid.includes('investig') || flabel.includes('investigation') || flabel.includes('test'))) {
+        investigations = val;
+      } else if (!plan && (fid.includes('plan') || fid.includes('treatment') || flabel.includes('plan') || flabel.includes('treatment'))) {
+        plan = val;
+      }
+    }
+  }
+
+  return {
+    id: t.id,
+    name: t.title || 'Untitled Clinical Template',
+    isCustom: true,
+    complaint,
+    hopi,
+    diagnosis,
+    investigations,
+    plan,
+    past_history,
+    examination,
+    female_investigations,
+    male_investigations,
+  };
+}

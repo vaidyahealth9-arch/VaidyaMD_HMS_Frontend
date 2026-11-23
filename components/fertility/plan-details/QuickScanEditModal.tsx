@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { parseFollicleTokens, isProcedureName } from './utils';
+import { MedicineAutocompleteInput } from '@/components/common';
 
 export type DayEventCategory = 'scan' | 'medication' | 'lab' | 'procedure';
 
@@ -46,6 +47,9 @@ export default function QuickScanEditModal({
     procedures: Array.isArray(day?.procedures) ? [...day.procedures] : [],
     right_follicles: day?.right_follicles || '',
     left_follicles: day?.left_follicles || '',
+    right_afc: day?.right_afc || day?.afc_right || '',
+    left_afc: day?.left_afc || day?.afc_left || '',
+    afc: day?.afc || '',
     endometrium_mm: day?.endometrium_mm || '',
     endometrial_pattern: day?.endometrial_pattern || 'Trilaminar',
     e2_pgml: day?.e2_pgml || '',
@@ -180,6 +184,11 @@ export default function QuickScanEditModal({
 
     // If scan was edited, ensure scan title is reflected
     const updated = { ...currentDay };
+    const rAfc = parseFloat(updated.right_afc);
+    const lAfc = parseFloat(updated.left_afc);
+    if (!isNaN(rAfc) || !isNaN(lAfc)) {
+      updated.afc = String((isNaN(rAfc) ? 0 : rAfc) + (isNaN(lAfc) ? 0 : lAfc));
+    }
     if (scanType && !isProcedureName(scanType)) {
       if (!updated.scans.includes(scanType)) {
         updated.scans = [...updated.scans, scanType];
@@ -235,7 +244,7 @@ export default function QuickScanEditModal({
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>🩺 Scan</span>
+            <span>Scan</span>
           </button>
           <button
             type="button"
@@ -247,7 +256,7 @@ export default function QuickScanEditModal({
             }`}
           >
             <Pill className="w-3.5 h-3.5" />
-            <span>💊 Medication</span>
+            <span>Medication</span>
           </button>
           <button
             type="button"
@@ -259,7 +268,7 @@ export default function QuickScanEditModal({
             }`}
           >
             <Droplet className="w-3.5 h-3.5" />
-            <span>🩸 Lab Test</span>
+            <span>Lab Test</span>
           </button>
           <button
             type="button"
@@ -271,7 +280,7 @@ export default function QuickScanEditModal({
             }`}
           >
             <Syringe className="w-3.5 h-3.5" />
-            <span>🧫 Procedure</span>
+            <span>Procedure</span>
           </button>
         </div>
 
@@ -386,13 +395,14 @@ export default function QuickScanEditModal({
                 ))}
 
               {/* Scan summary chip */}
-              {(currentDay.endometrium_mm || currentDay.right_follicles || currentDay.left_follicles) && (
+              {(currentDay.endometrium_mm || currentDay.right_follicles || currentDay.left_follicles || currentDay.right_afc || currentDay.left_afc) && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-sky-100 text-sky-900 border border-sky-300 px-2 py-0.5 rounded-md">
                   <Activity className="w-3 h-3 text-sky-700" />
                   <span>
                     ET {currentDay.endometrium_mm || '-'}mm
                     {currentDay.right_follicles ? ` · R:${currentDay.right_follicles}` : ''}
                     {currentDay.left_follicles ? ` · L:${currentDay.left_follicles}` : ''}
+                    {currentDay.right_afc || currentDay.left_afc ? ` · AFC: R-${currentDay.right_afc || 0}, L-${currentDay.left_afc || 0}` : ''}
                   </span>
                 </span>
               )}
@@ -418,7 +428,7 @@ export default function QuickScanEditModal({
                   Scan Checkpoint / Title
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {['Baseline TVS Scan', 'Follicle Tracking', 'Trigger Scan', 'Endometrial Receptivity'].map(
+                  {['Baseline TVS Scan', 'Antral Follicle Count (AFC)', 'Follicle Tracking', 'Trigger Scan', 'Endometrial Receptivity'].map(
                     (title) => (
                       <button
                         key={title}
@@ -512,6 +522,59 @@ export default function QuickScanEditModal({
                 </div>
               </div>
 
+              {/* Antral Follicle Count (AFC) Suite */}
+              <div className="bg-teal-50/50 border border-teal-200/70 rounded-xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-teal-900 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                    Antral Follicle Count (AFC Option)
+                  </span>
+                  {(currentDay.right_afc || currentDay.left_afc) && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-600 text-white shadow-2xs">
+                      Total AFC: {(() => {
+                        const r = parseFloat(currentDay.right_afc);
+                        const l = parseFloat(currentDay.left_afc);
+                        if (!isNaN(r) && !isNaN(l)) return r + l;
+                        if (!isNaN(r)) return r;
+                        if (!isNaN(l)) return l;
+                        return `${currentDay.right_afc || ''}/${currentDay.left_afc || ''}`;
+                      })()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-teal-950 block mb-1">
+                      Right Ovary AFC
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 8"
+                      value={currentDay.right_afc}
+                      onChange={(e) =>
+                        setCurrentDay({ ...currentDay, right_afc: e.target.value })
+                      }
+                      className="w-full text-xs py-1.5 px-3 border border-teal-300/80 rounded-lg font-bold text-slate-900 bg-white focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-teal-950 block mb-1">
+                      Left Ovary AFC
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 7"
+                      value={currentDay.left_afc}
+                      onChange={(e) =>
+                        setCurrentDay({ ...currentDay, left_afc: e.target.value })
+                      }
+                      className="w-full text-xs py-1.5 px-3 border border-teal-300/80 rounded-lg font-bold text-slate-900 bg-white focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -579,11 +642,11 @@ export default function QuickScanEditModal({
                     </button>
                   ))}
                 </div>
-                <input
-                  type="text"
+                <MedicineAutocompleteInput
                   placeholder="e.g. Follisurge (rFSH)"
                   value={medForm.name}
-                  onChange={(e) => setMedForm({ ...medForm, name: e.target.value })}
+                  onChange={(val) => setMedForm({ ...medForm, name: val })}
+                  onSelect={(item) => setMedForm({ ...medForm, name: item.drug })}
                   className="w-full text-xs py-2 px-3 border border-slate-300 rounded-lg text-slate-900 font-semibold"
                 />
               </div>

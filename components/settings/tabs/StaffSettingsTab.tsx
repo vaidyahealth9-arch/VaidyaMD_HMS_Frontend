@@ -48,6 +48,7 @@ export default function StaffSettingsTab({
     reg_number: string;
     phone: string;
     departments: string[];
+    consultation_fee: number;
     is_active: boolean;
   }>({
     name: '',
@@ -61,6 +62,7 @@ export default function StaffSettingsTab({
     reg_number: '',
     phone: '',
     departments: ['Reproductive Medicine & Infertility', 'Outpatient Department (OPD)'],
+    consultation_fee: 500,
     is_active: true,
   });
 
@@ -130,6 +132,7 @@ export default function StaffSettingsTab({
           qualification: staffForm.qualification,
           reg_number: staffForm.reg_number,
           phone: staffForm.phone,
+          consultation_fee: Number(staffForm.consultation_fee) || 500,
           departments: deptsArray,
           is_active: effectiveIsActive,
           ...(staffForm.password ? { password: staffForm.password } : {}),
@@ -151,6 +154,7 @@ export default function StaffSettingsTab({
           qualification: staffForm.qualification,
           reg_number: staffForm.reg_number,
           phone: staffForm.phone,
+          consultation_fee: Number(staffForm.consultation_fee) || 500,
           departments: deptsArray,
         });
         alert('Staff user created successfully!');
@@ -289,6 +293,7 @@ export default function StaffSettingsTab({
                 reg_number: '',
                 phone: '',
                 departments: ['Reproductive Medicine & Infertility', 'Outpatient Department (OPD)'],
+    consultation_fee: 500,
                 is_active: true,
               });
               setShowAddStaffModal(true);
@@ -466,6 +471,7 @@ export default function StaffSettingsTab({
                                 qualification: userItem.qualification || '',
                                 reg_number: userItem.reg_number || '',
                                 phone: userItem.phone || '',
+                                consultation_fee: userItem.consultation_fee !== undefined ? Number(userItem.consultation_fee) : 500,
                                 departments: deptsList.length > 0
                                   ? deptsList
                                   : isDoctor

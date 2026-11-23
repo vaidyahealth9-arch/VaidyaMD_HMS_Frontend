@@ -260,3 +260,37 @@ export function amountInWords(amount: number | string): string {
   }
   return `${res} Only`;
 }
+
+/** Safely casts any unknown value, object, or array into a renderable string to prevent Minified React Error #31 */
+export function safeString(val: any, fallback = ''): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) {
+    return val.map((v) => safeString(v)).filter(Boolean).join(', ');
+  }
+  if (typeof val === 'object') {
+    if (typeof val.name === 'string') return val.name;
+    if (typeof val.label === 'string') return val.label;
+    if (typeof val.title === 'string') return val.title;
+    if (typeof val.text === 'string') return val.text;
+    if (typeof val.notes === 'string') return val.notes;
+    if (typeof val.diagnosis === 'string') return val.diagnosis;
+    if (typeof val.complaint === 'string') return val.complaint;
+    if (typeof val.value === 'string') return val.value;
+    try {
+      const s = JSON.stringify(val);
+      return s === '{}' ? fallback : s;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+/** Ensures clinician name has a single canonical "Dr." prefix without duplicates like "Dr. Dr." */
+export function formatDoctorName(name?: string, fallback = 'Dr. Clinician'): string {
+  if (!name || !name.trim()) return fallback;
+  const clean = name.replace(/^(dr\.?\s*)+/i, '').trim();
+  return clean ? `Dr. ${clean}` : fallback;
+}

@@ -20,7 +20,13 @@ export default function WorkbenchTab({
   activeAppointment: propActiveAppt,
   onBack,
 }: WorkbenchTabProps) {
-  const activeAppointment = appointment || propActiveAppt;
+  const rawAppointment = appointment || propActiveAppt;
+  const isAppointmentActive =
+    rawAppointment &&
+    rawAppointment.status !== 'completed' &&
+    rawAppointment.status !== 'cancelled';
+  const activeAppointment = isAppointmentActive ? rawAppointment : undefined;
+
   const enrichedPatient = patient
     ? {
         ...patient,
@@ -35,7 +41,11 @@ export default function WorkbenchTab({
         patient={enrichedPatient}
         partner={partner || patient?.partner}
         appointment={activeAppointment}
-        triageData={activeAppointment?.metadata_?.triage || activeAppointment?.metadata?.triage}
+        triageData={
+          isAppointmentActive
+            ? (activeAppointment?.metadata_?.triage || activeAppointment?.metadata?.triage)
+            : undefined
+        }
         onBack={onBack}
       />
     </div>

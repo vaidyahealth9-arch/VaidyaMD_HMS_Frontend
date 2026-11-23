@@ -9,10 +9,10 @@ import { useForm, useFieldArray } from 'react-hook-form';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { patientsApi, opdApi, appointmentsApi, counselingApi, CounselingNote, billingApi, pharmacyApi, authApi } from '@/lib/api';
+import { patientsApi, opdApi, templatesApi, appointmentsApi, counselingApi, CounselingNote, billingApi, pharmacyApi, authApi } from '@/lib/api';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { isUserDoctor } from '@/lib/utils';
+import { isUserDoctor, formatDoctorName, getTodayIst, formatDateToIst } from '@/lib/utils';
 
 import {
 
@@ -121,6 +121,7 @@ import { calculateBMI, formatDateTime } from '@/lib/utils';
 import {
 
   CLINICAL_TEMPLATES,
+  extractClinicalTemplateData,
 
   RxTemplate,
 
@@ -137,7 +138,6 @@ export default function OPDWorkbench({
   patientId,
 
   patient: propPatient,
-
   partner: propPartner,
 
   triageData,
@@ -151,7 +151,6 @@ export default function OPDWorkbench({
   patientId?: string;
 
   patient?: any;
-
   partner?: any;
 
   triageData?: any;
@@ -162,7 +161,10 @@ export default function OPDWorkbench({
 
 }) {
 
-  const { user } = useAuth();
+  const { user, activeRole } = useAuth();
+  const userRole = (user?.role || activeRole || '').toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'hospital_admin';
+  const isClinicianUser = isUserDoctor(user);
 
   const queryClient = useQueryClient();
 
@@ -181,6 +183,8 @@ export default function OPDWorkbench({
   const [printablePrescription, setPrintablePrescription] = useState<any>(null);
 
   const [activeConsultationRecordId, setActiveConsultationRecordId] = useState<string | null>(null);
+
+
 
   const [showEditAlertsModal, setShowEditAlertsModal] = useState(false);
 
@@ -225,7 +229,14 @@ export default function OPDWorkbench({
 
   const searchParams = useSearchParams();
   const autoPrintRef = useRef(false);
-  const [workbenchMode, setWorkbenchMode] = useState<'doctor' | 'nurse'>(user?.role === 'nurse' ? 'nurse' : 'doctor');
+  const isNurseUser = userRole === 'nurse';
+  const [workbenchMode, setWorkbenchMode] = useState<'doctor' | 'nurse'>(isNurseUser ? 'nurse' : 'doctor');
+
+  useEffect(() => {
+    if (isNurseUser && workbenchMode !== 'nurse') {
+      setWorkbenchMode('nurse');
+    }
+  }, [isNurseUser, workbenchMode]);
 
 
 
@@ -266,107 +277,70 @@ export default function OPDWorkbench({
 
 
 
-  const rawPatient = propPatient || queryPatient;
-  const partner = propPartner || rawPatient?.partner;
-  const patient = rawPatient ? { ...rawPatient, partner: partner || rawPatient.partner } : rawPatient;
+  const patient = propPatient || queryPatient;
 
   const activeAlerts = localAlerts !== null ? localAlerts : (patient?.alert_notes || []);
 
 
 
-  // Fetch custom templates from backend
-
-  const { data: customClinicalData = [], refetch: refetchClinicalTemplates } = useQuery({
-
-    queryKey: ['custom-clinical-templates'],
-
+  // Fetch all custom clinical & rx templates from backend repository
+  const { data: allTemplatesFromDb = [], refetch: refetchAllTemplates } = useQuery({
+    queryKey: ['all-hospital-templates'],
     queryFn: async () => {
-
       try {
-
+        const res = await templatesApi.list();
+        if (Array.isArray(res) && res.length > 0) return res;
+      } catch (err) {
+        console.error('templatesApi.list failed, trying opdApi fallback', err);
+      }
+      try {
         const res = await opdApi.getTemplates('clinical_template');
-
-        if (Array.isArray(res)) {
-
-          return res.map((t: any) => ({
-
-            id: t.id,
-
-            name: t.title,
-
-            isCustom: true,
-
-            complaint: t.schema_json?.complaint || '',
-
-            hopi: t.schema_json?.hopi || '',
-
-            diagnosis: t.schema_json?.diagnosis || '',
-
-            investigations: t.schema_json?.investigations || '',
-
-            plan: t.schema_json?.plan || '',
-
-          }));
-
-        }
-
+        if (Array.isArray(res)) return res;
       } catch (err) {
-
-        console.error('Failed to load custom clinical templates', err);
-
+        console.error('Fallback getTemplates failed', err);
       }
-
       return [];
-
     },
-
   });
 
+  const refetchClinicalTemplates = refetchAllTemplates;
+  const refetchRxTemplates = refetchAllTemplates;
 
-
-  const { data: customRxData = [], refetch: refetchRxTemplates } = useQuery({
-
-    queryKey: ['custom-rx-templates'],
-
-    queryFn: async () => {
-
-      try {
-
-        const res = await opdApi.getTemplates('rx_template');
-
-        if (Array.isArray(res)) {
-
-          return res.map((t: any) => ({
-
-            id: t.id,
-
-            name: t.title,
-
-            isCustom: true,
-
-            category: t.schema_json?.category || 'General',
-
-            medications: t.schema_json?.medications || [],
-
-            advice: t.schema_json?.advice || '',
-
-          }));
-
+  const customClinicalData = useMemo(() => {
+    return allTemplatesFromDb
+      .filter((t: any) => {
+        const pId = (t.plugin_id || '').toLowerCase();
+        const rType = (t.record_type || '').toLowerCase();
+        if (pId === 'rx_template' || rType.startsWith('rx_') || pId === 'appointment_visit_type' || rType.startsWith('visit_')) {
+          return false;
         }
+        return true;
+      })
+      .map((t: any) => extractClinicalTemplateData(t));
+  }, [allTemplatesFromDb]);
 
-      } catch (err) {
-
-        console.error('Failed to load custom rx templates', err);
-
-      }
-
-      return [];
-
-    },
-
-  });
-
-
+  const customRxData = useMemo(() => {
+    return allTemplatesFromDb
+      .filter((t: any) => {
+        const pId = (t.plugin_id || '').toLowerCase();
+        const rType = (t.record_type || '').toLowerCase();
+        return (
+          pId === 'rx_template' ||
+          rType.startsWith('rx_') ||
+          rType.includes('stim') ||
+          rType.includes('protocol') ||
+          (t.schema_json && Array.isArray(t.schema_json.medications) && t.schema_json.medications.length > 0)
+        );
+      })
+      .map((t: any) => ({
+        id: t.id,
+        name: t.title,
+        isCustom: true,
+        category: t.schema_json?.category || 'General',
+        medications: Array.isArray(t.schema_json?.medications) ? t.schema_json.medications : [],
+        advice: t.schema_json?.advice || '',
+      }));
+  }, [allTemplatesFromDb]);
 
   const allClinicalTemplates: ClinicalTemplateItem[] = useMemo(() => {
 
@@ -551,134 +525,119 @@ export default function OPDWorkbench({
 
 
   // Active or linked appointment
-
   const currentAppointment = useMemo(() => {
-
-    if (appointment) return appointment;
-
+    if (appointment) {
+      if (appointment.status === 'completed' || appointment.status === 'cancelled') {
+        return null;
+      }
+      return appointment;
+    }
     if (!patientAppointments || patientAppointments.length === 0) return null;
 
-    return (
+    // Strict appointment resolution:
+    // Only link an appointment if it is scheduled for TODAY and is still active (not completed or cancelled)
+    const todayStr = getTodayIst();
+    const activeTodayAppt = patientAppointments.find((a: any) => {
+      if (a.status === 'completed' || a.status === 'cancelled') return false;
+      const apptDate = a.scheduled_at ? formatDateToIst(a.scheduled_at) : (a.appointment_date || '');
+      return apptDate === todayStr && ['waiting', 'in_progress', 'scheduled', 'in_consultation', 'arrived'].includes(a.status);
+    });
 
-      patientAppointments.find((a: any) => a.metadata?.triage || a.metadata_?.triage) ||
-
-      patientAppointments.find((a: any) => a.status === 'scheduled' || a.status === 'in_consultation' || a.status === 'arrived') ||
-
-      patientAppointments[0]
-
-    );
-
+    return activeTodayAppt || null;
   }, [appointment, patientAppointments]);
+
+  const activeRecord = activeConsultationRecordId
+    ? consultationHistory?.find((r: any) => r.id === activeConsultationRecordId)
+    : null;
+  const activeRecordDocName = activeRecord?.data?.doctor?.name || activeRecord?.data?.doctor_name || activeRecord?.created_by_name;
+  const consultationDoctorName = formatDoctorName(
+    activeRecordDocName || currentAppointment?.doctor_name || (currentAppointment as any)?.doctor?.name || patient?.treating_doctor_name || 'Consultant'
+  );
+  const canEditConsultation = activeConsultationRecordId ? isAdmin : (isAdmin || isClinicianUser);
 
 
 
   // Compute effective triage data across all sources (Appointment, Props, or Past Nurse Triage Records)
-
   const effectiveTriage = useMemo(() => {
+    // 1. If viewing an existing past consultation record, triage linking is not applicable
+    if (activeConsultationRecordId) {
+      return null;
+    }
 
-    // 1. Explicit triageData prop
+    // 2. If there is no active appointment, or if current appointment is completed or cancelled, do NOT pull triage!
+    if (!currentAppointment || currentAppointment.status === 'completed' || currentAppointment.status === 'cancelled') {
+      return null;
+    }
 
+    // 3. Check if this appointment's triage was already linked to an existing completed consultation
+    const alreadyMerged = consultationHistory?.some(
+      (r: any) => (r.data?.appointment_id === currentAppointment.id || r.appointment_id === currentAppointment.id) && r.id !== activeConsultationRecordId
+    );
+    if (alreadyMerged) {
+      return null;
+    }
+
+    // 4. Explicit triageData prop (only valid if current appointment is active and not merged)
     if (triageData?.vitals || triageData?.chief_complaint || triageData?.provisional_diagnosis || triageData?.diagnosis) {
-
       return {
-
         vitals: triageData.vitals,
-
         chief_complaint: triageData.chief_complaint,
-
         nurse_notes: triageData.nurse_notes,
-
         provisional_diagnosis: triageData.provisional_diagnosis || triageData.diagnosis,
-
         source: 'Appointment Triage',
-
       };
-
     }
 
     // 2. Appointment triage metadata
-
     const apptTriage = currentAppointment?.metadata?.triage || currentAppointment?.metadata_?.triage;
-
     if (apptTriage?.vitals || apptTriage?.chief_complaint || apptTriage?.provisional_diagnosis || apptTriage?.diagnosis) {
-
       return {
-
         vitals: apptTriage.vitals,
-
         chief_complaint: apptTriage.chief_complaint,
-
         nurse_notes: apptTriage.nurse_notes,
-
         provisional_diagnosis: apptTriage.provisional_diagnosis || apptTriage.diagnosis,
-
         source: 'Appointment Triage',
-
       };
-
     }
 
-    // 3. Latest nurse triage record from consultationHistory
-
-    const triageRecord = consultationHistory?.find(
-
-      (r: any) => r.record_type === 'nurse_triage' || r.data?.record_type === 'nurse_triage' || (r.data?.vitals && !r.data?.plan)
-
-    );
+    // 3. Nurse triage record only if it explicitly belongs to this current appointment and is not completed
+    const triageRecord = currentAppointment?.id && consultationHistory
+      ? consultationHistory.find(
+          (r: any) =>
+            (r.data?.appointment_id === currentAppointment.id || r.appointment_id === currentAppointment.id) &&
+            (r.record_type === 'nurse_triage' || r.data?.record_type === 'nurse_triage') &&
+            r.data?.status !== 'completed'
+        )
+      : null;
 
     if (triageRecord) {
-
       return {
-
         vitals: triageRecord.data?.vitals || {
-
           bp:
-
             triageRecord.data?.blood_pressure_systolic && triageRecord.data?.blood_pressure_diastolic
-
               ? `${triageRecord.data.blood_pressure_systolic}/${triageRecord.data.blood_pressure_diastolic}`
-
               : undefined,
-
           hr: triageRecord.data?.heart_rate,
-
           rr: triageRecord.data?.respiratory_rate,
-
           temp: triageRecord.data?.temperature,
-
           spo2: triageRecord.data?.spo2,
-
           weight: triageRecord.data?.weight,
-
           height: triageRecord.data?.height,
-
           bmi: triageRecord.data?.bmi,
-
         },
-
         chief_complaint: triageRecord.data?.chief_complaints || triageRecord.data?.chief_complaint,
-
         nurse_notes: triageRecord.data?.nurse_notes,
-
         provisional_diagnosis: triageRecord.data?.provisional_diagnosis || triageRecord.data?.diagnosis,
-
         cvs_findings: triageRecord.data?.cvs_findings,
-
         cns_findings: triageRecord.data?.cns_findings,
-
         rs_findings: triageRecord.data?.rs_findings,
-
         record_id: triageRecord.id,
-
         source: 'Nurse Triage Record',
-
       };
-
     }
 
     return null;
-
-  }, [triageData, currentAppointment, consultationHistory]);
+  }, [triageData, currentAppointment, consultationHistory, activeConsultationRecordId]);
 
 
 
@@ -736,6 +695,14 @@ export default function OPDWorkbench({
 
       investigations_to_be_advised: '',
 
+      female_investigations: '',
+
+      male_investigations: '',
+
+      female_medications: [] as any[],
+
+      male_medications: [] as any[],
+
       treatment_notes: '',
 
       future_consultation_notes: '',
@@ -772,7 +739,8 @@ export default function OPDWorkbench({
   // Auto-populate Triage Data into form fields whenever effectiveTriage updates
 
   useEffect(() => {
-
+    // Never overwrite loaded consultation with triage
+    if (activeConsultationRecordId) return;
     if (effectiveTriage) {
 
       const v = effectiveTriage.vitals;
@@ -806,9 +774,10 @@ export default function OPDWorkbench({
       }
 
       if (effectiveTriage.chief_complaint) {
-
-        setValue('chief_complaints', effectiveTriage.chief_complaint);
-
+        const curComplaint = getValues('chief_complaints');
+        if (!curComplaint || /^[.\s\-_]*$/.test(curComplaint.trim())) {
+          setValue('chief_complaints', effectiveTriage.chief_complaint);
+        }
       }
 
       if (effectiveTriage.nurse_notes) {
@@ -1001,9 +970,9 @@ export default function OPDWorkbench({
 
 
 
-    const proformaFemaleMeds = resolvePrescriptionMeds(proforma?.femaleMedications || []);
+    const proformaFemaleMeds = resolvePrescriptionMeds(formVals.female_medications || proforma?.femaleMedications || []);
 
-    const proformaMaleMeds = resolvePrescriptionMeds(proforma?.maleMedications || []);
+    const proformaMaleMeds = resolvePrescriptionMeds(formVals.male_medications || proforma?.maleMedications || []);
 
     const hasCoupleMeds = proformaFemaleMeds.length > 0 || proformaMaleMeds.length > 0;
 
@@ -1088,7 +1057,12 @@ export default function OPDWorkbench({
 
       differentialDiagnosis: formVals.differential_diagnosis,
 
-      investigations: formVals.investigations_to_be_advised || formVals.investigations_ordered || formVals.previous_investigations,
+      investigations: (formVals.female_investigations || formVals.male_investigations)
+        ? [
+            formVals.female_investigations ? `[Female Investigations]\n${formVals.female_investigations}` : '',
+            formVals.male_investigations ? `[Male Investigations]\n${formVals.male_investigations}` : '',
+          ].filter(Boolean).join('\n\n')
+        : (formVals.investigations_to_be_advised || formVals.investigations_ordered || formVals.previous_investigations),
 
       medications: meds,
 
@@ -1310,6 +1284,15 @@ export default function OPDWorkbench({
         medications: [],
 
         clinical_proforma: null,
+        weight: '',
+        height: '',
+        bmi: '',
+        blood_pressure_systolic: '',
+        blood_pressure_diastolic: '',
+        heart_rate: '',
+        respiratory_rate: '',
+        temperature: '',
+        spo2: '',
 
       });
 
@@ -1435,30 +1418,19 @@ export default function OPDWorkbench({
 
     mutationFn: (formData: any) => {
 
+      const bpValue = formData.blood_pressure_systolic && formData.blood_pressure_diastolic
+        ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
+        : (formData.bp || effectiveTriage?.vitals?.bp || undefined);
+
       const vitalsPayload = {
-
-        bp:
-
-          formData.blood_pressure_systolic && formData.blood_pressure_diastolic
-
-            ? `${formData.blood_pressure_systolic}/${formData.blood_pressure_diastolic}`
-
-            : undefined,
-
-        hr: formData.heart_rate,
-
-        rr: formData.respiratory_rate,
-
-        temp: formData.temperature,
-
-        spo2: formData.spo2,
-
-        weight: formData.weight,
-
-        height: formData.height,
-
-        bmi: formData.bmi,
-
+        bp: bpValue,
+        hr: formData.heart_rate || effectiveTriage?.vitals?.hr || undefined,
+        rr: formData.respiratory_rate || effectiveTriage?.vitals?.rr || undefined,
+        temp: formData.temperature || effectiveTriage?.vitals?.temp || undefined,
+        spo2: formData.spo2 || effectiveTriage?.vitals?.spo2 || undefined,
+        weight: formData.weight || effectiveTriage?.vitals?.weight || undefined,
+        height: formData.height || effectiveTriage?.vitals?.height || undefined,
+        bmi: formData.bmi || effectiveTriage?.vitals?.bmi || undefined,
       };
 
 
@@ -1827,9 +1799,9 @@ export default function OPDWorkbench({
 
     const proforma = data.clinical_proforma || getValues('clinical_proforma');
 
-    const proformaFemaleMeds = resolvePrescriptionMeds(proforma?.femaleMedications || []);
+    const proformaFemaleMeds = resolvePrescriptionMeds(data.female_medications || proforma?.femaleMedications || []);
 
-    const proformaMaleMeds = resolvePrescriptionMeds(proforma?.maleMedications || []);
+    const proformaMaleMeds = resolvePrescriptionMeds(data.male_medications || proforma?.maleMedications || []);
 
     const isFertility = clinicalHistoryTemplate === 'fertility';
 
@@ -1906,6 +1878,16 @@ export default function OPDWorkbench({
     setValue('investigations_to_be_advised', tmpl.investigations);
 
     setValue('treatment_notes', tmpl.plan);
+
+    if (tmpl.past_history) setValue('previous_history', tmpl.past_history);
+    if (tmpl.examination) setValue('examination', tmpl.examination);
+    if (tmpl.female_investigations) {
+      setValue('female_investigations', tmpl.female_investigations);
+      setValue('investigations_to_be_advised', tmpl.female_investigations);
+    }
+    if (tmpl.male_investigations) {
+      setValue('male_investigations', tmpl.male_investigations);
+    }
 
     toast.success('Clinical Template Applied', `Loaded "${tmpl.name}"`);
 
@@ -2261,6 +2243,7 @@ export default function OPDWorkbench({
         workbenchMode={workbenchMode}
 
         setWorkbenchMode={setWorkbenchMode}
+        isNurse={isNurseUser}
 
         onBack={onBack}
 
@@ -2486,34 +2469,36 @@ export default function OPDWorkbench({
 
             <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="space-y-5 w-full pb-24">
 
-              {/* Active Consultation In-Place Update Alert */}
-
+              {/* Active Consultation In-Place Update or Read-Only Alert */}
               {activeConsultationRecordId && (
-
-                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between shadow-2xs animate-in fade-in">
-
+                <div className={`p-3 rounded-lg flex items-center justify-between shadow-2xs animate-in fade-in ${
+                  canEditConsultation ? 'bg-amber-50 border border-amber-300' : 'bg-blue-50/80 border border-blue-200'
+                }`}>
                   <div className="flex items-center gap-2.5">
-
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-
+                    <span className={`w-2.5 h-2.5 rounded-full ${canEditConsultation ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'}`} />
                     <div>
-
-                      <p className="text-xs font-bold text-amber-950">Editing Existing Consultation (In-Place Update Mode)</p>
-
-                      <p className="text-[10px] text-amber-700">Any changes saved will directly update this consultation in EMR without creating duplicates.</p>
-
+                      {canEditConsultation ? (
+                        <>
+                          <p className="text-xs font-bold text-amber-950">Editing Existing Consultation (Admin In-Place Update Mode)</p>
+                          <p className="text-[10px] text-amber-700">Any changes saved will directly update this consultation in EMR without creating duplicates.</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-bold text-blue-950">
+                            Consultation Assigned to {formatDoctorName(consultationDoctorName)}. You are viewing in read-only mode.
+                          </p>
+                          <p className="text-[10px] text-blue-700">
+                            Only an administrator may modify this consultation.
+                          </p>
+                        </>
+                      )}
                     </div>
-
                   </div>
 
                   <Button
-
                     type="button"
-
                     variant="outline"
-
                     size="sm"
-
                     onClick={() => {
                       setActiveConsultationRecordId(null);
                       setClinicalHistoryTemplate('standard');
@@ -2550,20 +2535,12 @@ export default function OPDWorkbench({
                       });
                       toast.info('New Consultation', 'Reset form to start a brand new consultation record');
                     }}
-
                     className="h-7 text-xs font-bold bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-
                   >
-
                     + Start New Consult
-
                   </Button>
-
                 </div>
-
               )}
-
-
 
               {/* Pre-ART Counselor Session Quick Review Banner (Doctor Consultation) */}
 
@@ -2639,6 +2616,7 @@ export default function OPDWorkbench({
 
 
 
+              <fieldset disabled={!canEditConsultation} className={`space-y-5 w-full ${!canEditConsultation ? 'pointer-events-none opacity-90 select-text' : ''}`}>
               {/* Top Collapsible Vitals & Triage Summary Banner (Doctor View) */}
 
               <OPDVitalsSection
@@ -2695,6 +2673,8 @@ export default function OPDWorkbench({
 
                 clinicalHistoryTemplate={clinicalHistoryTemplate}
 
+                activeNoteTemplateId={activeNoteTemplateId}
+
                 watch={watch}
 
                 setValue={setValue}
@@ -2730,6 +2710,8 @@ export default function OPDWorkbench({
               />
 
 
+
+              </fieldset>
 
               {/* Bottom Form Actions */}
 
@@ -2772,43 +2754,32 @@ export default function OPDWorkbench({
 
 
                 <div className="flex items-center gap-3">
-
-                  <Button
-
-                    type="button"
-
-                    variant="outline"
-
-                    disabled={saveMutation.isPending}
-
-                    onClick={handleSubmit((data) => onSubmit(data, true))}
-
-                    className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-10 rounded-md shadow-xs gap-2"
-
-                  >
-
-                    <Printer className="w-4 h-4 text-emerald-600" />
-
-                    <span>Save &amp; Print Rx</span>
-
-                  </Button>
-
-                  <Button
-
-                    type="submit"
-
-                    disabled={saveMutation.isPending}
-
-                    className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
-
-                  >
-
-                    <Save className="w-4 h-4" />
-
-                    <span>{saveMutation.isPending ? 'Saving to EMR...' : activeConsultationRecordId ? 'Update Consultation' : 'Save Consultation Record'}</span>
-
-                  </Button>
-
+                  {canEditConsultation ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={saveMutation.isPending}
+                        onClick={handleSubmit((data) => onSubmit(data, true))}
+                        className="bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-bold px-5 h-10 rounded-md shadow-xs gap-2"
+                      >
+                        <Printer className="w-4 h-4 text-emerald-600" />
+                        <span>Save &amp; Print Rx</span>
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={saveMutation.isPending}
+                        className="bg-[rgb(var(--clr-primary))] hover:bg-[rgb(var(--clr-primary)/0.9)] text-white font-semibold px-6 h-10 rounded-md shadow-xs gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>{saveMutation.isPending ? 'Saving to EMR...' : activeConsultationRecordId ? 'Update Consultation' : 'Save Consultation Record'}</span>
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-4 py-2 rounded-md">
+                      Read-Only (Admin Edit Only)
+                    </span>
+                  )}
                 </div>
 
               </div>
@@ -2842,6 +2813,7 @@ export default function OPDWorkbench({
       <ConsultationRecordModal
 
         record={viewingRecord}
+        consultationHistory={consultationHistory}
 
         onClose={() => setViewingRecord(null)}
 

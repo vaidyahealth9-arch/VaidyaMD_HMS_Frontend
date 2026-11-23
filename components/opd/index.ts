@@ -10,4 +10,9 @@ export { default as ClinicalHistoryProformaModal } from './ClinicalHistoryProfor
 export { default as ConsultationRecordModal } from './ConsultationRecordModal';
 export { default as SmartOrderDialog } from './SmartOrderDialog';
 export { default as TemplateManagementDialog } from './TemplateManagementDialog';
+export { default as CouplePrescriptionManager } from './CouplePrescriptionManager';
+export { default as CoupleMedicationColumn } from './CoupleMedicationColumn';
+export { default as CoupleInvestigationsBlock } from './CoupleInvestigationsBlock';
+export { default as MedicineAutocompleteInput } from './MedicineAutocompleteInput';
+export * from './prescriptionUtils';
 export * from './opdTemplates';

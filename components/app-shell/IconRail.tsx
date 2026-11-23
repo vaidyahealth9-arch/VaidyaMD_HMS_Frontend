@@ -23,16 +23,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   HeartHandshake,
+  Handshake,
   PhoneCall,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 
 const navItems = [
   { id: 'dashboard',        href: '/dashboard',                 icon: LayoutDashboard, label: 'Dashboard',          roles: ['admin','doctor','nurse','receptionist','accounts','embryologist','andrologist','pharma','pharmacist','counsellor'] },
-  // Temporarily hidden from navigation menu during pre-release testing. Uncomment when ready to expose to users:
-  // { id: 'crm',              href: '/crm',                       icon: PhoneCall,       label: 'CRM & Dialer',       roles: ['admin','counsellor','receptionist','doctor','accounts'], badge: 'New' },
+  { id: 'crm',              href: '/crm',                       icon: PhoneCall,       label: 'CRM & Dialer',       roles: ['admin','counsellor','receptionist','doctor','accounts'], badge: 'New' },
   { id: 'patients',         href: '/patients',                  icon: Users,           label: 'Patients & EMR',     roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
   { id: 'appointments',     href: '/appointments',              icon: Calendar,        label: 'Appointments',       roles: ['admin','doctor','nurse','receptionist','accounts','counsellor'] },
+  { id: 'counseling',       href: '/counseling',                icon: HeartHandshake,  label: 'Counseling',         roles: ['admin','doctor','nurse','counsellor'] },
   { id: 'cosgyn',           href: '/cosgyn',                    icon: Sparkles,        label: 'Cosmetic Gynae',     roles: ['admin','doctor','nurse','receptionist','accounts'] },
   { id: 'treatment-board',  href: '/fertility/treatment-board', icon: Activity,        label: 'Treatment Board',    roles: ['admin','doctor','nurse','embryologist','receptionist','accounts'], badge: 'Live' },
   { id: 'ivf-lab',          href: '/ivf-lab',                   icon: Microscope,      label: 'IVF Lab',            roles: ['admin','doctor','embryologist','andrologist'], badge: 'ART' },
@@ -40,7 +41,7 @@ const navItems = [
   { id: 'pharmacy',         href: '/pharmacy',                  icon: Pill,            label: 'Pharmacy & Stock',   roles: ['admin','pharma','pharmacist','doctor'] },
   { id: 'lims',             href: '/lims',                      icon: FlaskConical,    label: 'LIMS & HL7 Lab',     roles: ['admin','doctor','andrologist','embryologist'] },
   { id: 'billing',          href: '/billing',                   icon: ReceiptText,     label: 'Billing & Cashier',  roles: ['admin','receptionist','accounts','pharma','pharmacist','doctor'] },
-  { id: 'referrals',        href: '/referrals',                 icon: HeartHandshake,  label: 'Doctor Referrals',   roles: ['admin','doctor','receptionist','accounts'], badge: 'Pro' },
+  { id: 'referrals',        href: '/referrals',                 icon: Handshake,       label: 'Doctor Referrals',   roles: ['admin','doctor','receptionist','accounts'], badge: 'Pro' },
 ];
 
 export default function IconRail() {

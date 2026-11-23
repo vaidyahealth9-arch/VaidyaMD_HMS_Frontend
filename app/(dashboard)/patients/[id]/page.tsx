@@ -12,7 +12,7 @@ import {
   documentsApi,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getTodayIst, formatDateToIst } from '@/lib/utils';
 import PageLayout from '@/components/common/PageLayout';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { useToast } from '@/contexts/ToastContext';
@@ -188,17 +188,23 @@ export default function PatientProfilePage() {
       .then((res: any) => {
         const appts = res?.appointments || (Array.isArray(res) ? res : []);
         if (appts.length > 0) {
+          const todayStr = getTodayIst();
           const activeAppt =
-            (appointmentIdFromUrl ? appts.find((a: any) => a.id === appointmentIdFromUrl) : null) ||
-            appts.find((a: any) => a.metadata?.triage || a.metadata_?.triage) ||
-            appts.find((a: any) => a.status === 'scheduled' || a.status === 'in_consultation' || a.status === 'arrived') ||
-            appts[0];
-          if (activeAppt) {
-            setActiveAppointment(activeAppt);
-          }
+            (appointmentIdFromUrl ? appts.find((a: any) => a.id === appointmentIdFromUrl && a.status !== 'completed' && a.status !== 'cancelled') : null) ||
+            appts.find((a: any) => {
+              if (a.status === 'completed' || a.status === 'cancelled') return false;
+              const apptDate = a.scheduled_at ? formatDateToIst(a.scheduled_at) : (a.appointment_date || '');
+              return apptDate === todayStr && ['waiting', 'in_progress', 'scheduled', 'in_consultation', 'arrived'].includes(a.status);
+            });
+          setActiveAppointment(activeAppt || null);
+        } else {
+          setActiveAppointment(null);
         }
       })
-      .catch((err) => console.error('Failed to load patient appointments', err));
+      .catch((err) => {
+        console.error('Failed to load patient appointments', err);
+        setActiveAppointment(null);
+      });
   };
 
   useEffect(() => {

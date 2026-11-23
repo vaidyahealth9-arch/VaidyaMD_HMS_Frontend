@@ -17,7 +17,7 @@ export function useRegistrationForm() {
     gender: 'female',
     age: '',
     dob: '',
-    marital_status: 'married',
+    marital_status: 'single',
     phone: '',
     alternate_phone: '',
     email: '',

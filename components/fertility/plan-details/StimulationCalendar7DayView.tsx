@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { parseFollicleTokens, isProcedureName, fillMissingCalendarDays } from './utils';
 import { DayEventCategory } from './QuickScanEditModal';
+import { safeString } from '@/lib/utils';
 
 interface StimulationCalendar7DayViewProps {
   days: any[];
@@ -22,6 +23,8 @@ interface StimulationCalendar7DayViewProps {
   onAddMed?: (dayNum: number, drugName: string, dose?: string) => void;
   onCopyForward: (dayNum: number, daysToForward?: number) => void;
   onOpenScanEdit: (day: any, initialCategory?: DayEventCategory) => void;
+  selectedDays?: number[];
+  onToggleSelectDay?: (dayNumber: number) => void;
 }
 
 export default function StimulationCalendar7DayView({
@@ -30,6 +33,8 @@ export default function StimulationCalendar7DayView({
   onRemoveMed,
   onCopyForward,
   onOpenScanEdit,
+  selectedDays = [],
+  onToggleSelectDay,
 }: StimulationCalendar7DayViewProps) {
   // Ensure all calendar days are kept so 7-day weeks and missing days remain accessible
   const allDays = fillMissingCalendarDays(days);
@@ -99,19 +104,29 @@ export default function StimulationCalendar7DayView({
               return (
                 <div
                   key={day.day_number}
-                  className={`p-2.5 flex flex-col justify-between min-h-[280px] transition-colors relative group ${isTrigger
+                  className={`p-2.5 flex flex-col justify-between min-h-[280px] transition-colors relative group ${
+                    selectedDays.includes(day.day_number)
+                      ? 'bg-purple-50/70 ring-1 ring-purple-300'
+                      : isTrigger
                       ? 'bg-amber-50/40'
                       : isOpu
-                        ? 'bg-rose-50/40'
-                        : hasScan
-                          ? 'bg-slate-50/60'
-                          : 'bg-white hover:bg-slate-50/50'
-                    }`}
+                      ? 'bg-rose-50/40'
+                      : hasScan
+                      ? 'bg-slate-50/60'
+                      : 'bg-white hover:bg-slate-50/50'
+                  }`}
                 >
                   {/* Top: Day # & Date Header */}
                   <div>
                     <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
                       <div className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedDays.includes(day.day_number)}
+                          onChange={() => onToggleSelectDay?.(day.day_number)}
+                          className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer mr-0.5"
+                          title={`Select Day ${day.day_number} for batch modification`}
+                        />
                         <span
                           className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${isTrigger
                               ? 'bg-amber-600 text-white'
@@ -144,7 +159,7 @@ export default function StimulationCalendar7DayView({
                     </div>
 
                     {/* Milestone Banner (Checkpoint only, not duplicated procedure) */}
-                    {day.milestone && !isProcedureName(day.milestone) && (
+                    {day.milestone && !isProcedureName(safeString(day.milestone)) && (
                       <div
                         className={`mt-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded border truncate flex items-center gap-1 ${isTrigger
                             ? 'bg-amber-100 text-amber-900 border-amber-300'
@@ -154,24 +169,27 @@ export default function StimulationCalendar7DayView({
                           }`}
                       >
                         <Sparkles className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{day.milestone}</span>
+                        <span className="truncate">{safeString(day.milestone)}</span>
                       </div>
                     )}
 
                     {/* Procedure Badges */}
                     {hasProcedures &&
-                      day.procedures.map((proc: string, pIdx: number) => (
-                        <div
-                          key={`proc-${pIdx}`}
-                          onClick={() => !readonly && onOpenScanEdit(day, 'procedure')}
-                          className={`mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded border truncate flex items-center gap-1 bg-purple-100 text-purple-900 border-purple-300 ${!readonly ? 'cursor-pointer hover:bg-purple-200' : ''
-                            }`}
-                          title={proc}
-                        >
-                          <Syringe className="w-3 h-3 shrink-0 text-purple-700" />
-                          <span className="truncate">{proc}</span>
-                        </div>
-                      ))}
+                      day.procedures.map((proc: any, pIdx: number) => {
+                        const procStr = safeString(proc?.name || proc);
+                        return (
+                          <div
+                            key={`proc-${pIdx}`}
+                            onClick={() => !readonly && onOpenScanEdit(day, 'procedure')}
+                            className={`mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded border truncate flex items-center gap-1 bg-purple-100 text-purple-900 border-purple-300 ${!readonly ? 'cursor-pointer hover:bg-purple-200' : ''
+                              }`}
+                            title={procStr}
+                          >
+                            <Syringe className="w-3 h-3 shrink-0 text-purple-700" />
+                            <span className="truncate">{procStr}</span>
+                          </div>
+                        );
+                      })}
 
                     {/* Active Medications List in Day Box */}
                     <div className="mt-2 space-y-1">
@@ -183,13 +201,13 @@ export default function StimulationCalendar7DayView({
                           >
                             <span
                               className="font-bold truncate max-w-[85px]"
-                              title={m.drug_name || m.name}
+                              title={safeString(m.drug_name || m.name)}
                             >
-                              {(m.drug_name || m.name || '').split('(')[0].trim()}
+                              {safeString(m.drug_name || m.name).split('(')[0].trim()}
                             </span>
                             <div className="flex items-center gap-1">
                               <span className="text-[10px] font-extrabold text-primary">
-                                {m.dose || m.dosage}
+                                {safeString(m.dose || m.dosage)}
                               </span>
                               {!readonly && (
                                 <button
@@ -223,17 +241,22 @@ export default function StimulationCalendar7DayView({
                         {day.p4_ngml && <div>P4: {day.p4_ngml}</div>}
                         {Array.isArray(day.investigations) &&
                           day.investigations
-                            .filter(
-                              (i: string) =>
-                                !i.toLowerCase().includes('estradiol') &&
-                                !i.toLowerCase().includes('luteinising') &&
-                                !i.toLowerCase().includes('progesterone')
-                            )
-                            .map((inv: string, idx: number) => (
-                              <div key={`inv-${idx}`} className="truncate">
-                                {inv}
-                              </div>
-                            ))}
+                            .filter((i: any) => {
+                              const iStr = safeString(i?.test_name || i?.name || i).toLowerCase();
+                              return (
+                                !iStr.includes('estradiol') &&
+                                !iStr.includes('luteinising') &&
+                                !iStr.includes('progesterone')
+                              );
+                            })
+                            .map((inv: any, idx: number) => {
+                              const invStr = safeString(inv?.test_name || inv?.name || inv);
+                              return (
+                                <div key={`inv-${idx}`} className="truncate">
+                                  {invStr}
+                                </div>
+                              );
+                            })}
                       </div>
                     )}
                   </div>

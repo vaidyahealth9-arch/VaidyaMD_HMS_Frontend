@@ -25,6 +25,10 @@ import StimulationCalendar7DayView from './StimulationCalendar7DayView';
 import InsertEditPlanModal from './InsertEditPlanModal';
 import TakeawayCalendarModal from './TakeawayCalendarModal';
 import QuickScanEditModal from './QuickScanEditModal';
+import StimulationBatchActionBar, { BatchOperationMode } from './StimulationBatchActionBar';
+import BatchDeleteConfirmModal from './BatchDeleteConfirmModal';
+import BatchAddEventModal, { BatchAddEventPayload } from './BatchAddEventModal';
+import BatchModifyMedModal, { BatchModifyMedPayload } from './BatchModifyMedModal';
 import HrtFetProtocolSheet from '@/components/fertility/HrtFetProtocolSheet';
 
 interface PlanDetailsSubTabContentProps {
@@ -58,6 +62,16 @@ export default function PlanDetailsSubTabContent({
   const [showTakeawayModal, setShowTakeawayModal] = useState(false);
   const [takeawayLogoMode, setTakeawayLogoMode] = useState(true);
   const [editingScanDay, setEditingScanDay] = useState<any | null>(null);
+  const [isBatchModeActive, setIsBatchModeActive] = useState(false);
+  const [batchMode, setBatchMode] = useState<BatchOperationMode>('modify');
+  const [activeMedName, setActiveMedName] = useState<string | null>(null);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
+  const [showBatchAddModal, setShowBatchAddModal] = useState(false);
+  const [showBatchAdvanceModal, setShowBatchAdvanceModal] = useState(false);
+
+
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -117,6 +131,355 @@ export default function PlanDetailsSubTabContent({
     return fillMissingCalendarDays(source);
   }, [localDays, initialDays, cycleCalendar?.days, activeCycle?.medication_calendar]);
 
+  const drugList = useMemo(() => {
+    const set = new Set<string>([
+      'rFSH (Gonal-F / Rekovelle)',
+      'HMG (Menopur)',
+      'GnRH Antagonist (Cetrotide / Orgalutran)',
+      'GnRH Agonist (Leuprolide / Lupride)',
+      'r-hCG / Ovitrelle 250mcg',
+      'Progesterone (Susten / Gestone)',
+      'Estradiol Valerate (Progynova)',
+      'Aspirin 75mg',
+      'Low Molecular Weight Heparin (Clexane)',
+    ]);
+    activeDays.forEach((d: any) => {
+      (d.medications || []).forEach((m: any) => {
+        const name = m.drug_name || m.name;
+        if (name) set.add(name);
+      });
+    });
+    return Array.from(set);
+  }, [activeDays]);
+
+
+
+  const handleToggleSelectDay = (dayNum: number) => {
+    setSelectedDays((prev) =>
+      prev.includes(dayNum) ? prev.filter((d) => d !== dayNum) : [...prev, dayNum]
+    );
+  };
+
+  const handleSelectAllDays = (selectAll: boolean) => {
+    const visibleDays = Array.from(new Set(filteredTimelineItems.map((i) => i.day_number))).filter(Boolean);
+    setSelectedDays(selectAll ? visibleDays : []);
+  };
+
+  const handleToggleSelectItem = (itemId: string, item?: PlanTimelineItem) => {
+    const targetItem = item || timelineItems.find((x) => x.id === itemId);
+    if (!targetItem) return;
+
+    if (batchMode === 'modify') {
+      if (targetItem.category !== 'medication') return;
+
+      // Smart Auto-Select with Exclusion: If starting new med selection
+      if (!activeMedName || activeMedName.toLowerCase() !== targetItem.name.toLowerCase()) {
+        setActiveMedName(targetItem.name);
+        const matchingIds = timelineItems
+          .filter(
+            (i) =>
+              i.category === 'medication' &&
+              i.name.toLowerCase() === targetItem.name.toLowerCase()
+          )
+          .map((i) => i.id);
+        setSelectedItemIds(matchingIds);
+        const matchingDays = Array.from(
+          new Set(
+            timelineItems
+              .filter(
+                (i) =>
+                  i.category === 'medication' &&
+                  i.name.toLowerCase() === targetItem.name.toLowerCase()
+              )
+              .map((i) => i.day_number)
+          )
+        );
+        setSelectedDays(matchingDays);
+      } else {
+        // Uncheck to exclude a specific day
+        setSelectedItemIds((prev) => {
+          const next = prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId];
+          if (next.length === 0) {
+            setActiveMedName(null);
+            setSelectedDays([]);
+          } else {
+            const nextDays = Array.from(
+              new Set(timelineItems.filter((i) => next.includes(i.id)).map((i) => i.day_number))
+            );
+            setSelectedDays(nextDays);
+          }
+          return next;
+        });
+      }
+    } else {
+      // In delete mode or general multi-select
+      setSelectedItemIds((prev) =>
+        prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
+      );
+    }
+  };
+
+  const handleSelectAllItems = (selectAll: boolean) => {
+    if (batchMode === 'modify') {
+      if (!selectAll) {
+        setSelectedItemIds([]);
+        setActiveMedName(null);
+        setSelectedDays([]);
+      }
+    } else {
+      setSelectedItemIds(selectAll ? filteredTimelineItems.map((item) => item.id) : []);
+    }
+  };
+
+  const handleQuickApplyDose = (newDose: string) => {
+    if (!activeMedName || selectedItemIds.length === 0) return;
+    const targetItems = timelineItems.filter((i) => selectedItemIds.includes(i.id));
+    const targetDayNumbers = new Set(targetItems.map((i) => i.day_number));
+
+    const nextDays = activeDays.map((d: any) => {
+      if (!targetDayNumbers.has(d.day_number)) return d;
+      const meds = (d.medications || []).map((m: any) => {
+        if ((m.drug_name || m.name || '').toLowerCase() === activeMedName.toLowerCase()) {
+          return {
+            ...m,
+            dose: newDose,
+            dose_display: formatDoseDisplay(newDose),
+          };
+        }
+        return m;
+      });
+      return { ...d, medications: meds };
+    });
+
+    updateDays(nextDays);
+    toast.success('Dose Updated', `Updated ${activeMedName} to ${newDose} across ${targetDayNumbers.size} days.`);
+    setSelectedItemIds([]);
+    setSelectedDays([]);
+    setActiveMedName(null);
+  };
+
+  const handleQuickPresetDays = (preset: 'all' | 'stim' | 'next5' | 'clear') => {
+    const allDayNums = Array.from(new Set(activeDays.map((d: any) => d.day_number))).sort((a, b) => a - b);
+    if (preset === 'all') {
+      setSelectedDays(allDayNums);
+    } else if (preset === 'stim') {
+      const stims = activeDays
+        .filter((d: any) => d.day_number >= 2 && d.day_number <= 11)
+        .map((d: any) => d.day_number);
+      setSelectedDays(stims.length > 0 ? stims : allDayNums.slice(1, 10));
+    } else if (preset === 'next5') {
+      setSelectedDays(allDayNums.slice(0, 5));
+    } else {
+      setSelectedDays([]);
+    }
+  };
+
+  const handleApplyAdvanceModify = (payload: BatchModifyMedPayload) => {
+    if (!activeMedName || selectedDays.length === 0) return;
+    const { dose, route, frequency, instructions } = payload;
+    const targetDaysSet = new Set(selectedDays);
+
+    const nextDays = activeDays.map((d: any) => {
+      if (!targetDaysSet.has(d.day_number)) return d;
+
+      let updatedMeds = [...(d.medications || [])];
+      const existingIdx = updatedMeds.findIndex(
+        (m: any) => (m.drug_name || m.name || '').toLowerCase() === activeMedName.toLowerCase()
+      );
+
+      const modifiedMed = {
+        id: `med-${d.day_number}-${Date.now()}`,
+        drug_name: activeMedName,
+        name: activeMedName,
+        dose,
+        dose_display: formatDoseDisplay(dose),
+        route: route || 'SC',
+        frequency: frequency || 'OD',
+        status: 'planned',
+        instructions: instructions || undefined,
+      };
+
+      if (existingIdx >= 0) {
+        updatedMeds[existingIdx] = { ...updatedMeds[existingIdx], ...modifiedMed };
+      } else {
+        updatedMeds.push(modifiedMed);
+      }
+
+      return { ...d, medications: updatedMeds };
+    });
+
+    updateDays(nextDays);
+    toast.success('Medication Updated', `Updated ${activeMedName} (${dose}) across ${selectedDays.length} days.`);
+    setSelectedItemIds([]);
+    setSelectedDays([]);
+    setActiveMedName(null);
+  };
+
+  const handleApplyBatchAdd = (payload: BatchAddEventPayload) => {
+    const { category, name, dose, route, frequency, notes, targetDays } = payload;
+    const nextDays = activeDays.map((d: any) => {
+      if (!targetDays.includes(d.day_number)) return d;
+      let updated = { ...d };
+      if (category === 'medication') {
+        const meds = [...(updated.medications || [])];
+        const existingIdx = meds.findIndex(
+          (m: any) => (m.drug_name || m.name || '').toLowerCase() === name.toLowerCase()
+        );
+        const newMed = {
+          id: `med-${d.day_number}-${Date.now()}`,
+          drug_name: name,
+          name: name,
+          dose: dose || '',
+          dose_display: formatDoseDisplay(dose || ''),
+          route: route || 'SC',
+          frequency: frequency || 'OD',
+          status: 'planned',
+          instructions: notes || undefined,
+        };
+        if (existingIdx >= 0) meds[existingIdx] = { ...meds[existingIdx], ...newMed };
+        else meds.push(newMed);
+        updated.medications = meds;
+      } else if (category === 'scan') {
+        const scans = [...(updated.scans || [])];
+        if (!scans.includes(name)) scans.push(name);
+        updated.scans = scans;
+        if (!updated.milestone) updated.milestone = name;
+      } else if (category === 'lab') {
+        const labs = [...(updated.investigations || [])];
+        if (!labs.includes(name)) labs.push(name);
+        updated.investigations = labs;
+      } else if (category === 'procedure') {
+        const procs = [...(updated.procedures || [])];
+        if (!procs.includes(name)) procs.push(name);
+        updated.procedures = procs;
+        updated.milestone = name;
+      }
+      return updated;
+    });
+
+    updateDays(nextDays);
+    toast.success('Batch Added', `Added ${name} across ${targetDays.length} days.`);
+    setSelectedDays([]);
+    setSelectedItemIds([]);
+  };
+
+  const handleConfirmDelete = () => {
+    if (selectedItemIds.length === 0) return;
+    const isAllSelected = selectedItemIds.length >= filteredTimelineItems.length;
+
+    let nextDays: any[] = [];
+    if (isAllSelected) {
+      // Complete wipe of all scheduled items across all days
+      nextDays = activeDays.map((d: any) => ({
+        ...d,
+        medications: [],
+        scans: [],
+        procedures: [],
+        investigations: [],
+        milestone: undefined,
+        right_follicles: '',
+        left_follicles: '',
+        endometrium_mm: '',
+        endometrial_pattern: undefined,
+        e2_pgml: '',
+        p4_ngml: '',
+        lh_miu: '',
+        notes: '',
+      }));
+    } else {
+      const targets = timelineItems.filter((x: PlanTimelineItem) => selectedItemIds.includes(x.id));
+      if (targets.length === 0) return;
+
+      const norm = (s: any) =>
+        typeof s === 'string'
+          ? s.trim().toLowerCase()
+          : (s?.name || s?.test_name || s?.drug_name || '').trim().toLowerCase();
+
+      nextDays = activeDays.map((d: any, dayIdx: number) => {
+        const dayNum = d.day_number ?? dayIdx + 1;
+        const dayTargets = targets.filter(
+          (t) => t.day_number === dayNum || (t.date && d.date && t.date === d.date)
+        );
+        if (dayTargets.length === 0) return d;
+
+        // Check if all items for this specific day were selected
+        const allItemsForDay = timelineItems.filter(
+          (t) => t.day_number === dayNum || (t.date && d.date && t.date === d.date)
+        );
+        const allDayItemsSelected = allItemsForDay.every((i) => selectedItemIds.includes(i.id));
+
+        if (allDayItemsSelected) {
+          return {
+            ...d,
+            medications: [],
+            scans: [],
+            procedures: [],
+            investigations: [],
+            milestone: undefined,
+            right_follicles: '',
+            left_follicles: '',
+            endometrium_mm: '',
+            endometrial_pattern: undefined,
+            e2_pgml: '',
+            p4_ngml: '',
+            lh_miu: '',
+            notes: '',
+          };
+        }
+
+        let updated = { ...d };
+        for (const target of dayTargets) {
+          const tNorm = norm(target.name);
+
+          if (target.category === 'medication') {
+            updated.medications = (updated.medications || []).filter((m: any) => {
+              if (m.id && target.id && m.id === target.id) return false;
+              const mNorm = norm(m.drug_name || m.name);
+              return mNorm !== tNorm && !mNorm.includes(tNorm) && !tNorm.includes(mNorm);
+            });
+          } else if (target.category === 'scan') {
+            updated.scans = (updated.scans || []).filter((s: any) => {
+              const sNorm = norm(s);
+              return sNorm !== tNorm && !sNorm.includes(tNorm) && !tNorm.includes(sNorm);
+            });
+            if (!updated.scans || updated.scans.length === 0) {
+              updated.right_follicles = '';
+              updated.left_follicles = '';
+              updated.endometrium_mm = '';
+            }
+            if (updated.milestone && norm(updated.milestone) === tNorm) {
+              updated.milestone = undefined;
+            }
+          } else if (target.category === 'procedure') {
+            updated.procedures = (updated.procedures || []).filter((p: any) => {
+              const pNorm = norm(p);
+              return pNorm !== tNorm && !pNorm.includes(tNorm) && !tNorm.includes(pNorm);
+            });
+            if (updated.milestone && norm(updated.milestone) === tNorm) {
+              updated.milestone = undefined;
+            }
+          } else {
+            updated.investigations = (updated.investigations || []).filter((i: any) => {
+              const iNorm = norm(i);
+              return iNorm !== tNorm && !iNorm.includes(tNorm) && !tNorm.includes(iNorm);
+            });
+            if (tNorm.includes('lh') || tNorm.includes('luteinising')) updated.lh_miu = '';
+            if (tNorm.includes('estradiol') || tNorm.includes('e2')) updated.e2_pgml = '';
+            if (tNorm.includes('progesterone') || tNorm.includes('p4')) updated.p4_ngml = '';
+          }
+        }
+        return updated;
+      });
+    }
+
+    updateDays(nextDays);
+    toast.success('Deleted Items', `Successfully removed ${selectedItemIds.length} item(s) from schedule.`);
+    setSelectedItemIds([]);
+    setSelectedDays([]);
+    setActiveMedName(null);
+  };
+
+
   const updateDays = (nextDays: any[], protocolInfo?: { protocolId: string; protocolName: string }) => {
     setLocalDays(nextDays);
     if (onDaysChange) {
@@ -133,6 +496,27 @@ export default function PlanDetailsSubTabContent({
       return true;
     });
   }, [timelineItems, startDateFilter, endDateFilter]);
+
+  const activeMedDefaults = useMemo(() => {
+    if (!activeMedName) return null;
+    const matching = timelineItems
+      .filter(
+        (i) =>
+          i.category === 'medication' &&
+          i.name.toLowerCase() === activeMedName.toLowerCase()
+      )
+      .sort((a, b) => a.day_number - b.day_number);
+
+    if (matching.length === 0) return null;
+    const first = matching[0];
+    return {
+      dose: first.dosage || first.dose_display || '',
+      route: first.route || 'SC',
+      frequency: first.frequency || 'OD',
+      instructions: first.notes || '',
+    };
+  }, [activeMedName, timelineItems]);
+
 
   const follicleStats = useMemo(() => calculateFollicleStats(activeDays), [activeDays]);
 
@@ -192,32 +576,73 @@ export default function PlanDetailsSubTabContent({
   const handleDeleteItem = (itemId: string) => {
     const target = timelineItems.find((x: PlanTimelineItem) => x.id === itemId);
     if (!target) return;
-    const nextDays = activeDays.map((d: any) => {
-      if (d.day_number !== target.day_number) return d;
+
+    const targetDayNumber = target.day_number;
+    const targetDate = target.date;
+    const targetNameClean = (target.name || '').trim().toLowerCase();
+
+    const nextDays = activeDays.map((d: any, dIdx: number) => {
+      const dayMatches =
+        d.day_number === targetDayNumber ||
+        (targetDate && d.date === targetDate) ||
+        (!d.day_number && dIdx + 1 === targetDayNumber);
+
+      if (!dayMatches) return d;
+
       if (target.category === 'medication') {
-        return { ...d, medications: (d.medications || []).filter((m: any) => (m.drug_name || m.name) !== target.name) };
+        const parts = (target.id || '').split('-');
+        const parsedIdx = parts[0] === 'med' && parts.length >= 3 ? parseInt(parts[2], 10) : -1;
+
+        const filteredMeds = (d.medications || []).filter((m: any, mIdx: number) => {
+          if (m.id && m.id === target.id) return false;
+          if (parsedIdx >= 0 && mIdx === parsedIdx) return false;
+          const mClean = (m.drug_name || m.name || '').trim().toLowerCase();
+          if (mClean === targetNameClean) return false;
+          if (targetNameClean && mClean && (targetNameClean.startsWith(mClean) || mClean.startsWith(targetNameClean))) return false;
+          return true;
+        });
+        return { ...d, medications: filteredMeds };
       }
+
       if (target.category === 'scan') {
-        const remainingScans = (d.scans || []).filter((s: string) => s !== target.name);
+        const remainingScans = (d.scans || []).filter(
+          (s: string) => (s || '').trim().toLowerCase() !== targetNameClean
+        );
         return {
           ...d,
           scans: remainingScans,
           right_follicles: remainingScans.length === 0 ? '' : d.right_follicles,
           left_follicles: remainingScans.length === 0 ? '' : d.left_follicles,
           endometrium_mm: remainingScans.length === 0 ? '' : d.endometrium_mm,
-          milestone: d.milestone === target.name ? undefined : d.milestone,
+          milestone: (d.milestone || '').trim().toLowerCase() === targetNameClean ? undefined : d.milestone,
         };
       }
+
       if (target.category === 'procedure') {
         return {
           ...d,
-          procedures: (d.procedures || []).filter((p: string) => p !== target.name),
-          milestone: d.milestone === target.name ? undefined : d.milestone,
+          procedures: (d.procedures || []).filter((p: string) => (p || '').trim().toLowerCase() !== targetNameClean),
+          milestone: (d.milestone || '').trim().toLowerCase() === targetNameClean ? undefined : d.milestone,
         };
       }
-      return { ...d, investigations: (d.investigations || []).filter((i: string) => i !== target.name), lh_miu: '', e2_pgml: '', p4_ngml: '' };
+
+      return {
+        ...d,
+        investigations: (d.investigations || []).filter((i: string) => (i || '').trim().toLowerCase() !== targetNameClean),
+        lh_miu: targetNameClean.includes('lh') ? '' : d.lh_miu,
+        e2_pgml: targetNameClean.includes('e2') || targetNameClean.includes('estradiol') ? '' : d.e2_pgml,
+        p4_ngml: targetNameClean.includes('p4') || targetNameClean.includes('progesterone') ? '' : d.p4_ngml,
+      };
     });
+
     updateDays(nextDays);
+    toast.success('Item Deleted', `${target.name} removed from Day ${target.day_number}.`);
+
+    if (activeCycle?.id) {
+      treatmentCyclesApi.updateMedicationCalendar(activeCycle.id, nextDays).catch((err: any) => {
+        console.warn('Auto-save calendar deletion note:', err);
+      });
+    }
   };
 
   const handleAddItem = (newItem: Partial<PlanTimelineItem>) => {
@@ -467,6 +892,18 @@ export default function PlanDetailsSubTabContent({
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onOpenInsertEditPlan={() => setShowInsertPlanModal(true)}
+            isBatchModeActive={isBatchModeActive}
+            onToggleBatchMode={() => {
+              setIsBatchModeActive((prev) => {
+                const nextVal = !prev;
+                if (!nextVal) {
+                  setSelectedItemIds([]);
+                  setSelectedDays([]);
+                  setActiveMedName(null);
+                }
+                return nextVal;
+              });
+            }}
             onPrintCalendar={() => { setTakeawayLogoMode(true); setShowTakeawayModal(true); }}
           />
 
@@ -478,12 +915,21 @@ export default function PlanDetailsSubTabContent({
           {viewMode === 'timeline_ledger' && (
             <PlanDetailsTimelineTable
               items={filteredTimelineItems}
+              isBatchModeActive={isBatchModeActive}
               onUpdateItemDose={handleUpdateItemDose}
               onUpdateItemScan={handleUpdateItemScan}
               onUpdateItemRemarks={handleUpdateItemRemarks}
               onToggleStatus={handleToggleStatus}
               onDeleteItem={handleDeleteItem}
               onAddItem={handleAddItem}
+              batchMode={batchMode}
+              activeMedName={activeMedName}
+              selectedDays={selectedDays}
+              onToggleSelectDay={handleToggleSelectDay}
+              onSelectAllDays={handleSelectAllDays}
+              selectedItemIds={selectedItemIds}
+              onToggleSelectItem={handleToggleSelectItem}
+              onSelectAllItems={handleSelectAllItems}
               onOpenScanEdit={(dayNum) => {
                 const day = activeDays.find((d: any) => d.day_number === dayNum);
                 if (day) setEditingScanDay({ ...day, _initialCategory: 'scan' });
@@ -496,6 +942,8 @@ export default function PlanDetailsSubTabContent({
           {viewMode === 'calendar_7day' && (
             <StimulationCalendar7DayView
               days={activeDays}
+              selectedDays={selectedDays}
+              onToggleSelectDay={handleToggleSelectDay}
               onUpdateMedDose={(dayNum, medIdx, newDose) => {
                 const nextDays = activeDays.map((d: any) => {
                   if (d.day_number !== dayNum) return d;
@@ -607,6 +1055,63 @@ export default function PlanDetailsSubTabContent({
           }}
         />
       )}
+
+
+      {isBatchModeActive && (
+        <StimulationBatchActionBar
+          batchMode={batchMode}
+          onSetBatchMode={setBatchMode}
+          selectedDays={selectedDays}
+          selectedItemIds={selectedItemIds}
+          activeMedName={activeMedName}
+          initialDose={activeMedDefaults?.dose || ''}
+          onQuickPresetDays={handleQuickPresetDays}
+          onOpenAddModal={() => setShowBatchAddModal(true)}
+          onQuickApplyDose={handleQuickApplyDose}
+          onOpenAdvanceModal={() => setShowBatchAdvanceModal(true)}
+          onOpenDeleteModal={() => setShowBatchDeleteModal(true)}
+          onClearSelection={() => {
+            setSelectedDays([]);
+            setSelectedItemIds([]);
+            setActiveMedName(null);
+          }}
+          onCloseBatchMode={() => {
+            setIsBatchModeActive(false);
+            setSelectedDays([]);
+            setSelectedItemIds([]);
+            setActiveMedName(null);
+          }}
+        />
+      )}
+
+      <BatchDeleteConfirmModal
+        isOpen={showBatchDeleteModal}
+        onClose={() => setShowBatchDeleteModal(false)}
+        selectedItems={timelineItems.filter((i) => selectedItemIds.includes(i.id))}
+        onConfirmDelete={handleConfirmDelete}
+      />
+
+      <BatchAddEventModal
+        isOpen={showBatchAddModal}
+        onClose={() => setShowBatchAddModal(false)}
+        selectedDays={selectedDays}
+        allDays={activeDays}
+        drugList={drugList}
+        onApplyAdd={handleApplyBatchAdd}
+      />
+
+      <BatchModifyMedModal
+        isOpen={showBatchAdvanceModal}
+        onClose={() => setShowBatchAdvanceModal(false)}
+        medName={activeMedName || ''}
+        selectedDays={selectedDays}
+        initialDose={activeMedDefaults?.dose || ''}
+        initialRoute={activeMedDefaults?.route || 'SC'}
+        initialFrequency={activeMedDefaults?.frequency || 'OD'}
+        initialInstructions={activeMedDefaults?.instructions || ''}
+        onApplyModify={handleApplyAdvanceModify}
+      />
+
     </div>
   );
 }

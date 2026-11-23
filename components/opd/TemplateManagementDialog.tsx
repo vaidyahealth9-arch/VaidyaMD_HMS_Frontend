@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog';
 import { opdApi } from '@/features/opd/api';
+import { templatesApi } from '@/lib/api';
+import { extractClinicalTemplateData } from './opdTemplates';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/contexts/ToastContext';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
@@ -35,6 +37,10 @@ export interface ClinicalTemplateItem {
   diagnosis: string;
   investigations: string;
   plan: string;
+  past_history?: string;
+  examination?: string;
+  female_investigations?: string;
+  male_investigations?: string;
 }
 
 export interface RxMedicationItem {
@@ -118,38 +124,61 @@ export default function TemplateManagementDialog({
   const fetchCustomTemplates = async () => {
     setIsLoading(true);
     try {
-      const [clinicalRes, rxRes] = await Promise.allSettled([
-        opdApi.getTemplates('clinical_template'),
-        opdApi.getTemplates('rx_template'),
-      ]);
-
-      if (clinicalRes.status === 'fulfilled' && Array.isArray(clinicalRes.value)) {
-        setCustomClinical(
-          clinicalRes.value.map((t: any) => ({
-            id: t.id,
-            name: t.title,
-            isCustom: true,
-            complaint: t.schema_json?.complaint || '',
-            hopi: t.schema_json?.hopi || '',
-            diagnosis: t.schema_json?.diagnosis || '',
-            investigations: t.schema_json?.investigations || '',
-            plan: t.schema_json?.plan || '',
-          }))
-        );
+      let allTemplates: any[] = [];
+      try {
+        const res = await templatesApi.list();
+        if (Array.isArray(res) && res.length > 0) {
+          allTemplates = res;
+        }
+      } catch (e) {
+        console.warn('templatesApi.list failed in studio, trying opdApi fallback', e);
       }
 
-      if (rxRes.status === 'fulfilled' && Array.isArray(rxRes.value)) {
-        setCustomRx(
-          rxRes.value.map((t: any) => ({
-            id: t.id,
-            name: t.title,
-            isCustom: true,
-            category: t.schema_json?.category || 'General',
-            medications: t.schema_json?.medications || [],
-            advice: t.schema_json?.advice || '',
-          }))
-        );
+      if (allTemplates.length === 0) {
+        const [clinicalRes, rxRes] = await Promise.allSettled([
+          opdApi.getTemplates('clinical_template'),
+          opdApi.getTemplates('rx_template'),
+        ]);
+        const clinicalList = clinicalRes.status === 'fulfilled' && Array.isArray(clinicalRes.value) ? clinicalRes.value : [];
+        const rxList = rxRes.status === 'fulfilled' && Array.isArray(rxRes.value) ? rxRes.value : [];
+        allTemplates = [...clinicalList, ...rxList];
       }
+
+      // Map clinical proformas & note templates
+      const mappedClinical = allTemplates
+        .filter((t: any) => {
+          const pId = (t.plugin_id || '').toLowerCase();
+          const rType = (t.record_type || '').toLowerCase();
+          if (pId === 'rx_template' || rType.startsWith('rx_') || pId === 'appointment_visit_type' || rType.startsWith('visit_')) {
+            return false;
+          }
+          return true;
+        })
+        .map((t: any) => extractClinicalTemplateData(t));
+      setCustomClinical(mappedClinical);
+
+      // Map daily medication & Rx templates
+      const mappedRx = allTemplates
+        .filter((t: any) => {
+          const pId = (t.plugin_id || '').toLowerCase();
+          const rType = (t.record_type || '').toLowerCase();
+          return (
+            pId === 'rx_template' ||
+            rType.startsWith('rx_') ||
+            rType.includes('stim') ||
+            rType.includes('protocol') ||
+            (t.schema_json && Array.isArray(t.schema_json.medications) && t.schema_json.medications.length > 0)
+          );
+        })
+        .map((t: any) => ({
+          id: t.id,
+          name: t.title,
+          isCustom: true,
+          category: t.schema_json?.category || 'General',
+          medications: Array.isArray(t.schema_json?.medications) ? t.schema_json.medications : [],
+          advice: t.schema_json?.advice || '',
+        }));
+      setCustomRx(mappedRx);
     } catch (err) {
       console.error('Failed to fetch custom templates', err);
     } finally {

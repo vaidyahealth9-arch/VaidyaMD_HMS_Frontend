@@ -3,6 +3,7 @@
 import React from 'react';
 import { Pill, Check, Sparkles } from 'lucide-react';
 import { MedModalState } from './types';
+import { MedicineAutocompleteInput } from '@/components/common';
 
 import { HrtFetRowData } from './types';
 
@@ -40,11 +41,11 @@ export default function HrtFetMedicationModal({
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] font-bold text-slate-600 block mb-0.5">Medication / Drug Name</label>
-                <input
-                  type="text"
+                <MedicineAutocompleteInput
                   value={medModal.medication}
-                  onChange={(e) => setMedModal({ ...medModal, medication: e.target.value })}
-                  className="vmd-input text-xs w-full"
+                  onChange={(val) => setMedModal({ ...medModal, medication: val })}
+                  onSelect={(item) => setMedModal({ ...medModal, medication: item.drug })}
+                  className="h-8 text-xs w-full font-semibold"
                   placeholder="e.g. Estradiol Valerate (Progynova)"
                 />
               </div>

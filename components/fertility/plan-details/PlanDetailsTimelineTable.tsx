@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import { PlanTimelineItem, PlanItemCategory } from './types';
 import { formatDoseDisplay } from './utils';
+import { safeString } from '@/lib/utils';
 
 interface PlanDetailsTimelineTableProps {
+  isBatchModeActive?: boolean;
   items: PlanTimelineItem[];
   readonly?: boolean;
   onUpdateItemDose: (itemId: string, newDose: string) => void;
@@ -28,10 +30,19 @@ interface PlanDetailsTimelineTableProps {
   onOpenScanEdit?: (dayNumber: number) => void;
   onSave?: () => void;
   isSaving?: boolean;
+  selectedItemIds?: string[];
+  onToggleSelectItem?: (itemId: string, item?: PlanTimelineItem) => void;
+  onSelectAllItems?: (selectAll: boolean) => void;
+  batchMode?: 'add' | 'modify' | 'delete';
+  activeMedName?: string | null;
+  selectedDays?: number[];
+  onToggleSelectDay?: (dayNum: number) => void;
+  onSelectAllDays?: (selectAll: boolean) => void;
 }
 
 export default function PlanDetailsTimelineTable({
   items,
+  isBatchModeActive = false,
   readonly = false,
   onUpdateItemDose,
   onUpdateItemScan,
@@ -42,6 +53,14 @@ export default function PlanDetailsTimelineTable({
   onOpenScanEdit,
   onSave,
   isSaving = false,
+  selectedItemIds = [],
+  onToggleSelectItem,
+  onSelectAllItems,
+  batchMode = 'modify',
+  activeMedName = null,
+  selectedDays = [],
+  onToggleSelectDay,
+  onSelectAllDays,
 }: PlanDetailsTimelineTableProps) {
   const [editingDoseId, setEditingDoseId] = useState<string | null>(null);
   const [editDoseVal, setEditDoseVal] = useState<string>('');
@@ -155,12 +174,44 @@ export default function PlanDetailsTimelineTable({
     );
   }
 
+  const allDayNumbers = Array.from(new Set(items.map((i) => i.day_number))).filter(Boolean);
+  const isAllDaysSelected = allDayNumbers.length > 0 && allDayNumbers.every((d) => selectedDays.includes(d));
+  const isAllRowsSelected = items.length > 0 && items.every((i) => selectedItemIds.includes(i.id));
+  const isHeaderChecked = batchMode === 'add' ? isAllDaysSelected : isAllRowsSelected;
+
+  const handleHeaderCheckboxChange = (checked: boolean) => {
+    if (batchMode === 'add') {
+      onSelectAllDays?.(checked);
+    } else {
+      onSelectAllItems?.(checked);
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 select-none">
+              {isBatchModeActive && (
+                <th className="py-2.5 px-2 w-8 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isHeaderChecked}
+                    onChange={(e) => handleHeaderCheckboxChange(e.target.checked)}
+                    className="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer"
+                    title={
+                      batchMode === 'add'
+                        ? isAllDaysSelected
+                          ? 'Deselect all days'
+                          : 'Select all days'
+                        : isAllRowsSelected
+                        ? 'Deselect all rows'
+                        : 'Select all rows'
+                    }
+                  />
+                </th>
+              )}
               <th className="py-2.5 px-3 w-16 text-center" title="Clinical Phase: Amber = Stimulation, Emerald = Luteal">Phase</th>
               <th className="py-2.5 px-3 w-16">Dow</th>
               <th className="py-2.5 px-3 w-28">Date</th>
@@ -178,13 +229,67 @@ export default function PlanDetailsTimelineTable({
               const isEvenDay = item.day_number % 2 === 0;
               const isLuteal = item.phase === 'luteal';
 
+              const isMed = item.category === 'medication';
+              const isChecked =
+                batchMode === 'add'
+                  ? selectedDays.includes(item.day_number)
+                  : selectedItemIds.includes(item.id);
+
+              const isModifyDisabled =
+                batchMode === 'modify' &&
+                (!isMed || (Boolean(activeMedName) && item.name.toLowerCase() !== activeMedName?.toLowerCase()));
+
               return (
                 <tr
                   key={item.id || idx}
                   className={`transition-colors group hover:bg-slate-50/70 ${
-                    isEvenDay ? 'bg-slate-50/30' : 'bg-white'
+                    isBatchModeActive && isChecked
+                      ? batchMode === 'modify'
+                        ? 'bg-amber-50/80 ring-1 ring-amber-300'
+                        : 'bg-purple-50/80 ring-1 ring-purple-300'
+                      : isEvenDay
+                      ? 'bg-slate-50/30'
+                      : 'bg-white'
                   }`}
                 >
+                  {isBatchModeActive && (
+                    <td className="py-2 px-2 text-center align-middle">
+                      {batchMode === 'add' ? (
+                        isFirstOfDay ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedDays.includes(item.day_number)}
+                            onChange={() => onToggleSelectDay?.(item.day_number)}
+                            className="rounded w-3.5 h-3.5 cursor-pointer text-primary focus:ring-primary"
+                            title={`Select Day ${item.day_number} for batch addition`}
+                          />
+                        ) : (
+                          <span className="w-3.5 h-3.5 inline-block text-slate-200 select-none text-center">·</span>
+                        )
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isModifyDisabled}
+                          onChange={() => onToggleSelectItem?.(item.id, item)}
+                          className={`rounded w-3.5 h-3.5 cursor-pointer ${
+                            isModifyDisabled
+                              ? 'opacity-20 cursor-not-allowed text-slate-300'
+                              : batchMode === 'modify'
+                              ? 'text-amber-600 focus:ring-amber-500'
+                              : 'text-primary focus:ring-primary'
+                          }`}
+                          title={
+                            isModifyDisabled
+                              ? !isMed
+                                ? 'Only medications can be modified in Modify Meds mode'
+                                : `Select only matching ${activeMedName}`
+                              : `Select ${item.name} (Day ${item.day_number})`
+                          }
+                        />
+                      )}
+                    </td>
+                  )}
                   {/* Phase Indicator Block (Amber for Stimulation, Emerald for Luteal) */}
                   <td className="py-2 px-3 text-center align-middle">
                     <button
@@ -264,11 +369,11 @@ export default function PlanDetailsTimelineTable({
                             : 'text-rose-900 font-bold'
                         }`}
                       >
-                        {item.name}
+                        {safeString(item.name)}
                       </span>
                       {item.notes && (
                         <span className="text-[10px] text-slate-400 italic">
-                          ({item.notes})
+                          ({safeString(item.notes)})
                         </span>
                       )}
                     </div>
@@ -297,12 +402,12 @@ export default function PlanDetailsTimelineTable({
                           }`}
                           title={!readonly ? 'Click to edit dosage' : undefined}
                         >
-                          {item.dose_display || formatDoseDisplay(item.dosage || '', item.quantity || 1) || '—'}
+                          {safeString(item.dose_display) || formatDoseDisplay(safeString(item.dosage) || '', item.quantity || 1) || '—'}
                         </div>
                       )
                     ) : item.category === 'lab' && item.lab_result ? (
                       <span className="font-mono text-xs font-bold text-rose-700">
-                        {item.lab_result}
+                        {safeString(item.lab_result)}
                       </span>
                     ) : item.category === 'procedure' ? (
                       <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
@@ -431,9 +536,12 @@ export default function PlanDetailsTimelineTable({
                     <td className="py-2 px-3 text-center align-middle">
                       <button
                         type="button"
-                        onClick={() => onDeleteItem(item.id)}
-                        className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer"
-                        title="Delete item from plan"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteItem(item.id);
+                        }}
+                        className="text-slate-400 hover:text-rose-600 opacity-70 hover:opacity-100 group-hover:opacity-100 transition-all p-1.5 rounded hover:bg-rose-50 cursor-pointer inline-flex items-center justify-center"
+                        title={`Delete ${item.name} from Day ${item.day_number}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

@@ -31,13 +31,15 @@ export default function RegisterPatientPage() {
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [registeredSuccessData, setRegisteredSuccessData] = useState<RegistrationSuccessData | null>(null);
 
-  // Registration Tariff & Billing State
-  const [tariffFee, setTariffFee] = useState<number>(500);
+  // Registration Tariff & Itemized Billing State
+  const [registrationFee, setRegistrationFee] = useState<number>(500);
+  const [consultationFee, setConsultationFee] = useState<number>(500);
+  const [includeConsultation, setIncludeConsultation] = useState<boolean>(true);
   const [tariffPaymentStatus, setTariffPaymentStatus] = useState<'paid' | 'pending' | 'waived'>('paid');
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
 
   // OPD Direct Check-in State
-  const [queueForOpd, setQueueForOpd] = useState(false);
+  const [queueForOpd, setQueueForOpd] = useState(true);
   const [opdDoctorId, setOpdDoctorId] = useState('');
   const [opdVisitType, setOpdVisitType] = useState('consultation');
 
@@ -97,30 +99,51 @@ export default function RegisterPatientPage() {
         await patientsApi.linkPartner(primaryPatient.id, partnerRes.id).catch(() => {});
       }
 
-      // Generate Single Consolidated Couple Registration Invoice if tariff > 0
+      // Generate Itemized Registration & Consultation Invoice if total > 0
       let invoiceRes: any = null;
-      if (tariffFee > 0 && tariffPaymentStatus !== 'waived') {
+      const effectiveConsultFee = includeConsultation ? consultationFee : 0;
+      const totalTariffFee = (registrationFee || 0) + (effectiveConsultFee || 0);
+      const assignedDoctor = doctorsList.find((d) => d.id === (form.treating_doctor_id || opdDoctorId));
+      const doctorDisplayName = assignedDoctor ? (assignedDoctor.name?.startsWith('Dr.') ? assignedDoctor.name : `Dr. ${assignedDoctor.name}`) : 'OPD Consultant';
+
+      if (totalTariffFee > 0 && tariffPaymentStatus !== 'waived') {
         try {
-          const itemDesc = isCouple
-            ? `Couple Registration & Initial Consultation - [Primary: ${primaryPatient.name}] & [Spouse: ${partnerRes?.name || 'Partner'}]`
-            : `Patient Registration & Initial Consultation - ${primaryPatient.name}`;
+          const invoiceItems: any[] = [];
+          if (registrationFee > 0) {
+            invoiceItems.push({
+              description: isCouple
+                ? `Couple Registration Fee - [Primary: ${primaryPatient.name}] & [Spouse: ${partnerRes?.name || 'Spouse'}] (Spouse Waived ₹0)`
+                : `Patient Registration Fee - ${primaryPatient.name}`,
+              quantity: 1,
+              unit_price: registrationFee,
+              total: registrationFee,
+              service_code: isCouple ? 'REG-COUPLE' : 'REG-PATIENT',
+            });
+          }
+
+          if (effectiveConsultFee > 0) {
+            invoiceItems.push({
+              description: isCouple
+                ? `Initial Couple OPD Consultation - ${doctorDisplayName}`
+                : `Initial OPD Consultation - ${doctorDisplayName}`,
+              quantity: 1,
+              unit_price: effectiveConsultFee,
+              total: effectiveConsultFee,
+              service_code: 'CONS-OPD',
+            });
+          }
+
           const invNotes = isCouple
-            ? `Consolidated couple registration tariff for ${primaryPatient.name} (${primaryPatient.vid}) and ${partnerRes?.name || 'Spouse'} (${partnerRes?.vid || ''}). Spouse fee waived (₹0).`
-            : `Registration tariff for ${primaryPatient.name} (${primaryPatient.vid})`;
+            ? `Itemized couple registration & consultation for ${primaryPatient.name} (${primaryPatient.vid}) and ${partnerRes?.name || 'Spouse'}.`
+            : `Itemized registration & consultation for ${primaryPatient.name} (${primaryPatient.vid})`;
 
           invoiceRes = await billingApi.createInvoice({
             patient_id: primaryPatient.id,
             appointment_source: 'OP',
             source_module: 'opd',
-            reason_for_attendance: isCouple ? 'Couple Registration' : 'Patient Registration',
-            items: [{
-              description: itemDesc,
-              quantity: 1,
-              unit_price: tariffFee,
-              total: tariffFee,
-              service_code: isCouple ? 'REG-COUPLE' : 'REG-PATIENT',
-            }],
-            paid_amount: tariffPaymentStatus === 'paid' ? tariffFee : 0,
+            reason_for_attendance: isCouple ? 'Couple Registration & OPD' : 'Patient Registration & OPD',
+            items: invoiceItems,
+            paid_amount: tariffPaymentStatus === 'paid' ? totalTariffFee : 0,
             payment_method: tariffPaymentStatus === 'paid' ? paymentMethod : 'pending',
             branch_id: activeBranchId,
             notes: invNotes,
@@ -180,7 +203,7 @@ export default function RegisterPatientPage() {
         primary: primaryPatient,
         partner: partnerRes,
         invoice: invoiceRes,
-        fee: tariffFee,
+        fee: totalTariffFee,
         appointment: appointmentRes,
         queuedToOpd: Boolean(appointmentRes),
       });
@@ -248,8 +271,12 @@ export default function RegisterPatientPage() {
 
         <RegistrationTariffSection
           registrationMode={registrationMode}
-          tariffFee={tariffFee}
-          setTariffFee={setTariffFee}
+          registrationFee={registrationFee}
+          setRegistrationFee={setRegistrationFee}
+          consultationFee={consultationFee}
+          setConsultationFee={setConsultationFee}
+          includeConsultation={includeConsultation}
+          setIncludeConsultation={setIncludeConsultation}
           tariffPaymentStatus={tariffPaymentStatus}
           setTariffPaymentStatus={setTariffPaymentStatus}
           paymentMethod={paymentMethod}
@@ -259,6 +286,7 @@ export default function RegisterPatientPage() {
           queueForOpd={queueForOpd}
           setQueueForOpd={setQueueForOpd}
           treatingDoctorId={form.treating_doctor_id}
+          onSelectDoctor={(docId) => update('treating_doctor_id', docId)}
           doctorsList={doctorsList}
           opdDoctorId={opdDoctorId}
           setOpdDoctorId={setOpdDoctorId}

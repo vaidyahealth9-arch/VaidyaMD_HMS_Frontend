@@ -4,15 +4,17 @@
 
 import React from 'react';
 
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatDoctorName } from '@/lib/utils';
 
 import PrintableModal from './PrintableModal';
 
 import PrintableReportHeader, { resolveLogoUrl } from './PrintableReportHeader';
 
 import PrintableReportFooter from './PrintableReportFooter';
+import { cleanVitalValue } from '@/lib/vitalsUtils';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { formatFrequency } from '@/components/opd/prescriptionUtils';
 
 
 
@@ -85,6 +87,7 @@ interface PrescriptionProps {
   pastHistory?: string;
 
   examination?: string;
+  previousInvestigations?: string;
 
   vitals?: {
 
@@ -201,7 +204,7 @@ function MedTable({ medications, label }: { medications: MedRow[]; label: string
                 ) : null}
               </td>
 
-              <td className="py-1.5 px-2 font-bold text-[#4A2E2B]">{med.freq || 'OD'}</td>
+              <td className="py-1.5 px-2 font-bold text-[#4A2E2B]">{formatFrequency(med.freq)}</td>
 
               <td className="py-1.5 px-2 text-slate-600">{med.duration || '—'}</td>
 
@@ -234,6 +237,7 @@ function ClinicalHistoryBlock({
   pastHistory,
 
   examination,
+  previousInvestigations,
 
   diagnosis,
 
@@ -248,6 +252,7 @@ function ClinicalHistoryBlock({
   pastHistory?: string;
 
   examination?: string;
+  previousInvestigations?: string;
 
   diagnosis?: string;
 
@@ -255,7 +260,19 @@ function ClinicalHistoryBlock({
 
 }) {
 
-  const hasAny = chiefComplaint || hopi || pastHistory || examination || diagnosis || differentialDiagnosis;
+  const cleanChiefComplaint =
+    chiefComplaint && !/^[.\s\-_]+$/.test(chiefComplaint.trim())
+      ? chiefComplaint.trim()
+      : undefined;
+
+  const hasAny =
+    cleanChiefComplaint ||
+    hopi ||
+    pastHistory ||
+    examination ||
+    previousInvestigations ||
+    diagnosis ||
+    differentialDiagnosis;
 
   if (!hasAny) return null;
 
@@ -267,7 +284,7 @@ function ClinicalHistoryBlock({
 
       {/* Chief Complaints — Single Column Full Width */}
 
-      {chiefComplaint && (
+      {cleanChiefComplaint && (
 
         <div className="p-2 print:p-1.5 rounded-lg print:rounded bg-slate-50/80 border border-slate-200 break-inside-avoid">
 
@@ -277,7 +294,7 @@ function ClinicalHistoryBlock({
 
           </span>
 
-          <p className="text-xs print:text-[11px] text-slate-900 font-medium whitespace-pre-line leading-relaxed print:leading-snug">{chiefComplaint}</p>
+          <p className="text-xs print:text-[11px] text-slate-900 font-medium whitespace-pre-line leading-relaxed print:leading-snug">{cleanChiefComplaint}</p>
 
         </div>
 
@@ -373,6 +390,19 @@ function ClinicalHistoryBlock({
 
 
 
+      {/* Previous Investigations / Past Reports & Imaging */}
+      {previousInvestigations && (
+        <div
+          className="p-2 print:p-1.5 rounded-lg print:rounded bg-slate-50/80 border border-slate-200"
+          style={{ pageBreakInside: 'auto', breakInside: 'auto' }}
+        >
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+            Previous Investigations / Past Reports &amp; Imaging
+          </span>
+          <p className="text-xs print:text-[11px] text-slate-800 whitespace-pre-line leading-relaxed print:leading-snug">{previousInvestigations}</p>
+        </div>
+      )}
+
       {/* Diagnosis Banner */}
 
       {(diagnosis || differentialDiagnosis) && (
@@ -432,6 +462,7 @@ export default function PrintablePrescription({
   pastHistory,
 
   examination,
+  previousInvestigations,
 
   vitals,
 
@@ -460,6 +491,7 @@ export default function PrintablePrescription({
   const [activeDoctor, setActiveDoctor] = React.useState(doctor);
 
   const { currentBranch, user: currentUser } = useAuth() || {};
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'hospital_admin' || currentUser?.role === 'super_admin';
 
   const [realtimeDoctors, setRealtimeDoctors] = React.useState<any[]>([]);
 
@@ -602,97 +634,10 @@ export default function PrintablePrescription({
 
           ` }} />
 
-          {/* Doctor Switcher Toolbar (Screen Only, Hidden in Print) */}
-
-          <div className="print:hidden p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-
-            <div className="flex items-center gap-2">
-
-              <span className="text-xs font-bold text-slate-700">Treating Doctor:</span>
-
-              <select
-
-                className="text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
-
-                value={activeDoctor.name}
-
-                onChange={(e) => {
-
-                  const val = e.target.value;
-                  const norm = (s?: string) => (s || '').toLowerCase().replace(/^dr\.?\s*/i, '').trim();
-
-                  const matched = realtimeDoctors.find((d: any) => {
-
-                    const docName = d.name.startsWith('Dr') ? d.name : `Dr. ${d.name}`;
-
-                    return docName === val || d.id === val || d.name === val || norm(d.name) === norm(val);
-
-                  });
-
-                  if (matched) {
-
-                    setActiveDoctor({
-
-                      id: matched.id,
-
-                      name: matched.name.startsWith('Dr') ? matched.name : `Dr. ${matched.name}`,
-
-                      qualification: matched.qualification || '',
-
-                      specialization: matched.specialization || (matched.departments?.[0]) || '',
-
-                      reg_number: matched.reg_number || undefined,
-
-                      department: matched.departments?.[0] || 'Outpatient Department',
-
-                    });
-
-                  } else {
-
-                    setActiveDoctor(prev => ({ ...prev, name: val }));
-
-                  }
-
-                }}
-
-              >
-
-                <option value={activeDoctor.name}>{activeDoctor.name} (Current Treating Clinician)</option>
-
-                {realtimeDoctors.map((doc: any) => {
-
-                  const docDisplayName = doc.name.startsWith('Dr') ? doc.name : `Dr. ${doc.name}`;
-
-                  if (docDisplayName === activeDoctor.name) return null;
-
-                  return (
-
-                    <option key={doc.id} value={docDisplayName}>
-
-                      {docDisplayName} {doc.specialization ? `(${doc.specialization})` : ''}
-
-                    </option>
-
-                  );
-
-                })}
-
-              </select>
-
-            </div>
-
-          </div>
-
-
-
-          <div
-
+                    <div
             className="printable-document relative bg-white text-slate-900 text-xs w-full max-w-[210mm] min-h-[297mm] mx-auto my-6 shadow-2xl rounded-sm border border-slate-300 print:border-none print:my-0 print:shadow-none print:max-w-none print:w-full print:min-h-0 print:m-0 print:p-0 flex flex-col justify-between overflow-hidden print:overflow-visible"
-
-          style={{ fontFamily: 'Inter, Arial, sans-serif', ['--print-footer-height' as any]: effectiveFooterHeight }}
-
-        >
-
+            style={{ fontFamily: 'Inter, Arial, sans-serif', ['--print-footer-height' as any]: effectiveFooterHeight }}
+          >
           {/* Centered Watermark Background (Repeats on every printed page via position: fixed) */}
 
           {!hideHeader && effectiveWatermark && (
@@ -949,7 +894,7 @@ export default function PrintablePrescription({
 
                             <span className="font-bold text-slate-900">
 
-                              {activeDoctor.name.startsWith('Dr') ? activeDoctor.name : `Dr. ${activeDoctor.name}`}
+                              {formatDoctorName(activeDoctor.name)}
 
                             </span>
 
@@ -1005,7 +950,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            BP: <strong className="text-slate-900">{vitals.bp} mmHg</strong>
+                            BP: <strong className="text-slate-900">{cleanVitalValue(vitals.bp)} mmHg</strong>
 
                           </span>
 
@@ -1015,7 +960,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            Pulse: <strong className="text-slate-900">{vitals.pulse} bpm</strong>
+                            Pulse: <strong className="text-slate-900">{cleanVitalValue(vitals.pulse)} bpm</strong>
 
                           </span>
 
@@ -1025,7 +970,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            Weight: <strong className="text-slate-900">{vitals.weight} kg</strong>
+                            Weight: <strong className="text-slate-900">{cleanVitalValue(vitals.weight)} kg</strong>
 
                           </span>
 
@@ -1035,7 +980,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            Height: <strong className="text-slate-900">{vitals.height} cm</strong>
+                            Height: <strong className="text-slate-900">{cleanVitalValue(vitals.height)} cm</strong>
 
                           </span>
 
@@ -1045,7 +990,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            BMI: <strong className="text-slate-900">{vitals.bmi}</strong>
+                            BMI: <strong className="text-slate-900">{cleanVitalValue(vitals.bmi)}</strong>
 
                           </span>
 
@@ -1055,7 +1000,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            Temp: <strong className="text-slate-900">{vitals.temp} °F</strong>
+                            Temp: <strong className="text-slate-900">{cleanVitalValue(vitals.temp)} °F</strong>
 
                           </span>
 
@@ -1065,7 +1010,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            SpO2: <strong className="text-slate-900">{vitals.spo2}%</strong>
+                            SpO2: <strong className="text-slate-900">{cleanVitalValue(vitals.spo2)}%</strong>
 
                           </span>
 
@@ -1075,7 +1020,7 @@ export default function PrintablePrescription({
 
                           <span>
 
-                            RR: <strong className="text-slate-900">{vitals.rr}</strong>
+                            RR: <strong className="text-slate-900">{cleanVitalValue(vitals.rr)} /min</strong>
 
                           </span>
 
@@ -1098,6 +1043,7 @@ export default function PrintablePrescription({
                       pastHistory={pastHistory}
 
                       examination={examination}
+                      previousInvestigations={previousInvestigations}
 
                       diagnosis={diagnosis}
 

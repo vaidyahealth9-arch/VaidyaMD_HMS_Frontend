@@ -16,6 +16,7 @@ import {
   UserCheck,
   CheckCircle2,
   Calendar,
+  PhoneCall,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { toast } from '@/contexts/ToastContext';
@@ -27,6 +28,7 @@ import {
   RescheduleAppointmentModal,
   NurseTriageModal,
   AppointmentCardGrid,
+  FollowUpCallList,
   DEFAULT_VISIT_TYPES,
 } from '@/components/appointments';
 
@@ -298,11 +300,18 @@ export default function AppointmentsPage() {
           { id: 'in_progress', label: 'In Cabin', icon: UserCheck, badge: inProgressCount || undefined },
           { id: 'scheduled', label: 'Scheduled', icon: CalendarDays, badge: scheduledCount || undefined },
           { id: 'completed', label: 'Completed', icon: CheckCircle2, badge: completedCount || undefined },
+          { id: 'follow_ups', label: 'Follow-Up Call List', icon: PhoneCall },
         ]}
       />
 
       {/* Appointment Queue Grid */}
-      <AppointmentCardGrid
+      {filter === 'follow_ups' ? (
+        <FollowUpCallList
+          doctors={doctors}
+          onBookAppointment={() => setShowBookModal(true)}
+        />
+      ) : (
+        <AppointmentCardGrid
         appointments={filteredAppointments}
         patients={patients}
         isLoading={isLoading}
@@ -313,6 +322,7 @@ export default function AppointmentsPage() {
         onTriage={(apt) => setTriageApt(apt)}
         onRefresh={() => loadData(true)}
       />
+      )}
 
       {/* Modals */}
       <BookAppointmentModal

@@ -18,6 +18,7 @@ import {
   Check,
   EyeOff,
   Pill,
+  Copy,
 } from 'lucide-react';
 import CycleTypeModal from '../modals/CycleTypeModal';
 import ProtocolModal from '../modals/ProtocolModal';
@@ -65,6 +66,32 @@ export default function CyclesSettingsTab({
         .then((res: any) => setProtocolPreviewCalendar(res?.days || []))
         .catch(() => setProtocolPreviewCalendar([]));
     }
+  };
+
+  const handleDuplicateProtocol = (proto: any) => {
+    if (!proto) return;
+    setEditingProtocol(null);
+    setProtocolForm({
+      name: `${proto.name || 'Protocol'} (Copy)`,
+      category: proto.category || 'stimulation',
+      description: proto.description ? `Copy of ${proto.name}: ${proto.description}` : `Copy of ${proto.name}`,
+      rules: (proto.rules || []).map((r: any) => ({
+        drug_name: r.drug_name || '',
+        dose: r.dose || '',
+        route: r.route || 'SC',
+        frequency: r.frequency || 'OD',
+        day_start_offset: r.day_start_offset ?? 1,
+        day_end_offset: r.day_end_offset ?? 10,
+        instructions: r.instructions || '',
+      })),
+      timeline_events: (proto.timeline_events || []).map((ev: any) => ({
+        type: ev.type || 'scan',
+        day_offset: ev.day_offset ?? 1,
+        title: ev.title || '',
+        instructions: ev.instructions || '',
+      })),
+    });
+    setShowProtocolModal(true);
   };
 
   // Schema parsing & field builder synchronization
@@ -514,6 +541,17 @@ export default function CyclesSettingsTab({
                       >
                         <div className="flex items-center justify-between gap-1">
                           <div className="font-bold text-slate-900 text-xs truncate">{proto.name}</div>
+                          <span
+                            role="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicateProtocol(proto);
+                            }}
+                            className="p-1 text-slate-400 hover:text-primary rounded hover:bg-slate-200/50 transition-colors shrink-0"
+                            title="Duplicate Protocol"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </span>
                           {proto.is_active === false && (
                             <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                               Inactive
@@ -584,6 +622,14 @@ export default function CyclesSettingsTab({
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
                       >
                         <Edit2 className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateProtocol(selectedProtocol)}
+                        className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-xs rounded-lg flex items-center gap-1 shadow-2xs"
+                        title="Duplicate this protocol to modify and create a new template"
+                      >
+                        <Copy className="w-3 h-3 text-primary" /> Duplicate
                       </button>
 
                       {/* Deactivate vs Reactivate Buttons */}

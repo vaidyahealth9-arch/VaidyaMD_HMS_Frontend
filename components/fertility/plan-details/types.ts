@@ -40,6 +40,9 @@ export interface PlanTimelineItem {
   endometrial_pattern?: string;
   right_follicles?: string;
   left_follicles?: string;
+  right_afc?: string;
+  left_afc?: string;
+  afc?: string;
   lab_result?: string;
   notes?: string;
 }
@@ -54,6 +57,9 @@ export interface DayTimelineGroup {
   items: PlanTimelineItem[];
   right_follicles?: string;
   left_follicles?: string;
+  right_afc?: string;
+  left_afc?: string;
+  afc?: string;
   endometrium_mm?: string;
   endometrial_pattern?: string;
   e2_pgml?: string;

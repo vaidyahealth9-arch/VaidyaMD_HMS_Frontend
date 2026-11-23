@@ -48,7 +48,7 @@ import {
 
 import { StatusBadge, ReceiptModal, RecordPaymentModal } from '@/components/billing';
 
-import { statusColors } from '@/lib/utils';
+import { statusColors, formatDoctorName } from '@/lib/utils';
 
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -122,7 +122,9 @@ export default function AppointmentCardGrid({
 
   const router = useRouter();
 
-  const { can } = useAuth();
+  const { can, user, activeRole } = useAuth();
+  const userRole = (user?.role || activeRole || '').toLowerCase();
+  const canStartConsultation = ['admin', 'super_admin', 'doctor', 'consultant'].includes(userRole);
 
   const { openBilling } = useBillingModal();
 
@@ -393,7 +395,7 @@ export default function AppointmentCardGrid({
 
                     <p className="text-slate-800 font-bold truncate mt-0.5">
 
-                      {apt.doctor_name || 'Consultant'}
+                      {formatDoctorName(apt.doctor_name || apt.doctor?.name, 'Consultant')}
 
                     </p>
 
@@ -541,7 +543,7 @@ export default function AppointmentCardGrid({
 
 
 
-                  {apt.status === 'waiting' && !isCosGyn && can('action:start_consultation') && (
+                  {apt.status === 'waiting' && !isCosGyn && canStartConsultation && (
 
                     <button
 
@@ -565,7 +567,7 @@ export default function AppointmentCardGrid({
 
                     <>
 
-                      {!isCosGyn && can('action:start_consultation') && (
+                      {!isCosGyn && canStartConsultation && (
 
                         <button
 

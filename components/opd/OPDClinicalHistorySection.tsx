@@ -117,7 +117,7 @@ export default function OPDClinicalHistorySection({
                   {...register('chief_complaints', { required: true })}
                   rows={2}
                   placeholder="e.g. Primary subfertility for 3 years, irregular menses..."
-                  className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -128,7 +128,7 @@ export default function OPDClinicalHistorySection({
                     {...register('present_history')}
                     rows={10}
                     placeholder="Detailed chronological history of present illness..."
-                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -138,7 +138,7 @@ export default function OPDClinicalHistorySection({
                     {...register('previous_history')}
                     rows={4}
                     placeholder="Previous hospitalizations, medical illnesses, surgeries, drug allergies, family history..."
-                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -148,7 +148,7 @@ export default function OPDClinicalHistorySection({
                     {...register('examination')}
                     rows={4}
                     placeholder="General examination (O/E, BP, Pallor, Pedal edema), P/A, P/S, P/V, USG findings..."
-                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -159,7 +159,7 @@ export default function OPDClinicalHistorySection({
                   {...register('previous_investigations')}
                   rows={2}
                   placeholder="Past reports and imaging..."
-                  className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
                 />
               </div>
             </>

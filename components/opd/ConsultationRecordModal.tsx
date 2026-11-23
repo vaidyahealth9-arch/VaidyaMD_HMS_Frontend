@@ -20,6 +20,7 @@ import { formatDateTime } from '@/lib/utils';
 
 interface ConsultationRecordModalProps {
   record: any;
+  consultationHistory?: any[];
   onClose: () => void;
   onLoadForEdit: (record: any) => void;
   onPrintRx: (record: any) => void;
@@ -28,12 +29,42 @@ interface ConsultationRecordModalProps {
 
 export default function ConsultationRecordModal({
   record,
+  consultationHistory,
   onClose,
   onLoadForEdit,
   onPrintRx,
   onDelete,
 }: ConsultationRecordModalProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Resolve effective vitals across direct record data, linked triage, or matching same-day triage
+  const resolvedVitals = React.useMemo(() => {
+    if (!record) return null;
+    const directVitals = record.data?.vitals;
+    const hasDirectValues = directVitals && Object.values(directVitals).some((v) => v && v !== '—' && v !== '');
+    if (hasDirectValues) return directVitals;
+
+    // Check linked_triage_record_id
+    if (consultationHistory && record.data?.linked_triage_record_id) {
+      const linked = consultationHistory.find((r: any) => r.id === record.data.linked_triage_record_id);
+      if (linked?.data?.vitals) return linked.data.vitals;
+    }
+
+    // Check same-day triage in consultationHistory
+    if (consultationHistory && record.created_at) {
+      const recordDay = new Date(record.created_at).toDateString();
+      const sameDayTriage = consultationHistory.find((r: any) => {
+        const isTriage = r.record_type === 'nurse_triage' || r.data?.record_type === 'nurse_triage';
+        if (!isTriage) return false;
+        const rDay = r.created_at ? new Date(r.created_at).toDateString() : '';
+        return rDay === recordDay;
+      });
+      if (sameDayTriage?.data?.vitals) return sameDayTriage.data.vitals;
+    }
+
+    return directVitals || null;
+  }, [record, consultationHistory]);
+
   if (!record) return null;
 
   return (
@@ -118,39 +149,39 @@ export default function ConsultationRecordModal({
                 <span>Objective &amp; Examination</span>
               </h4>
 
-              {record.data?.vitals && (
+              {(resolvedVitals || record.data?.vitals) && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-rose-50/30 p-3 rounded-lg border border-rose-100">
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">BP</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.bp || '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).bp || '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">Heart Rate</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.hr ? `${record.data.vitals.hr} bpm` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).hr ? `${(resolvedVitals || record.data.vitals).hr} bpm` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">Resp Rate</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.rr ? `${record.data.vitals.rr} /m` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).rr ? `${(resolvedVitals || record.data.vitals).rr} /m` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">Temp</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.temp ? `${record.data.vitals.temp} °F` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).temp ? `${(resolvedVitals || record.data.vitals).temp} °F` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">SpO2</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.spo2 ? `${record.data.vitals.spo2}%` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).spo2 ? `${(resolvedVitals || record.data.vitals).spo2}%` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">Weight</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.weight ? `${record.data.vitals.weight} kg` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).weight ? `${(resolvedVitals || record.data.vitals).weight} kg` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">Height</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.height ? `${record.data.vitals.height} cm` : '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).height ? `${(resolvedVitals || record.data.vitals).height} cm` : '—'}</span>
                   </div>
                   <div className="text-center p-1.5 bg-white rounded border border-rose-100/80">
                     <span className="text-[10px] text-slate-400 font-bold block uppercase">BMI</span>
-                    <span className="text-xs font-bold text-slate-800">{record.data.vitals.bmi || '—'}</span>
+                    <span className="text-xs font-bold text-slate-800">{(resolvedVitals || record.data.vitals).bmi || '—'}</span>
                   </div>
                 </div>
               )}
