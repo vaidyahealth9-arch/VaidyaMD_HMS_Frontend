@@ -32,7 +32,7 @@ import {
   getStepDays,
 } from '@/components/cosgyn';
 import { UnifiedInvoiceSheet } from '@/components/billing';
-import type { EditableSessionItem } from '@/components/cosgyn/BookPackageModal';
+import type { EditableSessionItem, CustomCosgynServiceItem } from '@/components/cosgyn';
 
 export default function CosGynDashboard() {
   const queryClient = useQueryClient();
@@ -89,7 +89,7 @@ export default function CosGynDashboard() {
   const [teslaStartDate, setTeslaStartDate] = useState(todayStr);
   const [teslaTime, setTeslaTime] = useState('11:30');
   const [teslaFrequency, setTeslaFrequency] = useState('twice_weekly');
-  const [teslaDuration, setTeslaDuration] = useState(28);
+  const [teslaDuration, setTeslaDuration] = useState(30);
 
   const [prpStartDate, setPrpStartDate] = useState(todayStr);
   const [prpTime, setPrpTime] = useState('12:30');
@@ -98,6 +98,29 @@ export default function CosGynDashboard() {
 
   // Granular Editable Sessions Array
   const [editableSessions, setEditableSessions] = useState<EditableSessionItem[]>([]);
+  const [customServices, setCustomServices] = useState<CustomCosgynServiceItem[]>([
+    {
+      id: 'init-1',
+      name: 'Jet Plasma Rejuvenation',
+      sessions: 3,
+      unitPrice: 10000,
+      duration_mins: 30,
+      startDate: todayStr,
+      time: '10:00',
+      frequency: 'weekly',
+    },
+    {
+      id: 'init-2',
+      name: 'Tesla Chair HIFEM Pelvic Floor',
+      sessions: 6,
+      unitPrice: 8000,
+      duration_mins: 30,
+      startDate: todayStr,
+      time: '11:30',
+      frequency: 'twice_weekly',
+    },
+  ]);
+  const [customPackageName, setCustomPackageName] = useState<string>('Custom CosGyn Care Plan');
 
   // Printable Schedule State
   const [printableScheduleData, setPrintableScheduleData] = useState<any | null>(null);
@@ -142,6 +165,39 @@ export default function CosGynDashboard() {
       return;
     }
 
+    if (selectedTreatmentId === 'custom_package') {
+      const list: EditableSessionItem[] = [];
+      let sNum = 1;
+      let totalTariff = 0;
+
+      for (const srv of customServices) {
+        const qty = Math.max(1, Number(srv.sessions) || 1);
+        totalTariff += qty * (Number(srv.unitPrice) || 0);
+        let curDate = srv.startDate || todayStr;
+        const normEquipName = srv.name.toLowerCase().includes('tesla')
+          ? 'Tesla Chair'
+          : srv.name.toLowerCase().includes('jet')
+          ? 'Jet Plasma'
+          : srv.name;
+        for (let i = 0; i < qty; i++) {
+          list.push({
+            id: `${srv.id}-${i + 1}`,
+            equipment: normEquipName,
+            session_number: sNum++,
+            date: curDate,
+            time: srv.time || '10:00',
+            duration_mins: Number(srv.duration_mins) || 30,
+          });
+          curDate = addDaysToDate(curDate, getStepDays(srv.frequency, i));
+        }
+      }
+
+      setEditableSessions(list);
+      setBookingPackagePrice(totalTariff);
+      return;
+      return;
+    }
+
     const list: EditableSessionItem[] = [];
     let sNum = 1;
 
@@ -180,7 +236,7 @@ export default function CosGynDashboard() {
         session_number: sNum++,
         date: curTcDate,
         time: teslaTime || '11:30',
-        duration_mins: Number(teslaDuration) || selectedTreatment?.tesla_chair_duration_mins || 28,
+        duration_mins: Number(teslaDuration) || selectedTreatment?.tesla_chair_duration_mins || 30,
       });
       curTcDate = addDaysToDate(curTcDate, getStepDays(teslaFrequency, i));
     }
@@ -231,6 +287,7 @@ export default function CosGynDashboard() {
     prpTime,
     prpFrequency,
     prpDuration,
+    customServices,
   ]);
 
   const handleOpenBookingModal = (treatmentId?: string, prefillDate?: string, prefillTime?: string, prefillEquip?: string) => {
@@ -284,15 +341,35 @@ export default function CosGynDashboard() {
     });
   };
 
-  const isSlotBooked = (equip: string, date: string, time: string) => {
-    return sessions.some((s: any) => {
+  const normalizeEquipment = (equip: string) => {
+    const e = (equip || '').toLowerCase().trim();
+    if (e.includes('tesla')) return 'tesla chair';
+    if (e.includes('jet')) return 'jet plasma';
+    if (e.includes('prp')) return 'prp';
+    if (e.includes('laser') || e.includes('co2')) return 'co2 laser';
+    if (e.includes('rf') || e.includes('radiofrequency')) return 'rf';
+    return e;
+  };
+
+  const isSlotBooked = (equip: string, date: string, time: string, currentSessionId?: string) => {
+    const targetNorm = normalizeEquipment(equip);
+    // 1. Check against booked sessions in database
+    const dbConflict = sessions.some((s: any) => {
       if (s.status?.toLowerCase() === 'cancelled') return false;
-      if (s.equipment?.toLowerCase() !== equip.toLowerCase()) return false;
+      if (normalizeEquipment(s.equipment || '') !== targetNorm) return false;
       const sDate = s.scheduled_datetime ? s.scheduled_datetime.split('T')[0] : '';
       const sTime = s.scheduled_datetime
         ? new Date(s.scheduled_datetime).toTimeString().slice(0, 5)
         : '';
       return sDate === date && sTime === time;
+    });
+    if (dbConflict) return true;
+
+    // 2. Check against other draft sessions within the current package
+    return editableSessions.some((es) => {
+      if (currentSessionId && es.id === currentSessionId) return false;
+      if (normalizeEquipment(es.equipment || '') !== targetNorm) return false;
+      return es.date === date && es.time === time;
     });
   };
 
@@ -509,7 +586,11 @@ export default function CosGynDashboard() {
     let singleEquipment = undefined;
     let customTreatmentName = undefined;
 
-    if (selectedTreatmentId === 'custom_jet') {
+    if (selectedTreatmentId === 'custom_package') {
+      finalTreatmentId = 'manual';
+      singleEquipment = customServices.map((s) => s.name).join(' + ');
+      customTreatmentName = customPackageName || 'Custom CosGyn Care Plan';
+    } else if (selectedTreatmentId === 'custom_jet') {
       finalTreatmentId = 'manual';
       singleEquipment = 'Jet Plasma';
       customTreatmentName = 'Single Session: Jet Plasma';
@@ -583,8 +664,8 @@ export default function CosGynDashboard() {
 
   const vacancyStats = useMemo(() => {
     const totalSlotsPerEquip = operationalTimeSlots.length;
-    const teslaBooked = daySessions.filter((s: any) => s.equipment === 'Tesla Chair').length;
-    const jetBooked = daySessions.filter((s: any) => s.equipment === 'Jet Plasma').length;
+    const teslaBooked = daySessions.filter((s: any) => (s.equipment || '').toLowerCase().includes('tesla')).length;
+    const jetBooked = daySessions.filter((s: any) => (s.equipment || '').toLowerCase().includes('jet')).length;
 
     const totalSlots = totalSlotsPerEquip * 2;
     const totalBooked = teslaBooked + jetBooked;
@@ -768,6 +849,12 @@ export default function CosGynDashboard() {
           daySessions={daySessions}
           slotVacancyStats={vacancyStats}
           onOpenBookingModal={handleOpenBookingModal}
+          onNavigateToPackage={(planId) => {
+            setActiveTab('packages_booked');
+            if (planId) {
+              setExpandedPlanIds((prev) => ({ ...prev, [planId]: true }));
+            }
+          }}
         />
       )}
 
@@ -825,6 +912,10 @@ export default function CosGynDashboard() {
         setBookingNotes={setBookingNotes}
         handleBookSubmit={handleBookSubmit}
         isCreatingPlan={createPlanMutation.isPending}
+        customServices={customServices}
+        setCustomServices={setCustomServices}
+        customPackageName={customPackageName}
+        setCustomPackageName={setCustomPackageName}
       />
 
       <EditPlanScheduleModal

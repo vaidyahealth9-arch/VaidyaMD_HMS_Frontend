@@ -45,6 +45,7 @@ import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import PrintableReportFooter from '@/components/common/PrintableReportFooter';
 import A4Sheet from '@/components/common/A4Sheet';
 import { getProtocolActualDays } from './plan-details/utils';
+import BatchRangeEditModal, { BatchEditResult } from './BatchRangeEditModal';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -74,6 +75,9 @@ export interface DayData {
   }[];
   right_follicles?: string;
   left_follicles?: string;
+  right_afc?: string;
+  left_afc?: string;
+  afc?: string;
   endometrium_mm?: string;
   endometrial_pattern?: string;
   e2_pgml?: string;
@@ -233,6 +237,7 @@ export default function StimulationCalendarGrid({
 
   // Popover state to add medication to a specific day in Calendar View
   const [activeAddMedDay, setActiveAddMedDay] = useState<number | null>(null);
+  const [showBatchEditModal, setShowBatchEditModal] = useState<boolean>(false);
 
   useEffect(() => {
     protocolsApi
@@ -569,6 +574,54 @@ export default function StimulationCalendarGrid({
       })
     );
     setActiveAddMedDay(null);
+  };
+
+  const handleApplyBatchEdit = (result: BatchEditResult) => {
+    if (readonly) return;
+    const { targetDays, actionType, medication, milestone, clearExistingMedsOnDays } = result;
+
+    setDays((prev) =>
+      prev.map((day) => {
+        if (!targetDays.includes(day.day_number)) return day;
+
+        let updatedMeds = clearExistingMedsOnDays ? [] : [...day.medications];
+
+        if (actionType === 'set_medication' && medication && medication.drug_name) {
+          const existingIdx = updatedMeds.findIndex(
+            (m) => m.drug_name.toLowerCase() === medication.drug_name.toLowerCase()
+          );
+          const newMedItem = {
+            drug_name: medication.drug_name,
+            dose: medication.dose || '',
+            route: medication.route || 'SC',
+            frequency: medication.frequency || 'OD',
+            time: medication.time || '',
+          };
+          if (existingIdx >= 0) {
+            updatedMeds[existingIdx] = newMedItem;
+          } else {
+            updatedMeds.push(newMedItem);
+          }
+        } else if (actionType === 'remove_medication' && medication?.drug_name) {
+          updatedMeds = updatedMeds.filter(
+            (m) => m.drug_name.toLowerCase() !== medication.drug_name.toLowerCase()
+          );
+        }
+
+        return {
+          ...day,
+          medications: updatedMeds,
+          milestone: actionType === 'set_milestone' && milestone ? milestone : day.milestone,
+        };
+      })
+    );
+
+    if (medication?.drug_name && !drugList.includes(medication.drug_name)) {
+      setDrugList((prev) => [...prev, medication.drug_name]);
+    }
+
+    setSaveMessage(`Applied batch edits to ${targetDays.length} days (Days ${targetDays.join(', ')})`);
+    setTimeout(() => setSaveMessage(null), 3000);
   };
 
   const handleCopyDayToNextDays = (sourceDayNum: number, daysToForward: number = 3) => {
@@ -987,6 +1040,16 @@ export default function StimulationCalendarGrid({
 
                   <button
                     type="button"
+                    onClick={() => setShowBatchEditModal(true)}
+                    className="px-2.5 py-1.5 bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                    title="Group edit dosages and days using Start:Stop:Step"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Batch / Range (Start:Stop:Step)</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleSaveCalendar}
                     disabled={isSaving}
                     className="px-3.5 py-1.5 bg-primary hover:bg-primary-mid disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
@@ -1148,6 +1211,15 @@ export default function StimulationCalendarGrid({
           {/* ========================================================================= */}
           {/* CONFIRMATION POPUP MODAL BEFORE OVERRIDING PROTOCOL                       */}
           {/* ========================================================================= */}
+          <BatchRangeEditModal
+            isOpen={showBatchEditModal}
+            onClose={() => setShowBatchEditModal(false)}
+            totalDays={totalDays}
+            days={days}
+            drugList={drugList}
+            onApplyBatch={handleApplyBatchEdit}
+          />
+
           {overrideModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs animate-fadeIn">
               <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border border-slate-200 space-y-4 animate-scaleIn">
@@ -1285,6 +1357,42 @@ export default function StimulationCalendarGrid({
                           ))}
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="bg-teal-50/50 border border-teal-200/70 rounded-xl p-2.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-900 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-teal-600" />
+                        Antral Follicle Count (AFC Option)
+                      </span>
+                      {(editingScanDay.right_afc || editingScanDay.left_afc) && (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-teal-600 text-white">
+                          Total: {(parseFloat(editingScanDay.right_afc || '0') + parseFloat(editingScanDay.left_afc || '0')) || ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-900 block mb-0.5">Right AFC</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 8"
+                          value={editingScanDay.right_afc || ''}
+                          onChange={(e) => setEditingScanDay({ ...editingScanDay, right_afc: e.target.value })}
+                          className="vmd-input text-xs w-full font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-900 block mb-0.5">Left AFC</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 7"
+                          value={editingScanDay.left_afc || ''}
+                          onChange={(e) => setEditingScanDay({ ...editingScanDay, left_afc: e.target.value })}
+                          className="vmd-input text-xs w-full font-semibold"
+                        />
+                      </div>
                     </div>
                   </div>
 

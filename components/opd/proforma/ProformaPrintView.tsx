@@ -2,6 +2,7 @@
 
 import React from 'react';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
+import { cleanVitalValue } from '@/lib/vitalsUtils';
 import type { ObstetricRow, MedicationRow, CustomInvestigationRow } from './types';
 
 interface ProformaPrintViewProps {
@@ -262,7 +263,7 @@ export default function ProformaPrintView({
                 data.femalePallor ? (['No', 'Absent'].includes(data.femalePallor) ? 'No pallor' : 'Pallor') : null,
                 data.femalePedalEdema ? (['No', 'Absent'].includes(data.femalePedalEdema) ? 'No pedal edema' : 'Pedal edema') : null,
                 data.femaleGoitre ? (['No', 'Absent'].includes(data.femaleGoitre) ? 'No goitre' : 'Goitre') : null,
-                data.femaleBp ? `BP ${data.femaleBp}` : null,
+                data.femaleBp ? `BP ${cleanVitalValue(data.femaleBp)}` : null,
               ].filter(Boolean).join(', ') || '—'}
             </strong>
           </div>
@@ -468,7 +469,7 @@ export default function ProformaPrintView({
                 {[
                   data.malePallor ? (['No', 'Absent'].includes(data.malePallor) ? 'No pallor' : 'Pallor') : null,
                   data.malePedalEdema ? (['No', 'Absent'].includes(data.malePedalEdema) ? 'No pedal edema' : 'Pedal edema') : null,
-                  data.maleBp ? `BP ${data.maleBp}` : null,
+                  data.maleBp ? `BP ${cleanVitalValue(data.maleBp)}` : null,
                 ].filter(Boolean).join(', ') || '—'}
               </strong>
             </div>

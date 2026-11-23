@@ -45,6 +45,7 @@ export const CATEGORY_TABS = [
   { id: 'Oxygen & Gas', label: 'Oxygen & Gas' },
   { id: 'Equipment', label: 'Equipment' },
   { id: 'Procedures', label: 'Procedures' },
+  { id: 'Operation Theatre', label: 'Operation Theatre (OT)' },
 ];
 
 export default function RollingBillFilterBar({

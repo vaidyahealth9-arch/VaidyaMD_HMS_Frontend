@@ -23,6 +23,7 @@ import PrintableReportHeader from '@/components/common/PrintableReportHeader';
 import PrintableReportFooter from '@/components/common/PrintableReportFooter';
 import A4Sheet from '@/components/common/A4Sheet';
 import { treatmentCyclesApi } from '@/lib/api';
+import { MedicineAutocompleteInput } from '@/components/common';
 
 export interface EmbryoTransferDischargeModalProps {
   cycle: any;
@@ -438,16 +439,20 @@ export default function EmbryoTransferDischargeModal({
                   ) : medications.map((m, idx) => (
                     <div key={idx} className="bg-white border border-slate-200 rounded-md p-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                       <div className="sm:col-span-4">
-                        <input
-                          type="text"
+                        <MedicineAutocompleteInput
                           value={m.drug}
                           placeholder="Drug Name (e.g. Susten 400mg)"
-                          onChange={(e) => {
+                          onChange={(val) => {
                             const updated = [...medications];
-                            updated[idx].drug = e.target.value;
+                            updated[idx].drug = val;
                             setMedications(updated);
                           }}
-                          className="vmd-input text-xs w-full font-semibold"
+                          onSelect={(item) => {
+                            const updated = [...medications];
+                            updated[idx].drug = item.drug;
+                            setMedications(updated);
+                          }}
+                          className="h-8 text-xs w-full font-semibold"
                         />
                       </div>
                       <div className="sm:col-span-2">

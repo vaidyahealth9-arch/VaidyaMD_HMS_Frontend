@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { X, Lock, ShieldCheck, Check, Plus, Building2, Stethoscope, Sparkles } from 'lucide-react';
-import { CLINICAL_DEPARTMENTS } from '../types';
+import { X, Lock, ShieldCheck, Check, Plus, Building2, Stethoscope, Sparkles, IndianRupee } from 'lucide-react';
+import { CLINICAL_DEPARTMENTS, VAIDYAMD_ROLES } from '../types';
 
 interface StaffUserModalProps {
   isOpen: boolean;
@@ -25,7 +25,6 @@ export default function StaffUserModal({
 }: StaffUserModalProps) {
   const [customDeptInput, setCustomDeptInput] = useState('');
 
-  // Normalize departments as string[]
   const currentDepts: string[] = useMemo(() => {
     if (Array.isArray(staffForm.departments)) {
       return staffForm.departments;
@@ -50,12 +49,6 @@ export default function StaffUserModal({
     setStaffForm({ ...staffForm, departments: updated });
   };
 
-  const setAsPrimary = (deptName: string) => {
-    const existing = currentDepts.find((d) => d.toLowerCase() === deptName.toLowerCase()) || deptName;
-    const rest = currentDepts.filter((d) => d.toLowerCase() !== deptName.toLowerCase());
-    setStaffForm({ ...staffForm, departments: [existing, ...rest] });
-  };
-
   const addCustomDepartment = () => {
     const trimmed = customDeptInput.trim();
     if (trimmed && !currentDepts.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
@@ -74,18 +67,6 @@ export default function StaffUserModal({
       ...staffForm,
       role: newRole,
       is_doctor: willBeDoctor,
-      departments: nextDepts,
-    });
-  };
-
-  const handleDoctorPrivilegeToggle = (checked: boolean) => {
-    let nextDepts = currentDepts;
-    if (checked && currentDepts.length === 0) {
-      nextDepts = ['Reproductive Medicine & Infertility', 'Outpatient Department (OPD)'];
-    }
-    setStaffForm({
-      ...staffForm,
-      is_doctor: checked,
       departments: nextDepts,
     });
   };
@@ -111,7 +92,7 @@ export default function StaffUserModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -133,73 +114,73 @@ export default function StaffUserModal({
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Corporate Email Address *</label>
+              <label className="block text-slate-700 font-semibold mb-1">Email (Login Username) *</label>
               <input
                 type="email"
                 required
                 value={staffForm.email}
                 onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
-                placeholder="doctor@hospital.com"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden font-mono text-[11px]"
+                placeholder="pooja@vaidyamd.com"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
               />
             </div>
           </div>
 
-          {/* Section 2: Password & Branch */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Section 2: Contact & Identification */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1">
-                {editingStaffUser ? 'New Password (Leave blank to keep current)' : 'Temporary Password *'}
+                {editingStaffUser ? 'New Password (Optional)' : 'Password *'}
               </label>
               <input
                 type="password"
+                required={!editingStaffUser}
                 value={staffForm.password}
                 onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden font-mono"
-                placeholder="••••••••"
+                placeholder={editingStaffUser ? 'Leave blank to keep current' : '••••••••'}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Assigned Branch Facility</label>
+              <label className="block text-slate-700 font-semibold mb-1">System Role *</label>
+              <select
+                value={staffForm.role}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden bg-white"
+              >
+                {VAIDYAMD_ROLES.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Assigned Branch</label>
               <select
                 value={staffForm.branch_id}
                 onChange={(e) => setStaffForm({ ...staffForm, branch_id: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden bg-white"
               >
-                <option value="">Main Facility (All Branches)</option>
-                {hospitalBranches.map((br) => (
-                  <option key={br.id} value={br.id}>
-                    {br.name} {br.code ? `(${br.code})` : ''}
-                  </option>
+                <option value="">All Branches / Central</option>
+                {hospitalBranches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Section 3: Role, Registration, Phone */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Role *</label>
-              <select
-                value={staffForm.role}
-                onChange={(e) => handleRoleChange(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white font-medium focus:ring-1 focus:ring-primary focus:border-primary outline-hidden text-xs"
-              >
-                <option value="doctor">Doctor / Consultant</option>
-                <option value="embryologist">Embryologist</option>
-                <option value="andrologist">Andrologist</option>
-                <option value="nurse">Nurse / Coordinator</option>
-                <option value="scanning">Ultrasonologist</option>
-                <option value="pharma">Pharmacist</option>
-                <option value="receptionist">Receptionist</option>
-                <option value="counsellor">Counsellor</option>
-                <option value="manager">Manager</option>
-                <option value="accounts">Accounts & Billing</option>
-                <option value="admin">Administrator</option>
-              </select>
+              <label className="block text-slate-700 font-semibold mb-1">Phone Number</label>
+              <input
+                type="text"
+                value={staffForm.phone}
+                onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
+                placeholder="+91-9876543210"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
+              />
             </div>
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">NMC / State Reg No.</label>
+              <label className="block text-slate-700 font-semibold mb-1">NMC / State Medical Council Reg No.</label>
               <input
                 type="text"
                 value={staffForm.reg_number}
@@ -208,19 +189,31 @@ export default function StaffUserModal({
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
               />
             </div>
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">Phone Number</label>
-              <input
-                type="text"
-                value={staffForm.phone}
-                onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
-                placeholder="+91-9876543210"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden text-xs"
-              />
-            </div>
           </div>
 
-          {/* Section 4: Specialization & Qualifications */}
+          {/* Section 3: Doctor Privileges Toggle */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Stethoscope className="w-3.5 h-3.5 text-primary" />
+                Treating Doctor / Consultant Privileges
+              </span>
+              <p className="text-[11px] text-slate-500">
+                Enables this user to be assigned to patients, treatment cycles, OPD queues, and clinical notes.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={staffForm.is_doctor}
+                onChange={(e) => setStaffForm({ ...staffForm, is_doctor: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+
+          {/* Section 4: Specialization & Qualifications & Doctor Master Consultation Fee */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1">Clinical Specialization</label>
@@ -242,244 +235,79 @@ export default function StaffUserModal({
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
               />
             </div>
+
+            {isDoctorUser && (
+              <div className="sm:col-span-2 bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="block text-slate-900 font-bold text-xs flex items-center gap-1.5">
+                    <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+                    Doctor OPD Consultation Fee (₹)
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Master consultation amount auto-populated during registration, queue check-in, and appointments.
+                  </p>
+                </div>
+                <div className="relative w-full sm:w-44">
+                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={staffForm.consultation_fee ?? 500}
+                    onChange={(e) => setStaffForm({ ...staffForm, consultation_fee: Number(e.target.value) })}
+                    placeholder="500"
+                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-hidden font-bold text-slate-900 text-xs shadow-2xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Section 5: CLINICAL DEPARTMENT CONFIGURATION (Highlight for Doctors) */}
-          <div
-            className={`p-3.5 rounded-xl border transition-all ${
-              isDoctorUser
-                ? 'bg-blue-50/40 border-blue-200 shadow-xs'
-                : 'bg-slate-50/70 border-slate-200'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
-              <div className="flex items-center gap-2">
-                {isDoctorUser ? (
-                  <Stethoscope className="w-4 h-4 text-blue-600 shrink-0" />
-                ) : (
-                  <Building2 className="w-4 h-4 text-slate-600 shrink-0" />
-                )}
-                <label className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                  Clinical Department(s)
-                  {isDoctorUser && <span className="text-red-500 font-bold">*</span>}
-                </label>
-                {isDoctorUser ? (
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-full border border-blue-200">
-                    Treating Doctor Assignment
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-medium bg-slate-200/80 text-slate-600 rounded-full">
-                    Department Station
-                  </span>
-                )}
-              </div>
-
-              {currentDepts.length > 0 && (
-                <div className="text-[11px] text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-blue-100 flex items-center gap-1">
-                  <span className="text-amber-500 font-bold">★ Primary:</span>
-                  <span className="font-semibold text-blue-700">{currentDepts[0]}</span>
-                </div>
-              )}
+          {/* Section 5: Clinical Departments */}
+          <div className="p-3.5 rounded-xl border bg-slate-50 border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-slate-600" />
+                Clinical Department(s)
+              </label>
+              <span className="text-[10px] text-slate-400">{currentDepts.length} Assigned</span>
             </div>
-
-            <p className="text-[11px] text-slate-500 mb-2.5">
-              {isDoctorUser
-                ? 'Assign the clinical departments where this doctor practices. The first department selected is set as the Primary Department for appointment scheduling, OPD routing, and clinical documentation.'
-                : 'Designate department affiliations for this staff member (e.g., OPD, IPD, Lab).'}
-            </p>
-
-            {/* Active Selected Department Tags with Primary marker */}
-            {currentDepts.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 mb-2.5 p-2 bg-white rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mr-1">
-                  Assigned:
-                </span>
-                {currentDepts.map((dept, idx) => (
-                  <span
-                    key={dept}
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-                      idx === 0
-                        ? 'bg-blue-600 text-white border-blue-600 font-semibold shadow-xs'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+            <div className="flex flex-wrap gap-1.5">
+              {CLINICAL_DEPARTMENTS.map((dept) => {
+                const isSelected = currentDepts.some((d) => d.toLowerCase() === dept.name.toLowerCase());
+                return (
+                  <button
+                    key={dept.id}
+                    type="button"
+                    onClick={() => toggleDepartment(dept.name)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-primary text-white border-primary shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    {idx === 0 ? (
-                      <span className="text-amber-300 text-[10px] font-bold" title="Primary Department">
-                        ★ Primary
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setAsPrimary(dept)}
-                        className="text-[9px] uppercase tracking-wider text-slate-500 hover:text-blue-700 font-bold mr-0.5 underline"
-                        title="Set as primary department for appointments and OPD"
-                      >
-                        Set Primary
-                      </button>
-                    )}
-                    <span>{dept}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleDepartment(dept)}
-                      className={`ml-1 rounded-full p-0.5 ${
-                        idx === 0 ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-rose-600'
-                      }`}
-                      title="Remove department"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="mb-2.5 p-2 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-center justify-between">
-                <span>
-                  {isDoctorUser
-                    ? '⚠️ No department selected. Please choose at least one department for this doctor.'
-                    : 'No department assigned yet.'}
-                </span>
-                {isDoctorUser && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setStaffForm({
-                        ...staffForm,
-                        departments: ['Reproductive Medicine & Infertility', 'Outpatient Department (OPD)'],
-                      })
-                    }
-                    className="text-[10px] font-bold text-blue-700 hover:underline bg-white px-2 py-0.5 rounded border border-blue-200"
-                  >
-                    + Apply Default (Fertility + OPD)
+                    {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                    <span>{dept.short || dept.name}</span>
                   </button>
-                )}
-              </div>
-            )}
-
-            {/* Quick Toggle Department Chips */}
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-                <span>Standard Hospital Departments:</span>
-                <span className="text-[10px] font-normal text-slate-400 lowercase">click to toggle</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {CLINICAL_DEPARTMENTS.map((dept) => {
-                  const isSelected = currentDepts.some(
-                    (d) =>
-                      d.toLowerCase() === dept.name.toLowerCase() ||
-                      d.toLowerCase() === dept.short.toLowerCase()
-                  );
-                  const isPrimary =
-                    isSelected &&
-                    (currentDepts[0]?.toLowerCase() === dept.name.toLowerCase() ||
-                      currentDepts[0]?.toLowerCase() === dept.short.toLowerCase());
-
-                  return (
-                    <button
-                      key={dept.id}
-                      type="button"
-                      onClick={() => {
-                        const matchedExisting = currentDepts.find(
-                          (d) =>
-                            d.toLowerCase() === dept.name.toLowerCase() ||
-                            d.toLowerCase() === dept.short.toLowerCase()
-                        );
-                        toggleDepartment(matchedExisting || dept.name);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border ${
-                        isPrimary
-                          ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-xs'
-                          : isSelected
-                          ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold'
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                      title={dept.desc}
-                    >
-                      {isPrimary ? (
-                        <span className="text-[10px] text-amber-300 font-bold">★</span>
-                      ) : isSelected ? (
-                        <Check className="w-3 h-3 text-blue-600" />
-                      ) : (
-                        <Plus className="w-3 h-3 text-slate-400" />
-                      )}
-                      <span>{dept.short}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Custom Department Tag Adder */}
-            <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-slate-200">
-              <input
-                type="text"
-                placeholder="Or enter a custom department name (e.g. Endocrinology, Urology, Genetics)..."
-                value={customDeptInput}
-                onChange={(e) => setCustomDeptInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addCustomDepartment();
-                  }
-                }}
-                className="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-md bg-white placeholder:text-slate-400 focus:ring-1 focus:ring-primary focus:border-primary outline-hidden"
-              />
-              <button
-                type="button"
-                onClick={addCustomDepartment}
-                disabled={!customDeptInput.trim()}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white text-xs font-semibold rounded-md transition-colors"
-              >
-                + Add Custom
-              </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Section 6: Privileges & Active Status */}
-          <div className="flex flex-wrap items-center gap-6 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={staffForm.is_doctor}
-                onChange={(e) => handleDoctorPrivilegeToggle(e.target.checked)}
-                className="rounded text-primary focus:ring-primary h-4 w-4"
-              />
-              <span className="font-semibold text-slate-800">
-                Treating Doctor Privileges (Eligible for Consultations & EMR)
-              </span>
-            </label>
-
-            {staffForm.role !== 'admin' && staffForm.role !== 'ADMIN' ? (
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={staffForm.is_active}
-                  onChange={(e) => setStaffForm({ ...staffForm, is_active: e.target.checked })}
-                  className="rounded text-primary focus:ring-primary h-4 w-4"
-                />
-                <span className="font-semibold text-slate-800">Account Active</span>
-              </label>
-            ) : (
-              <div className="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-semibold">
-                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Administrator accounts are permanently active</span>
-              </div>
-            )}
-          </div>
-
-          {/* Form Actions Footer */}
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          {/* Modal Footer Actions */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg font-bold text-xs cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-primary hover:bg-primary-mid text-white font-semibold rounded-lg shadow-sm transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-[rgb(var(--clr-primary)/0.9)] text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer"
             >
-              {editingStaffUser ? 'Save Staff Changes' : 'Create Staff Account'}
+              {editingStaffUser ? 'Update Staff Member' : 'Create Staff Account'}
             </button>
           </div>
         </form>
@@ -487,4 +315,3 @@ export default function StaffUserModal({
     </div>
   );
 }
-

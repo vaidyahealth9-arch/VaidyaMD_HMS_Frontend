@@ -16,3 +16,11 @@ export { default as InpatientBedsideChart } from './chart/InpatientBedsideChart'
 export { default as InpatientDemographicHeader } from './chart/InpatientDemographicHeader';
 export { default as EditAdmissionMetadataModal } from './modals/EditAdmissionMetadataModal';
 export { default as RollingBillLedger } from './chart/RollingBillLedger';
+export { default as EditRoundNoteModal } from './modals/EditRoundNoteModal';
+export { default as PrintDailyNotesModal } from './modals/PrintDailyNotesModal';
+export { default as EditBedsideOrderModal } from './modals/EditBedsideOrderModal';
+export { default as StopBedsideOrderModal } from './modals/StopBedsideOrderModal';
+export { default as PrintNursesRecordModal } from './modals/PrintNursesRecordModal';
+export { default as PrintVitalsFlowsheetModal } from './modals/PrintVitalsFlowsheetModal';
+export { default as PrintFluidBalanceModal } from './modals/PrintFluidBalanceModal';
+export { OTRecordTab, OTRecordCard, NewOTRecordModal, OTPostBillingModal, PrintOTRecordModal } from './chart/ot';

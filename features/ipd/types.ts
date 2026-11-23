@@ -1,7 +1,6 @@
 export type BedStatus = 'Vacant' | 'Occupied' | 'Cleaning' | 'Maintenance' | 'available' | 'occupied' | 'maintenance' | 'reserved';
 export type AdmissionStatus = 'Active' | 'Discharged' | 'Transferred' | 'admitted' | 'discharged' | 'transferred';
 export type NursingTaskStatus = 'Pending' | 'Completed' | 'Cancelled' | 'pending' | 'completed' | 'cancelled';
-
 export interface Ward {
   id: string;
   name: string;
@@ -13,7 +12,6 @@ export interface Ward {
   is_active?: boolean;
   branch_id?: string | null;
 }
-
 export interface Bed {
   id: string;
   ward_id: string;
@@ -40,7 +38,6 @@ export interface Bed {
     risk_factors?: RiskFactors;
   };
 }
-
 export interface RiskFactors {
   fall_risk?: boolean;
   npo?: boolean;
@@ -48,7 +45,6 @@ export interface RiskFactors {
   isolation?: boolean;
   pressure_ulcer_risk?: boolean;
 }
-
 export interface RoundNote {
   id: string;
   doctor_id?: string;
@@ -61,16 +57,16 @@ export interface RoundNote {
   notes?: string;
   created_at: string;
 }
-
 export interface AdministeredLog {
   id: string;
   timestamp: string;
   status: 'Given' | 'Withheld' | 'Refused' | 'Omitted';
   nurse_name: string;
   nurse_id?: string;
+  timing_slot?: string;
+  scheduled_time?: string;
   notes?: string;
 }
-
 export interface IPDOrder {
   id: string;
   order_type: 'Medication' | 'Investigation' | 'Diet' | 'Nursing Care' | string;
@@ -81,11 +77,14 @@ export interface IPDOrder {
   duration?: string;
   instructions?: string;
   status: 'Active' | 'Completed' | 'Discontinued';
+  start_date?: string;
+  stopped_at?: string;
+  stop_reason?: string;
+  timing_slots?: string[];
   administered_logs?: AdministeredLog[];
   ordered_by_name?: string;
   created_at: string;
 }
-
 export interface FluidBalance {
   id: string;
   record_date: string;
@@ -103,7 +102,6 @@ export interface FluidBalance {
   notes?: string;
   recorded_by_name?: string;
 }
-
 export interface DischargeSummary {
   discharge_type?: 'Normal' | 'LAMA' | 'Referred' | 'Deceased';
   condition_at_discharge?: 'Stable' | 'Critical' | 'Improved' | 'Cured';
@@ -121,7 +119,6 @@ export interface DischargeSummary {
   follow_up_instructions?: string;
   follow_up_date?: string;
 }
-
 export interface AdmissionDetails {
   id: string;
   admission_number: string;
@@ -172,8 +169,8 @@ export interface AdmissionDetails {
   orders: IPDOrder[];
   fluid_balances: FluidBalance[];
   nursing_tasks: NursingTask[];
+  ot_records?: OTRecord[];
 }
-
 export interface Admission {
   id: string;
   patient_id: string;
@@ -195,7 +192,6 @@ export interface Admission {
   allergies?: string[];
   risk_factors?: RiskFactors;
 }
-
 export interface VitalsPayload {
   bp_systolic?: number | string;
   bp_diastolic?: number | string;
@@ -208,7 +204,6 @@ export interface VitalsPayload {
   recorded_at?: string;
   [key: string]: unknown;
 }
-
 export interface NursingTask {
   id: string;
   admission_id: string;
@@ -226,8 +221,6 @@ export interface NursingTask {
   vitals_payload?: VitalsPayload;
   notes?: string;
 }
-
-
 export interface BillItem {
   id: string;
   admission_id?: string;
@@ -248,7 +241,6 @@ export interface BillItem {
   created_by_name?: string;
   notes?: string;
 }
-
 export interface IPDPayment {
   id: string;
   receipt_number: string;
@@ -261,7 +253,6 @@ export interface IPDPayment {
   collected_by_name?: string;
   notes?: string;
 }
-
 export interface RollingBillSummary {
   admission_id: string;
   admission_number: string;
@@ -283,7 +274,6 @@ export interface RollingBillSummary {
   items: BillItem[];
   payments: IPDPayment[];
 }
-
 export interface BillItemPayload {
   item_type: string;
   category: string;
@@ -294,7 +284,6 @@ export interface BillItemPayload {
   notes?: string;
   billing_date?: string;
 }
-
 export interface PaymentPayload {
   amount: number;
   payment_method: string;
@@ -302,3 +291,5 @@ export interface PaymentPayload {
   payment_type: string;
   notes?: string;
 }
+import type { OTStaffSummary, OTRecord } from '@/components/ipd/chart/ot/types';
+export type { OTStaffSummary, OTRecord };

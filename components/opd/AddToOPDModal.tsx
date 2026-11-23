@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { appointmentsApi, authApi } from '@/lib/api';
 import { toast } from '@/contexts/ToastContext';
-import { X, Stethoscope, Clock, IndianRupee, Users, User } from 'lucide-react';
+import { X, Stethoscope, Clock, IndianRupee, Users, User, ShieldCheck } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 
 interface AddToOPDModalProps {
@@ -31,7 +31,7 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
   const [doctors, setDoctors] = useState<any[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [consultationFee, setConsultationFee] = useState(0);
-  const [visitType, setVisitType] = useState('consultation');
+  const [visitType, setVisitType] = useState('follow_up');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visitMode, setVisitMode] = useState<'couple' | 'solo'>('couple');
@@ -45,23 +45,49 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
       authApi.getDoctors().then((docList) => {
         if (Array.isArray(docList) && docList.length > 0) {
           setDoctors(docList);
+          let targetDocId = '';
           if (patient?.treating_doctor_id && docList.some((d) => d.id === patient.treating_doctor_id)) {
-            setSelectedDoctorId(patient.treating_doctor_id);
+            targetDocId = patient.treating_doctor_id;
           } else if (user?.is_doctor || user?.role === 'doctor') {
-            setSelectedDoctorId(user.id);
+            targetDocId = user.id;
           } else {
-            setSelectedDoctorId('');
+            targetDocId = docList[0]?.id || '';
           }
+          setSelectedDoctorId(targetDocId);
+
+          // For follow-up, consultation fee defaults to 0 (complimentary/no reg fee)
+          // If routine consultation, load doctor's fee from master
+          const targetDoc = docList.find((d) => d.id === targetDocId);
+          setConsultationFee(0);
         }
       }).catch(() => {});
-      setConsultationFee(0);
-      setVisitType('consultation');
+      setVisitType('follow_up');
       setNotes('');
       setVisitMode('couple');
     }
   }, [open, patient, user]);
 
   if (!open || !patient) return null;
+
+  const handleDoctorChange = (docId: string) => {
+    setSelectedDoctorId(docId);
+    if (visitType !== 'follow_up') {
+      const doc = doctors.find((d) => d.id === docId);
+      if (doc && doc.consultation_fee !== undefined) {
+        setConsultationFee(Number(doc.consultation_fee) || 500);
+      }
+    }
+  };
+
+  const handleVisitTypeChange = (newType: string) => {
+    setVisitType(newType);
+    if (newType === 'follow_up') {
+      setConsultationFee(0);
+    } else {
+      const doc = doctors.find((d) => d.id === selectedDoctorId);
+      setConsultationFee(Number(doc?.consultation_fee) || 500);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +125,7 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
       toast.success(
         isCouple ? 'Couple Queued for OPD' : 'Added to OPD Queue',
         isCouple
-          ? `${patient.name} & ${partnerName} queued for ${selectedDoc?.name || 'Doctor'} (Couple Fee: ₹${fee})`
+          ? `${patient.name} & ${partnerName} queued for ${selectedDoc?.name || 'Doctor'} (Fee: ₹${fee})`
           : `${patient.name} queued for ${selectedDoc?.name || 'Doctor'} (Fee: ₹${fee})`
       );
       onClose();
@@ -120,8 +146,8 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
               <Stethoscope className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">Add to OPD Queue</h3>
-              <p className="text-[11px] text-slate-500 font-medium">Select consultant and visit mode</p>
+              <h3 className="font-bold text-slate-900 text-sm">Add to OPD Waiting Queue</h3>
+              <p className="text-[11px] text-slate-500 font-medium">Follow-up check-in & token generation</p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
@@ -144,6 +170,12 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
               <span>{patient.gender ? `${patient.gender} · ` : ''}</span>
               <span>{patient.age ? `${patient.age} yrs` : ''}</span>
             </div>
+          </div>
+
+          {/* Zero Registration Notice */}
+          <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-lg p-2.5 flex items-center gap-2 text-[11px] text-emerald-800 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Follow-up check-in: <strong>No Registration Fee</strong> charged.</span>
           </div>
 
           {hasPartner && (
@@ -186,26 +218,55 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Stethoscope className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" /> Select Treating Consultant *
+              <Clock className="w-3.5 h-3.5 text-slate-500" /> Visit Type
             </label>
             <select
-              value={selectedDoctorId}
-              onChange={(e) => setSelectedDoctorId(e.target.value)}
+              value={visitType}
+              onChange={(e) => handleVisitTypeChange(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-              required
             >
-              <option value="">Select Consultant...</option>
-              {doctors.map((doc) => (
-                <option key={doc.id} value={doc.id}>{doc.name} {doc.specialization ? `(${doc.specialization})` : ''}</option>
-              ))}
+              <option value="follow_up">Follow-up / Review (₹0 Default)</option>
+              <option value="consultation">Routine / Fresh Doctor Consultation</option>
+              <option value="tvs_scan">Follicular / TVS Ultrasound Scan</option>
+              <option value="emergency">Emergency / Priority</option>
             </select>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
-              {hasPartner && visitMode === 'couple' ? 'Couple Consultation Fee (₹)' : 'Consultation Fee (₹)'}
+              <Stethoscope className="w-3.5 h-3.5 text-[rgb(var(--clr-primary))]" /> Select Treating Consultant *
             </label>
+            <select
+              value={selectedDoctorId}
+              onChange={(e) => handleDoctorChange(e.target.value)}
+              className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+              required
+            >
+              <option value="">Select Consultant...</option>
+              {doctors.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.name} {doc.specialization ? `(${doc.specialization})` : ''} - ₹{doc.consultation_fee ?? 500}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+                {hasPartner && visitMode === 'couple' ? 'Couple Consultation Fee (₹)' : 'Consultation Fee (₹)'}
+              </label>
+              {consultationFee > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setConsultationFee(0)}
+                  className="text-[10px] text-slate-500 hover:text-slate-800 font-bold underline cursor-pointer"
+                >
+                  Waive (₹0)
+                </button>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
               <input
@@ -213,37 +274,25 @@ export default function AddToOPDModal({ open, onClose, patient, partner, onSucce
                 min="0"
                 step="50"
                 value={consultationFee}
-                onChange={(e) => setConsultationFee(Number(e.target.value))}
-                placeholder="500"
+                onChange={(e) => setConsultationFee(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
                 className="w-full h-9 pl-7 pr-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
               />
             </div>
-            <p className="text-[10px] text-slate-400">Set to 0 if complimentary review or follow-up.</p>
+            <p className="text-[10px] text-slate-400">
+              {visitType === 'follow_up'
+                ? 'Follow-up visits are ₹0 by default. Change only if follow-up fee applies.'
+                : 'Default loaded from doctor master profile.'}
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-slate-500" /> Visit Type
-            </label>
-            <select
-              value={visitType}
-              onChange={(e) => setVisitType(e.target.value)}
-              className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
-            >
-              <option value="consultation">First / Routine Consultation</option>
-              <option value="follow_up">Follow-up / Review</option>
-              <option value="tvs_scan">Follicular / TVS Ultrasound Scan</option>
-              <option value="emergency">Emergency / Priority</option>
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Chief Complaint / Initial Note</label>
+            <label className="text-xs font-bold text-slate-700">Chief Complaint / Visit Reason</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Day 2 baseline review, report review, couple fertility..."
+              placeholder="e.g. Day 2 baseline review, report review, cycle scan..."
               className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
             />
           </div>

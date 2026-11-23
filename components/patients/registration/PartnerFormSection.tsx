@@ -67,8 +67,8 @@ export default function PartnerFormSection({
             type="number"
             value={partnerForm.age}
             onChange={(e) => updatePartner('age', e.target.value)}
-            min={18}
-            max={75}
+            min={0}
+            max={125}
             className="vmd-input text-xs"
             placeholder="34"
           />

@@ -1,20 +1,8 @@
 import { request, toQueryString } from '@/lib/api';
 import type {
-  Ward,
-  Bed,
-  Admission,
-  AdmissionDetails,
-  NursingTask,
-  RoundNote,
-  IPDOrder,
-  FluidBalance,
-  DischargeSummary,
-  BedStatus,
-  BillItem,
-  IPDPayment,
-  RollingBillSummary,
-  BillItemPayload,
-  PaymentPayload,
+  Ward, Bed, Admission, AdmissionDetails, NursingTask, RoundNote,
+  IPDOrder, FluidBalance, DischargeSummary, BedStatus, BillItem,
+  IPDPayment, RollingBillSummary, BillItemPayload, PaymentPayload, OTRecord
 } from './types';
 
 export const ipdApi = {
@@ -127,6 +115,14 @@ export const ipdApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateRoundNote: (
+    noteId: string,
+    data: { subjective?: string; objective?: string; assessment?: string; plan?: string; notes?: string }
+  ) =>
+    request<{ id: string; message: string }>(`/core/ipd/round-notes/${noteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 
   // Bedside Orders & eMAR
   listOrders: (admissionId: string) =>
@@ -141,9 +137,33 @@ export const ipdApi = {
       frequency?: string;
       duration?: string;
       instructions?: string;
+      start_date?: string;
+      timing_slots?: string[];
     }
   ) =>
     request<{ id: string; message: string }>(`/core/ipd/admissions/${admissionId}/orders`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateOrder: (
+    orderId: string,
+    data: Partial<{
+      item_name: string;
+      dosage: string;
+      route: string;
+      frequency: string;
+      duration: string;
+      instructions: string;
+      start_date: string;
+      timing_slots: string[];
+    }>
+  ) =>
+    request<{ id: string; message: string }>(`/core/ipd/orders/${orderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  stopOrder: (orderId: string, data: { stopped_at?: string; stop_reason?: string }) =>
+    request<{ id: string; message: string }>(`/core/ipd/orders/${orderId}/stop`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -152,7 +172,10 @@ export const ipdApi = {
       method: 'PATCH',
       body: JSON.stringify({ status, notes }),
     }),
-  administerOrder: (orderId: string, data: { status: string; notes?: string; administered_by_name?: string }) =>
+  administerOrder: (
+    orderId: string,
+    data: { status: string; notes?: string; administered_by_name?: string; timing_slot?: string; scheduled_time?: string }
+  ) =>
     request<{ message: string; logs: any[] }>(`/core/ipd/orders/${orderId}/administer`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -214,10 +237,15 @@ export const ipdApi = {
       { method: 'PATCH', body: JSON.stringify(data) }
     ),
 
-
-  // Accrual
+  // Tariff Accrual
   accrueDailyCharges: () =>
     request<{ success: boolean; message: string }>('/core/ipd/accrue-daily-charges', { method: 'POST' }),
+  accrueAdmissionTariff: (admissionId: string) =>
+    request<{ success: boolean; message: string; day_total?: number; items_created?: number; already_accrued?: boolean }>(
+      `/core/ipd/admissions/${admissionId}/accrue`,
+      { method: 'POST' }
+    ),
+
   // Rolling Bill & Ledger
   getRollingBill: (admissionId: string) =>
     request<RollingBillSummary>(`/core/ipd/admissions/${admissionId}/rolling-bill`),
@@ -236,6 +264,25 @@ export const ipdApi = {
     request<IPDPayment[]>(`/core/ipd/admissions/${admissionId}/payments`),
   postPayment: (admissionId: string, data: PaymentPayload) =>
     request<IPDPayment>(`/core/ipd/admissions/${admissionId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Operation Theatre (OT)
+  listOTRecords: (admissionId: string) =>
+    request<OTRecord[]>(`/core/ipd/admissions/${admissionId}/ot`),
+  createOTRecord: (admissionId: string, data: any) =>
+    request<{ id: string; message: string }>(`/core/ipd/admissions/${admissionId}/ot`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateOTRecord: (otRecordId: string, data: any) =>
+    request<{ id: string; message: string }>(`/core/ipd/ot/${otRecordId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  postOTBilling: (otRecordId: string, data: { ot_room_charge: number; procedure_fee: number; surgeon_fee: number; anesthesia_fee: number; guest_surgeons_fee?: number; guest_surgeons?: any[]; notes?: string }) =>
+    request<{ success: boolean; message: string; total_posted: number }>(`/core/ipd/ot/${otRecordId}/bill`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),

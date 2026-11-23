@@ -26,8 +26,11 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { pharmacyApi } from '@/lib/api';
 import type { RxTemplateItem } from './TemplateManagementDialog';
+import CouplePrescriptionManager from './CouplePrescriptionManager';
+import { STANDARD_FREQUENCIES, FOOD_TIMING_PRESETS } from './prescriptionUtils';
 
 interface OPDPrescriptionSectionProps {
+  patient?: any;
   register: any;
   watch: any;
   setValue: any;
@@ -43,9 +46,12 @@ interface OPDPrescriptionSectionProps {
   setIsPlanSectionExpanded: (expanded: boolean) => void;
   onOpenSmartOrder: () => void;
   clinicalHistoryTemplate?: string;
+  activeNoteTemplateId?: string | null;
+  canEdit?: boolean;
 }
 
 export default function OPDPrescriptionSection({
+  patient,
   register,
   watch,
   setValue,
@@ -61,6 +67,8 @@ export default function OPDPrescriptionSection({
   setIsPlanSectionExpanded,
   onOpenSmartOrder,
   clinicalHistoryTemplate,
+  activeNoteTemplateId,
+  canEdit = true,
 }: OPDPrescriptionSectionProps) {
   const { data: batches = [] } = useQuery({
     queryKey: ['pharmacy-inventory-batches-active'],
@@ -132,8 +140,7 @@ export default function OPDPrescriptionSection({
   }, [medicineDirectory]);
 
 
-  const isCoupleMode = clinicalHistoryTemplate === 'fertility';
-  const clinicalProforma = watch('clinical_proforma');
+    const clinicalProforma = watch('clinical_proforma');
   const femaleMeds = React.useMemo(() => {
     return (clinicalProforma?.femaleMedications || []).filter((m: any) => m && m.drug && m.drug.trim());
   }, [clinicalProforma?.femaleMedications]);
@@ -141,6 +148,25 @@ export default function OPDPrescriptionSection({
     return (clinicalProforma?.maleMedications || []).filter((m: any) => m && m.drug && m.drug.trim());
   }, [clinicalProforma?.maleMedications]);
   const totalCoupleMeds = femaleMeds.length + maleMeds.length;
+
+  const [manualCoupleMode, setManualCoupleMode] = React.useState<boolean | null>(null);
+
+  const isCoupleMode = manualCoupleMode !== null
+    ? manualCoupleMode
+    : Boolean(
+        clinicalHistoryTemplate === 'fertility' ||
+        clinicalHistoryTemplate === 'fertility_couple' ||
+        clinicalHistoryTemplate === 'ivf' ||
+        clinicalHistoryTemplate === 'icsi' ||
+        clinicalHistoryTemplate === 'iui' ||
+        activeNoteTemplateId === 'clinical_fertility_review' ||
+        Boolean(watch('female_investigations') || watch('male_investigations')) ||
+        (clinicalProforma && (
+          (Array.isArray(clinicalProforma?.femaleMedications) && clinicalProforma.femaleMedications.length > 0) ||
+          (Array.isArray(clinicalProforma?.maleMedications) && clinicalProforma.maleMedications.length > 0) ||
+          'femaleMedications' in clinicalProforma
+        ))
+      );
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -207,6 +233,7 @@ export default function OPDPrescriptionSection({
             </div>
           </div>
 
+          {!isCoupleMode && (
           <div>
             <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -228,6 +255,7 @@ export default function OPDPrescriptionSection({
                     key={opt}
                     type="button"
                     onClick={() => {
+                      if (!canEdit) return;
                       const lines = currentVal.split('\n').map((l: string) => l.trim()).filter(Boolean);
                       const matchIdx = lines.findIndex(
                         (l: string) => l.toLowerCase() === opt.toLowerCase() || l.toLowerCase().includes(opt.toLowerCase())
@@ -259,6 +287,7 @@ export default function OPDPrescriptionSection({
               className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] font-mono"
             />
           </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -269,6 +298,30 @@ export default function OPDPrescriptionSection({
 
               {/* Rx Template Selector & Management */}
               <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Standard vs Couple Rx Switcher */}
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setManualCoupleMode(false)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      !isCoupleMode ? 'bg-white text-slate-800 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Single patient prescriptions and investigations"
+                  >
+                    Standard Single Rx
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualCoupleMode(true)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded transition-all flex items-center gap-1 cursor-pointer ${
+                      isCoupleMode ? 'bg-rose-500 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Separated Female & Male investigations and medication prescription columns"
+                  >
+                    <Heart className="w-3 h-3" />
+                    <span>Couple (Female + Male)</span>
+                  </button>
+                </div>
                 <select
                   onChange={(e) => {
                     if (e.target.value) {
@@ -312,108 +365,34 @@ export default function OPDPrescriptionSection({
             </div>
 
             {isCoupleMode ? (
-              <div className="bg-gradient-to-r from-rose-50/50 via-slate-50/50 to-blue-50/50 border border-slate-200 rounded-lg p-3.5 shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center shrink-0 text-rose-600 mt-0.5">
-                      <Heart className="w-4 h-4 text-rose-600" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-slate-900">
-                          Couple Prescriptions Active (Managed in Section 9)
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100/80 text-rose-800 border border-rose-200">
-                          Female &amp; Male Separated
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {totalCoupleMeds > 0 ? (
-                          <>
-                            <strong className="text-rose-700 font-semibold">{femaleMeds.length} Female</strong>
-                            {' and '}
-                            <strong className="text-blue-700 font-semibold">{maleMeds.length} Male</strong>
-                            {' medication(s) prescribed. Both will automatically print as separate labeled tables.'}
-                          </>
-                        ) : (
-                          'No medications added yet. Prescribe separated medications for Female & Male in Section 9 above.'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const el = document.getElementById('section-9-couple-meds');
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth' });
-                          el.classList.add('ring-2', 'ring-rose-400');
-                          setTimeout(() => el.classList.remove('ring-2', 'ring-rose-400'), 1500);
-                        }
-                      }}
-                      className="px-2.5 py-1 text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 border border-rose-300 rounded shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>↑ Go to Section 9 (Couple Rx)</span>
-                    </button>
-
-                  </div>
-                </div>
-
-                {totalCoupleMeds > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/70 text-xs">
-                    <div className="bg-white/80 rounded-md p-2.5 border border-rose-100 space-y-1">
-                      <div className="flex items-center justify-between border-b border-rose-100 pb-1">
-                        <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wide">
-                          Female Medications ({femaleMeds.length})
-                        </span>
-                        <span className="text-[9px] text-rose-600 font-medium">Wife</span>
-                      </div>
-                      {femaleMeds.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {femaleMeds.map((m: any, idx: number) => (
-                            <span key={idx} className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[11px] font-medium text-slate-800">
-                              {m.drug} <span className="text-[10px] text-slate-500 font-normal">({m.dose || '1 tab'}{m.route ? ` • ${m.route}` : ''})</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">None added yet</span>
-                      )}
-                    </div>
-
-                    <div className="bg-white/80 rounded-md p-2.5 border border-blue-100 space-y-1">
-                      <div className="flex items-center justify-between border-b border-blue-100 pb-1">
-                        <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wide">
-                          Male Medications ({maleMeds.length})
-                        </span>
-                        <span className="text-[9px] text-blue-600 font-medium">Husband / Partner</span>
-                      </div>
-                      {maleMeds.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {maleMeds.map((m: any, idx: number) => (
-                            <span key={idx} className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-[11px] font-medium text-slate-800">
-                              {m.drug} <span className="text-[10px] text-slate-500 font-normal">({m.dose || '1 tab'}{m.route ? ` • ${m.route}` : ''})</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">None added yet</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-
+              <div className="space-y-4">
+                <CouplePrescriptionManager
+                  watch={watch}
+                  setValue={setValue}
+                  register={register}
+                  femaleName={patient?.name || 'Female (Wife)'}
+                  maleName={patient?.partner?.name || 'Male (Partner)'}
+                  medicineDirectory={medicineDirectory}
+                  medicineStockMap={medicineStockMap}
+                />
               </div>
             ) : (
               <div>
 
             {/* Structured Medication Array */}
             <div ref={searchContainerRef} className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <div className="hidden sm:flex gap-2 items-center px-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-200">
+                <div className="flex-1 min-w-[160px]">Drug Name (Searchable)</div>
+                <div className="w-20">Dose</div>
+                <div className="w-28">Frequency</div>
+                <div className="w-24">Duration</div>
+                <div className="flex-1 min-w-[150px]">Instructions</div>
+                {canEdit && <div className="w-8 shrink-0"></div>}
+              </div>
+
               {medFields.map((field, index) => {
                 const drugNameVal = watch(`medications.${index}.drug_name`) || '';
+                const freqVal = watch(`medications.${index}.frequency`) || '';
                 const stockInfo = medicineStockMap.get(drugNameVal.trim().toLowerCase());
                 const rowQuery = (searchQuery[index] ?? drugNameVal).toLowerCase().trim();
 
@@ -430,44 +409,28 @@ export default function OPDPrescriptionSection({
 
                 return (
                   <div key={field.id} className="flex gap-2 items-start relative flex-wrap sm:flex-nowrap pb-2 border-b border-slate-100 last:border-b-0">
-                    <div className="flex-1 min-w-[150px] relative">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Drug Name (Searchable)</label>
-                        {stockInfo && (
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
-                              stockInfo.totalAvailable > 10
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : stockInfo.totalAvailable > 0
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-rose-50 text-rose-600 border-rose-200'
-                            }`}
-                          >
-                            {stockInfo.totalAvailable > 10
-                              ? `In Stock: ${stockInfo.totalAvailable}`
-                              : stockInfo.totalAvailable > 0
-                              ? `Low: ${stockInfo.totalAvailable}`
-                              : 'Out of Stock'}
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex-1 min-w-[160px] relative">
+                      <label className="sm:hidden text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Drug Name</label>
                       <Input
                         value={drugNameVal}
+                        disabled={!canEdit}
                         onChange={(e) => {
                           setValue(`medications.${index}.drug_name`, e.target.value);
                           setSearchQuery((prev) => ({ ...prev, [index]: e.target.value }));
                           setOpenSearchIndex(index);
                         }}
                         onFocus={() => {
-                          setOpenSearchIndex(index);
-                          setSearchQuery((prev) => ({ ...prev, [index]: drugNameVal }));
+                          if (canEdit) {
+                            setOpenSearchIndex(index);
+                            setSearchQuery((prev) => ({ ...prev, [index]: drugNameVal }));
+                          }
                         }}
                         placeholder="Type drug or generic name..."
-                        className="h-8 text-xs mt-1 bg-white font-medium"
+                        className="h-8 text-xs bg-white font-medium"
                       />
 
                       {/* Dropdown Suggestions with Stock Badges */}
-                      {openSearchIndex === index && (
+                      {canEdit && openSearchIndex === index && (
                         <div className="absolute z-50 left-0 top-full mt-1 w-80 max-w-[90vw] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                           <div className="px-2.5 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
                             <span>Formulary &amp; Stock</span>
@@ -559,65 +522,98 @@ export default function OPDPrescriptionSection({
                     </div>
 
                     <div className="w-20">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Dose</label>
+                      <label className="sm:hidden text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Dose</label>
                       <Input
                         {...register(`medications.${index}.dose`)}
+                        disabled={!canEdit}
                         placeholder="500mg"
-                        className="h-8 text-xs mt-1 bg-white"
+                        className="h-8 text-xs bg-white"
                       />
                     </div>
                     <div className="w-28">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Frequency</label>
+                      <label className="sm:hidden text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Frequency</label>
                       <select
                         {...register(`medications.${index}.frequency`)}
-                        className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                        disabled={!canEdit}
+                        className="w-full h-8 px-2 text-xs border border-slate-300 rounded-md bg-white text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-slate-100 disabled:text-slate-400"
                       >
                         <option value="">Select...</option>
-                        <option value="OD">OD (Once daily)</option>
-                        <option value="BD">BD (Twice daily)</option>
-                        <option value="TDS">TDS (Thrice daily)</option>
-                        <option value="QID">QID (Four times daily)</option>
-                        <option value="SOS">SOS (As needed)</option>
-                        <option value="Stat">Stat (Immediately)</option>
+                        {STANDARD_FREQUENCIES.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                        {freqVal && !STANDARD_FREQUENCIES.includes(freqVal as any) && (
+                          <option value={freqVal}>{freqVal} (Custom)</option>
+                        )}
                       </select>
                     </div>
                     <div className="w-24">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
+                      <label className="sm:hidden text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Duration</label>
                       <Input
                         {...register(`medications.${index}.duration`)}
+                        disabled={!canEdit}
                         placeholder="e.g. 5 days"
-                        className="h-8 text-xs mt-1 bg-white"
+                        className="h-8 text-xs bg-white"
                       />
                     </div>
-                    <div className="flex-1 min-w-[130px]">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
-                      <Input
-                        {...register(`medications.${index}.instructions`)}
-                        placeholder="After food"
-                        className="h-8 text-xs mt-1 bg-white"
-                      />
+                    <div className="flex-1 min-w-[150px]">
+                      <div className="flex items-center justify-between sm:hidden mb-0.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Instructions</label>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          {...register(`medications.${index}.instructions`)}
+                          disabled={!canEdit}
+                          placeholder="After food"
+                          className="h-8 text-xs bg-white pr-20"
+                        />
+                        {canEdit && (
+                          <div className="absolute right-1 top-1 flex items-center gap-0.5">
+                            {FOOD_TIMING_PRESETS.slice(0, 3).map((f) => (
+                              <button
+                                key={f.code}
+                                type="button"
+                                onClick={() => {
+                                  const cur = watch(`medications.${index}.instructions`) || '';
+                                  setValue(`medications.${index}.instructions`, cur ? `${cur}, ${f.label}` : f.label);
+                                }}
+                                className="text-[9px] px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                                title={f.label}
+                              >
+                                {f.code}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeMed(index)}
-                      className="mt-6 p-1.5 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => removeMed(index)}
+                        className="h-8 w-8 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-md hover:border-rose-200 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() =>
-                  appendMed({ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' })
-                }
-                className="text-xs font-bold text-[rgb(var(--clr-primary))] flex items-center gap-1 hover:underline pt-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Medicine</span>
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    appendMed({ drug_name: '', dose: '', frequency: '', duration: '', instructions: '' })
+                  }
+                  className="text-xs font-bold text-[rgb(var(--clr-primary))] flex items-center gap-1 hover:underline pt-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Medicine</span>
+                </button>
+              )}
             </div>
               </div>
             )}
@@ -628,9 +624,10 @@ export default function OPDPrescriptionSection({
               </label>
               <textarea
                 {...register('treatment_notes')}
+                disabled={!canEdit}
                 rows={3}
                 placeholder="Dietary and lifestyle instructions, additional advice..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))]"
+                className="w-full bg-slate-50 border border-slate-300 rounded-md p-2.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--clr-primary))] disabled:bg-slate-100 disabled:text-slate-500"
               />
             </div>
 

@@ -136,7 +136,7 @@ export default function PrimaryPatientFormSection({
       </div>
 
       {/* Demographics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
         <div>
           <label className="block text-xs font-bold text-slate-500 mb-1">Gender <span className="text-red-500">*</span></label>
           <select
@@ -158,8 +158,8 @@ export default function PrimaryPatientFormSection({
             value={form.age}
             onChange={(e) => update('age', e.target.value)}
             required
-            min={18}
-            max={70}
+            min={0}
+            max={125}
             className="vmd-input text-xs"
             placeholder="30"
           />
@@ -172,6 +172,23 @@ export default function PrimaryPatientFormSection({
             onChange={(e) => update('dob', e.target.value)}
             className="vmd-input text-xs"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">
+            Marital Status <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={form.marital_status || (registrationMode === 'couple' ? 'married' : 'single')}
+            onChange={(e) => update('marital_status', e.target.value)}
+            className="vmd-input text-xs font-semibold text-slate-800"
+            required
+          >
+            <option value="single">Single / Unmarried</option>
+            <option value="married">Married</option>
+            <option value="divorced">Divorced</option>
+            <option value="widowed">Widowed</option>
+            <option value="separated">Separated</option>
+          </select>
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-500 mb-1">Blood Group</label>

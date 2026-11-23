@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Printer, CheckCircle2, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { FileText, Printer, CheckCircle2, Plus, Trash2, ArrowRight, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/ui/dialog';
 import PrintableModal from '@/components/common/PrintableModal';
 import PrintableReportHeader from '@/components/common/PrintableReportHeader';
@@ -11,9 +11,10 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { ipdApi } from '@/features/ipd/api';
 import { pharmacyApi } from '@/lib/api';
-import PharmacyItemSearchDropdown from '@/components/common/PharmacyItemSearchDropdown';
+import { MedicineAutocompleteInput } from '@/components/common';
 import { toast } from '@/contexts/ToastContext';
 import type { AdmissionDetails, DischargeSummary } from '@/features/ipd/types';
+import { DISCHARGE_TEMPLATES } from './dischargeTemplates';
 
 interface ClinicalDischargeModalProps {
   isOpen: boolean;
@@ -83,6 +84,19 @@ export default function ClinicalDischargeModal({
     const updated = [...medications];
     (updated[index] as any)[field] = val;
     setMedications(updated);
+  };
+
+
+  
+  const handleApplyDischargeTemplate = (tmplId: string) => {
+    const tmpl = DISCHARGE_TEMPLATES.find((t) => t.id === tmplId);
+    if (!tmpl) return;
+    setDiagnosis(tmpl.diagnosis);
+    setHospitalCourse(tmpl.course);
+    setFollowUpInstructions(tmpl.instructions);
+    if (tmpl.meds && tmpl.meds.length > 0) {
+      setMedications(tmpl.meds);
+    }
   };
 
   const buildSummaryObject = (): DischargeSummary => ({
@@ -188,6 +202,32 @@ export default function ClinicalDischargeModal({
         <div className="flex-1 overflow-y-auto p-5 text-xs">
           {activeTab === 'document' ? (
             <div className="space-y-4">
+              
+              {/* Quick Template Selector */}
+              <div className="flex items-center justify-between p-2.5 bg-indigo-50/70 border border-indigo-200/80 rounded-md">
+                <div className="flex items-center gap-1.5 text-indigo-900 font-bold text-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Insert Free-Text Discharge Template:</span>
+                </div>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleApplyDischargeTemplate(e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                  className="h-7 text-xs font-semibold bg-white border border-indigo-300 rounded px-2 text-indigo-950 focus:outline-none cursor-pointer"
+                >
+                  <option value="" disabled>Select template to pre-fill...</option>
+                  {DISCHARGE_TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Type and Condition */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -251,7 +291,7 @@ export default function ClinicalDischargeModal({
                   </Button>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                <div className="border border-slate-200 rounded-lg overflow-visible bg-white">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
                       <tr>
@@ -266,12 +306,12 @@ export default function ClinicalDischargeModal({
                       {medications.map((m, idx) => (
                         <tr key={idx}>
                           <td className="p-1.5">
-                            <PharmacyItemSearchDropdown
+                            <MedicineAutocompleteInput
                               value={m.medicine_name}
                               onChange={(val) => handleMedChange(idx, 'medicine_name', val)}
-                              onSelect={(item) => handleMedChange(idx, 'medicine_name', item.itemName)}
-                              categoryFilter="medication"
-                              placeholder="Search discharge medication..."
+                              onSelect={(item) => handleMedChange(idx, 'medicine_name', item.drug)}
+                              placeholder="Search formulary or enter custom drug..."
+                              className="h-8 text-xs bg-white font-medium"
                             />
                           </td>
                           <td className="p-1.5">

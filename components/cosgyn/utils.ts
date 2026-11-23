@@ -6,7 +6,9 @@ export const addDaysToDate = (baseDateStr: string, days: number): string => {
 };
 
 export const getStepDays = (freq: string, index: number): number => {
+  if (freq === 'once') return 0;
   if (freq === 'daily') return 1;
+  if (freq === 'alternate') return 2;
   if (freq === 'twice_weekly') return index % 2 === 0 ? 3 : 4;
   if (freq === 'weekly') return 7;
   if (freq === 'fortnightly') return 14;

@@ -30,7 +30,9 @@ export function formatDoseDisplay(rawDose: string, quantity = 1): string {
 export function formatScanDetails(
   endometriumMm?: string | number,
   rightFollicles?: string,
-  leftFollicles?: string
+  leftFollicles?: string,
+  rightAfc?: string | number,
+  leftAfc?: string | number
 ): string {
   const parts: string[] = [];
 
@@ -42,6 +44,9 @@ export function formatScanDetails(
   }
   if (leftFollicles && leftFollicles.trim()) {
     parts.push(`L -${leftFollicles.trim()}`);
+  }
+  if ((rightAfc !== undefined && rightAfc !== '') || (leftAfc !== undefined && leftAfc !== '')) {
+    parts.push(`AFC: R-${rightAfc || 0}, L-${leftAfc || 0}`);
   }
 
   return parts.length > 0 ? `${parts.join('; ')};` : '';
@@ -481,11 +486,14 @@ export function flattenDaysToTimelineItems(days: any[]): PlanTimelineItem[] {
         category: 'scan',
         name: scanName,
         status: 'planned',
-        scan_details: formatScanDetails(day.endometrium_mm, day.right_follicles, day.left_follicles),
+        scan_details: formatScanDetails(day.endometrium_mm, day.right_follicles, day.left_follicles, day.right_afc || day.afc_right, day.left_afc || day.afc_left),
         endometrium_mm: day.endometrium_mm,
         endometrial_pattern: day.endometrial_pattern,
         right_follicles: day.right_follicles,
         left_follicles: day.left_follicles,
+        right_afc: day.right_afc || day.afc_right,
+        left_afc: day.left_afc || day.afc_left,
+        afc: day.afc,
         notes: day.notes,
       });
     });

@@ -48,6 +48,26 @@ export default function OPDSidebar({
   onDeleteConsultation,
   onSelectCounselingNote,
 }: OPDSidebarProps) {
+  // Deduplicate and unify triage + doctor consultation into a single visit entity
+  const displayConsultations = React.useMemo(() => {
+    if (!consultationHistory || consultationHistory.length === 0) return [];
+    const linkedTriageIds = new Set(
+      consultationHistory.map((r: any) => r.data?.linked_triage_record_id).filter(Boolean)
+    );
+    return consultationHistory.filter((rec: any) => {
+      if (linkedTriageIds.has(rec.id)) return false;
+      const isTriageOnly = rec.record_type === 'nurse_triage' || rec.data?.record_type === 'nurse_triage';
+      if (!isTriageOnly) return true;
+      const recDate = rec.created_at ? new Date(rec.created_at).toDateString() : '';
+      const hasConsultationOnSameDate = consultationHistory.some((other: any) => {
+        if (other.id === rec.id) return false;
+        const otherIsConsultation = other.record_type === 'opd_consultation' || other.data?.record_type === 'opd_consultation';
+        const otherDate = other.created_at ? new Date(other.created_at).toDateString() : '';
+        return otherIsConsultation && otherDate === recDate;
+      });
+      return !hasConsultationOnSameDate;
+    });
+  }, [consultationHistory]);
   return (
     <div
       className={`border-r border-slate-200 bg-white flex flex-col transition-all duration-300 flex-shrink-0 ${
@@ -142,8 +162,8 @@ export default function OPDSidebar({
           </div>
 
           {sidebarTab === 'consultations' ? (
-            consultationHistory && consultationHistory.length > 0 ? (
-              consultationHistory.map((rec: any) => (
+            displayConsultations && displayConsultations.length > 0 ? (
+              displayConsultations.map((rec: any) => (
                 <div
                   key={rec.id}
                   className={`p-2.5 border rounded-md transition-colors group relative shadow-2xs ${

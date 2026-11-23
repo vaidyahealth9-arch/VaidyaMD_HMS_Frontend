@@ -189,6 +189,7 @@ export default function AddBedsideItemModal({
                 <option value="lab_investigation">Diagnostic / Rapid Lab</option>
                 <option value="radiology">Radiology / Imaging</option>
                 <option value="miscellaneous">Miscellaneous Sundry</option>
+                <option value="others">Others / Custom Hospital Charge</option>
               </select>
             </div>
 

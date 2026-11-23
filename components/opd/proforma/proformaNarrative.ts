@@ -1,3 +1,5 @@
+import { cleanVitalValue } from '@/lib/vitalsUtils';
+
 export const defaultWifeTests = ['AMH', 'RBS', 'TSH', 'TPO', 'PRL', 'Rubella IgG', 'HbA1C'];
 export const defaultHusbandTests = ['TSH', 'RBS', 'PRL', 'HbA1C'];
 export const defaultPendingHusband = [
@@ -182,7 +184,7 @@ export function generateProformaNarrative(data: any): string {
   if (data.femalePallor?.trim()) fExam.push(`Pallor: ${data.femalePallor.trim()}`);
   if (data.femalePedalEdema?.trim()) fExam.push(`Pedal edema: ${data.femalePedalEdema.trim()}`);
   if (data.femaleGoitre?.trim()) fExam.push(`Goitre: ${data.femaleGoitre.trim()}`);
-  if (data.femaleBp?.trim()) fExam.push(`BP: ${data.femaleBp.trim()} mmHg`);
+  if (data.femaleBp?.trim()) fExam.push(`BP: ${cleanVitalValue(data.femaleBp)} mmHg`);
   if (fExam.length > 0) sections.push(['EXAMINATION (FEMALE):', ...fExam].join('\n'));
 
   // 13. Male Partner Evaluation (when activeTab is fertility)
@@ -237,7 +239,7 @@ export function generateProformaNarrative(data: any): string {
     if (data.malePallor?.trim()) mExam.push(`Pallor: ${data.malePallor.trim()}`);
     if (data.malePedalEdema?.trim()) mExam.push(`Pedal edema: ${data.malePedalEdema.trim()}`);
     if (data.maleGoitre?.trim()) mExam.push(`Goitre: ${data.maleGoitre.trim()}`);
-    if (data.maleBp?.trim()) mExam.push(`BP: ${data.maleBp.trim()} mmHg`);
+    if (data.maleBp?.trim()) mExam.push(`BP: ${cleanVitalValue(data.maleBp)} mmHg`);
     if (mExam.length > 0) sections.push(['EXAMINATION (MALE):', ...mExam].join('\n'));
   }
 
@@ -615,7 +617,7 @@ export function generateExaminationNarrative(data: any): string {
   if (data.femalePallor?.trim()) fExam.push(`Pallor: ${data.femalePallor.trim()}`);
   if (data.femalePedalEdema?.trim()) fExam.push(`Pedal edema: ${data.femalePedalEdema.trim()}`);
   if (data.femaleGoitre?.trim()) fExam.push(`Goitre: ${data.femaleGoitre.trim()}`);
-  if (data.femaleBp?.trim()) fExam.push(`BP: ${data.femaleBp.trim()} mmHg`);
+  if (data.femaleBp?.trim()) fExam.push(`BP: ${cleanVitalValue(data.femaleBp)} mmHg`);
   if (fExam.length > 0) sections.push(['GENERAL EXAMINATION (FEMALE):', ...fExam].join('\n'));
 
   // Male General Examination
@@ -624,7 +626,7 @@ export function generateExaminationNarrative(data: any): string {
     if (data.malePallor?.trim()) mExam.push(`Pallor: ${data.malePallor.trim()}`);
     if (data.malePedalEdema?.trim()) mExam.push(`Pedal edema: ${data.malePedalEdema.trim()}`);
     if (data.maleGoitre?.trim()) mExam.push(`Goitre: ${data.maleGoitre.trim()}`);
-    if (data.maleBp?.trim()) mExam.push(`BP: ${data.maleBp.trim()} mmHg`);
+    if (data.maleBp?.trim()) mExam.push(`BP: ${cleanVitalValue(data.maleBp)} mmHg`);
     if (mExam.length > 0) sections.push(['GENERAL EXAMINATION (MALE):', ...mExam].join('\n'));
   }
 

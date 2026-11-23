@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/shared/ui/button';
-import { Stethoscope, HeartPulse, Layers, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Stethoscope, HeartPulse, Layers, SlidersHorizontal, Sparkles, History, Plus } from 'lucide-react';
 import { ClinicalTemplateItem } from './TemplateManagementDialog';
 
 interface OPDWorkbenchHeaderProps {
@@ -13,6 +13,9 @@ interface OPDWorkbenchHeaderProps {
   onSelectUnifiedTemplate: (val: string) => void;
   onOpenTemplatesStudio: () => void;
   onOpenSmartOrder: () => void;
+  isEditingConsultation?: boolean;
+  onToggleEditingConsultation?: () => void;
+  isNurse?: boolean;
 }
 
 export default function OPDWorkbenchHeader({
@@ -25,6 +28,9 @@ export default function OPDWorkbenchHeader({
   onSelectUnifiedTemplate,
   onOpenTemplatesStudio,
   onOpenSmartOrder,
+  isEditingConsultation = false,
+  onToggleEditingConsultation,
+  isNurse = false,
 }: OPDWorkbenchHeaderProps) {
   return (
     <div className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between flex-shrink-0 gap-3">
@@ -40,32 +46,39 @@ export default function OPDWorkbenchHeader({
 
       <div className="flex items-center gap-2">
         {/* View Mode Switcher: Doctor Consultation vs Nurse Triage */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
-          <button
-            type="button"
-            onClick={() => setWorkbenchMode('doctor')}
-            className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 cursor-pointer ${
-              workbenchMode === 'doctor'
-                ? 'bg-white text-slate-900 shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Stethoscope className="w-3.5 h-3.5 text-primary" />
-            <span>Doctor View</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setWorkbenchMode('nurse')}
-            className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 cursor-pointer ${
-              workbenchMode === 'nurse'
-                ? 'bg-white text-slate-900 shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
+        {isNurse ? (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-md shadow-2xs">
             <HeartPulse className="w-3.5 h-3.5 text-rose-600" />
-            <span>Nurse Triage</span>
-          </button>
-        </div>
+            <span>Nurse Triage View</span>
+          </div>
+        ) : (
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setWorkbenchMode('doctor')}
+              className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 cursor-pointer ${
+                workbenchMode === 'doctor'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Stethoscope className="w-3.5 h-3.5 text-primary" />
+              <span>Doctor View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkbenchMode('nurse')}
+              className={`px-2.5 py-1 text-xs font-bold rounded transition-all flex items-center gap-1.5 cursor-pointer ${
+                workbenchMode === 'nurse'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <HeartPulse className="w-3.5 h-3.5 text-rose-600" />
+              <span>Nurse Triage</span>
+            </button>
+          </div>
+        )}
 
         {onBack && (
           <Button
@@ -78,7 +91,7 @@ export default function OPDWorkbenchHeader({
           </Button>
         )}
 
-        {workbenchMode === 'doctor' && (
+        {workbenchMode === 'doctor' && !isNurse && (
           <>
             {/* Unified Single-Source Clinical Template & Proforma Selector */}
             <div className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100/90 px-2.5 py-1 rounded-md border border-slate-300 shadow-2xs transition-colors">
@@ -101,7 +114,8 @@ export default function OPDWorkbenchHeader({
               >
                 <optgroup label="📋 Clinical Proformas & Assessment Modes">
                   <option value="mode:standard">Standard Free-Text Notes</option>
-                  <option value="mode:fertility">Fertility Couple Proforma</option>
+                  <option value="tmpl:clinical_fertility_review">★ Fertility Review (Couple Workup)</option>
+                  <option value="mode:fertility">Fertility Couple Proforma (Multi-tab)</option>
                   <option value="mode:gynaecology">Gynaecology Case Proforma</option>
                   <option value="mode:obstetric">Obstetric Antenatal Proforma</option>
                 </optgroup>

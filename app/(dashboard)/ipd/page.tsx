@@ -520,6 +520,8 @@ export default function IPDPage() {
                 onTransfer={handleOpenTransfer}
                 onDischarge={handleInitiateDischarge}
                 onInterimBill={handleInterimBilling}
+                onAccrueCharges={() => accrueTariffMutation.mutate()}
+                isAccruing={accrueTariffMutation.isPending}
               />
             )}
 

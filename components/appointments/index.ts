@@ -2,3 +2,4 @@ export { default as BookAppointmentModal, DEFAULT_VISIT_TYPES } from './modals/B
 export { default as RescheduleAppointmentModal } from './modals/RescheduleAppointmentModal';
 export { default as NurseTriageModal } from './modals/NurseTriageModal';
 export { default as AppointmentCardGrid } from './AppointmentCardGrid';
+export { default as FollowUpCallList } from './FollowUpCallList';

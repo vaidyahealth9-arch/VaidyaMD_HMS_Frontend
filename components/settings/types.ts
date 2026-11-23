@@ -50,6 +50,7 @@ export const menuKeys: MenuPermissionKey[] = [
   { key: 'pharmacy', label: 'Pharmacy Dispensary & Stock', category: 'inpatient_pharma', description: 'Drug batches, dispensing & stock management' },
 
   // Financial & Referrals
+  { key: 'crm', label: 'CRM & Telecaller Dialer', category: 'financial_referrals', description: 'Lead management, call logs & telecaller roster' },
   { key: 'billing', label: 'Billing & Cashier Invoices', category: 'financial_referrals', description: 'Treatment invoices, receipts & discharge bills' },
   { key: 'wallet', label: 'Patient Advance Wallet', category: 'financial_referrals', description: 'Security deposits, advances & balance refunds' },
   { key: 'referrals', label: 'Doctor Referrals & Commissions', category: 'financial_referrals', description: 'Referring partner directory, tracking & payout settlement' },
@@ -79,6 +80,7 @@ export const getDefaultPermissionsForRole = (roleId: string): Record<string, boo
   pharmacy: ['admin', 'pharma', 'nurse', 'doctor'].includes(roleId),
 
   // Financial & Referrals
+  crm: ['admin', 'counsellor', 'receptionist', 'doctor', 'accounts', 'manager'].includes(roleId),
   billing: ['admin', 'accounts', 'receptionist', 'manager', 'pharma', 'doctor'].includes(roleId),
   wallet: ['admin', 'accounts', 'manager'].includes(roleId),
   referrals: ['admin', 'doctor', 'accounts', 'manager', 'receptionist'].includes(roleId),
